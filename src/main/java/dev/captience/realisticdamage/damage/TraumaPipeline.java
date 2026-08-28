@@ -155,6 +155,13 @@ public final class TraumaPipeline {
 		if (magnitude < 0.22) {
 			return;
 		}
+		// Mock players (gametests) have no connection, and a vanilla client that
+		// lacks the mod never negotiated the channel.
+		if (player.connection == null
+				|| !net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
+						player, dev.captience.realisticdamage.net.ImpactPayload.TYPE)) {
+			return;
+		}
 		float yaw = player.getYRot();
 		Vec3 from = source.getSourcePosition();
 		if (from != null) {
