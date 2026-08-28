@@ -21,6 +21,16 @@ loom {
 			sourceSet sourceSets.client
 		}
 	}
+
+	runs {
+		gametest {
+			inherit server
+			name "Game Test"
+			vmArg "-Dfabric-api.gametest"
+			vmArg "-Dfabric-api.gametest.report-file=${project.layout.buildDirectory.file("junit.xml").get().getAsFile()}"
+			runDir "build/gametest"
+		}
+	}
 }
 
 dependencies {
@@ -33,6 +43,8 @@ dependencies {
 
 	testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+	// Boots the Knot classloader so unit tests may touch Minecraft classes (codec round-trips).
+	testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
 }
 
 test {
