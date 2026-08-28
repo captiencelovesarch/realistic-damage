@@ -46,19 +46,42 @@ public final class MouseInertia {
 			velY = 0.0;
 			return null;
 		}
+		// Everything goes into the buffer and comes back out over time. Holding
+		// back a fixed *fraction* per input event did not work: at high frame
+		// rates the mouse delivers many tiny deltas, so the buffer never grew and
+		// the whole thing just felt like reduced sensitivity. Draining on a time
+		// constant instead makes the lag real and preserves total sensitivity, so
+		// it reads as slippery rather than sluggish.
 		velX = Mth.clamp(velX + xo, -MAX_VELOCITY, MAX_VELOCITY);
 		velY = Mth.clamp(velY + yo, -MAX_VELOCITY, MAX_VELOCITY);
-		// Less of your input lands immediately the further gone you are.
-		double responsiveness = Mth.lerp(severity, 1.0, 0.20);
-		double outX = velX * responsiveness;
-		double outY = velY * responsiveness;
+		// A floor of input always lands directly, so that even if the drain were
+		// somehow not running the mouse still responds. Never a dead mouse.
+		double immediate = Mth.lerp(severity, 1.0, 0.25);
+		double outX = velX * immediate;
+		double outY = velY * immediate;
 		velX -= outX;
 		velY -= outY;
 		return new double[] {outX, outY};
 	}
 
+	/** Set each time the render path drains us; the tick fallback watches it. */
+	private static boolean drainedThisTick;
+
+	/**
+	 * Safety net. The per-frame drain lives in the HUD render path, which does
+	 * not run while the HUD is hidden; without this the buffer would fill and
+	 * never empty.
+	 */
+	public static void tickFallback() {
+		if (!drainedThisTick) {
+			frame(1.0);
+		}
+		drainedThisTick = false;
+	}
+
 	/** Bleeds off leftover momentum each frame, which is the glide you feel. */
 	public static void frame(double deltaTicks) {
+		drainedThisTick = true;
 		if (Math.abs(velX) < 1.0e-4 && Math.abs(velY) < 1.0e-4) {
 			return;
 		}
@@ -72,9 +95,10 @@ public final class MouseInertia {
 		if (player == null || Minecraft.getInstance().gui.screen() != null) {
 			return;
 		}
-		// Friction falls as you fade: a healthy player sheds momentum at once, a
-		// fading one keeps sliding.
-		double release = Mth.lerp(severity, 0.60, 0.10);
+		// Friction falls as you fade: a healthy player sheds momentum almost at
+		// once, a fading one keeps sliding. Per tick, so it is frame-rate
+		// independent.
+		double release = Mth.lerp(severity, 0.95, 0.22);
 		double factor = 1.0 - Math.pow(1.0 - release, Math.max(0.0, deltaTicks));
 		double outX = velX * factor;
 		double outY = velY * factor;
