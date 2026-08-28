@@ -1,0 +1,175 @@
+package dev.captience.realisticdamage.config;
+
+/**
+ * Every tuning constant in Realistic Damage lives here (spec: no scattered magic
+ * numbers). Server config multipliers scale on top of these base values; the
+ * constants themselves are the deterministic baseline the tests pin down.
+ */
+public final class Balance {
+	private Balance() {}
+
+	// --- Body condition maxima (spec §2) ---
+	public static final double HEAD_MAX = 20.0;
+	public static final double TORSO_MAX = 20.0;
+	public static final double ARM_MAX = 13.0;
+	public static final double LEG_MAX = 16.0;
+
+	// --- Body state thresholds, as fraction of max condition (spec §3) ---
+	public static final double HEALTHY_ABOVE = 0.75;
+	public static final double HURT_ABOVE = 0.50;
+	public static final double INJURED_ABOVE = 0.25;
+	// CRITICAL is (0, INJURED_ABOVE]; DISABLED is exactly 0.
+
+	// --- Trauma multipliers per damage category (spec §5) ---
+	public static final double TRAUMA_GENERIC = 0.75;
+	public static final double TRAUMA_SLASH = 1.00;
+	public static final double TRAUMA_HEAVY_SLASH = 1.15;
+	public static final double TRAUMA_PUNCTURE = 1.10;
+	public static final double TRAUMA_HEAVY_PUNCTURE = 1.20;
+	public static final double TRAUMA_BLUNT = 1.20;
+	public static final double TRAUMA_HEAVY_BLUNT = 1.40;
+	public static final double TRAUMA_EXPLOSION = 1.35;
+	public static final double TRAUMA_FALL = 1.25;
+	public static final double TRAUMA_FIRE = 0.60;
+	public static final double TRAUMA_LAVA = 1.00;
+	public static final double TRAUMA_SYSTEMIC = 0.10;
+
+	/** Head/torso hits leak this fraction of their localized trauma to each limb (spec §8). */
+	public static final double CORE_HIT_LIMB_SHOCK = 0.10;
+
+	// --- Deterministic limb breaking (spec §15) ---
+	/** Single qualifying heavy impact: condition damage at/above this breaks a limb. */
+	public static final double BREAK_IMPACT_ARM = 5.5;
+	public static final double BREAK_IMPACT_LEG = 6.5;
+
+	// --- Bleeding (spec §16-17) ---
+	public static final double BLOOD_MAX = 100.0;
+	/** Blood points per second per wound severity. */
+	public static final double BLEED_RATE_MINOR = 0.25;
+	public static final double BLEED_RATE_MODERATE = 0.6;
+	public static final double BLEED_RATE_SEVERE = 1.2;
+	public static final double BLEED_RATE_CRITICAL = 2.0;
+	/** Diminishing stacking weights, strongest wound first; 4th+ each get the last weight. */
+	public static final double[] WOUND_STACK_WEIGHTS = {1.0, 0.5, 0.25, 0.125};
+	/** Hard cap on effective total bleed rate (Blood/sec). */
+	public static final double WOUND_STACK_CAP = 3.0;
+	/** Max wounds tracked per player; new wounds merge into the weakest same-region wound. */
+	public static final int MAX_WOUNDS = 8;
+
+	// Blood bands (spec §17).
+	public static final double BLOOD_STABLE = 70.0;
+	public static final double BLOOD_MILD = 50.0;
+	public static final double BLOOD_SERIOUS = 30.0;
+	public static final double BLOOD_CRITICAL = 15.0;
+
+	/** Below BLOOD_SERIOUS: vanilla HP damage per tick-cycle begins. Half-hearts per second. */
+	public static final double BLEEDOUT_HP_PER_SEC_SERIOUS = 0.25;
+	public static final double BLEEDOUT_HP_PER_SEC_CRITICAL = 0.7;
+	public static final double BLEEDOUT_HP_PER_SEC_ZERO = 2.0;
+
+	// --- Consciousness (spec §19-23) ---
+	public static final double CONSCIOUSNESS_MAX = 100.0;
+	/** Baseline stable recovery, points per second (spec §22). */
+	public static final double CONSCIOUSNESS_RECOVERY_PER_SEC = 2.5;
+	/** Effective consciousness cap by head state (spec §20). */
+	public static final double HEAD_CAP_HEALTHY = 100.0;
+	public static final double HEAD_CAP_HURT = 95.0;
+	public static final double HEAD_CAP_INJURED = 82.0;
+	public static final double HEAD_CAP_CRITICAL = 55.0;
+	public static final double HEAD_CAP_DISABLED = 25.0;
+
+	/** Collapse at 0; wake only once consciousness reaches this (hysteresis, spec §25). */
+	public static final double WAKE_THRESHOLD = 20.0;
+	/** Minimum time unconscious, in ticks (~2.5s). */
+	public static final int MIN_UNCONSCIOUS_TICKS = 50;
+
+	// Symptom ladder thresholds (spec §23) — shared by server (action locks) and client (fx).
+	public static final double SYMPTOM_VIGNETTE = 75.0;
+	public static final double SYMPTOM_SENSITIVITY = 65.0;
+	public static final double SYMPTOM_ATTACK_RECOVERY = 55.0;
+	public static final double SYMPTOM_AFTERIMAGE = 45.0;
+	public static final double SYMPTOM_EXPOSURE = 35.0;
+	public static final double SYMPTOM_RINGING = 30.0;
+	public static final double SYMPTOM_HEARTBEAT = 25.0;
+	public static final double SYMPTOM_SPRINT_LOSS = 20.0;
+	public static final double SYMPTOM_SEVERE = 10.0;
+	/** Look-sensitivity reduction is capped (spec §24). */
+	public static final double SENSITIVITY_REDUCTION_CAP = 0.35;
+
+	// --- Impairment curve anchors (spec §11-12), piecewise-linear on condition fraction ---
+	// Arms: action speed / damage penalty fraction at anchor condition fractions.
+	public static final double ARM_PENALTY_AT_50 = 0.05;
+	public static final double ARM_PENALTY_AT_25 = 0.15;
+	public static final double ARM_PENALTY_NEAR_0 = 0.35;
+	public static final double ARM_PENALTY_DISABLED = 0.50;
+	/** Broken arm adds a flat penalty on top of the condition curve. */
+	public static final double ARM_PENALTY_BROKEN_BONUS = 0.25;
+	public static final double ARM_PENALTY_TOTAL_CAP = 0.65;
+
+	// Legs: movement penalty anchors.
+	public static final double LEG_PENALTY_AT_50 = 0.07;
+	public static final double LEG_PENALTY_AT_25 = 0.18;
+	public static final double LEG_PENALTY_NEAR_0 = 0.40;
+	public static final double LEG_PENALTY_DISABLED = 0.55;
+	public static final double LEG_PENALTY_BROKEN_BONUS = 0.20;
+	/** Worse leg dominates the combined movement penalty (spec §12). */
+	public static final double LEG_WORSE_WEIGHT = 0.70;
+	/** Cap so both-legs-wrecked still limps home at >= ~25% speed (spec §12). */
+	public static final double LEG_PENALTY_TOTAL_CAP = 0.75;
+	/** Jump penalty scales off the movement penalty with this factor. */
+	public static final double JUMP_PENALTY_FACTOR = 0.8;
+
+	/** Injured legs amplify subsequent fall trauma (spec §13): multiplier at worst. */
+	public static final double FALL_TRAUMA_INJURED_LEG_MAX_AMP = 2.0;
+
+	// --- Systemic damage (spec §9) ---
+	public static final double SYSTEMIC_SPREAD_FRACTION = 0.10;
+
+	// --- Healing (spec §37-38) ---
+	/** Body-condition repair budget granted per vanilla natural-regen heal, per HP healed. */
+	public static final double HEAL_BUDGET_PER_REGEN_HP = 2.0;
+	/** Blood restored per vanilla natural-regen heal, per HP healed. */
+	public static final double BLOOD_PER_REGEN_HP = 3.0;
+	/** Passive Blood regen per second when stable and not bleeding. */
+	public static final double BLOOD_PASSIVE_PER_SEC = 0.05;
+	/** Extra Blood per second while well fed (hunger >= 18). */
+	public static final double BLOOD_WELLFED_PER_SEC = 0.25;
+	/** Immediate Blood restored on eating = nutrition * this. */
+	public static final double BLOOD_PER_NUTRITION = 1.0;
+	/** Wound severity decay per natural-regen heal event (fraction of a severity step). */
+	public static final double WOUND_DECAY_PER_REGEN = 0.34;
+	/** Sleep recovery (spec §38). */
+	public static final double SLEEP_BLOOD_RESTORE = 60.0;
+	public static final double SLEEP_CONDITION_REPAIR_FRACTION = 0.5;
+
+	/** Strained severe arm (recent heavy use) pauses that arm's recovery this long (ticks). */
+	public static final int ARM_STRAIN_PAUSE_TICKS = 100;
+
+	// --- Golden foods (spec §40) ---
+	public static final double GAPPLE_BLOOD_RESTORE = 40.0;
+	public static final double GAPPLE_CONSCIOUSNESS_RESTORE = 25.0;
+	public static final double GAPPLE_CONDITION_REPAIR = 12.0;
+	public static final double ENCH_GAPPLE_BLOOD_RESTORE = 100.0;
+	public static final double ENCH_GAPPLE_CONSCIOUSNESS_RESTORE = 60.0;
+	public static final double ENCH_GAPPLE_CONDITION_REPAIR_FRACTION = 0.8;
+
+	// --- Totem stabilization floors (spec §41) ---
+	public static final double TOTEM_CONSCIOUSNESS_FLOOR = 60.0;
+	public static final double TOTEM_BLOOD_FLOOR = 45.0;
+	/** Disabled parts are raised to this fraction of max (low CRITICAL). */
+	public static final double TOTEM_CONDITION_FLOOR_FRACTION = 0.15;
+
+	// --- Armor / enchantments (spec §31) ---
+	/** Localized armor: covering piece reduces body trauma by up to this fraction (scaled by piece defense). */
+	public static final double LOCAL_ARMOR_MAX_REDUCTION = 0.30;
+	/** Trauma reduction per Protection level on the covering piece(s). */
+	public static final double PROTECTION_TRAUMA_PER_LEVEL = 0.04;
+	public static final double PROTECTION_TRAUMA_CAP = 0.20;
+	public static final double FEATHER_FALLING_LEG_TRAUMA_PER_LEVEL = 0.18;
+
+	// --- Shields (spec §32) ---
+	/** Heavy blunt/explosion damage transfers this fraction of would-be trauma to the shield arm on a full block. */
+	public static final double SHIELD_HEAVY_SHOCK_FRACTION = 0.25;
+	/** Minimum blocked damage before any shield-arm shock happens. */
+	public static final double SHIELD_SHOCK_MIN_DAMAGE = 8.0;
+}
