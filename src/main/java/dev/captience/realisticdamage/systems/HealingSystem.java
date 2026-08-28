@@ -149,11 +149,18 @@ public final class HealingSystem {
 	}
 
 	private static void clearRecoveredStatuses(ServerPlayer player, RealisticDamageData data) {
-		if (data.concussion()
-				&& data.part(BodyPart.HEAD).state() == dev.captience.realisticdamage.body.BodyState.HEALTHY
-				&& data.consciousness() >= Balance.CONCUSSION_CLEAR_CONSCIOUSNESS) {
-			data.setConcussion(false);
-			Notifier.message(player, "realisticdamage.msg.concussion_cleared");
+		if (data.concussion()) {
+			// Stable means: head mended, consciousness sitting at its ceiling, not
+			// bleeding. Only then does the clock toward recovery run, and it has to
+			// run for a while — a concussion is supposed to linger.
+			boolean stable = data.part(BodyPart.HEAD).state() == dev.captience.realisticdamage.body.BodyState.HEALTHY
+					&& data.consciousness() >= data.consciousnessCap() - Balance.CONCUSSION_STABLE_MARGIN
+					&& !data.bleeding();
+			data.setConcussionStableTicks(stable ? data.concussionStableTicks() + 1 : 0);
+			if (data.concussionStableTicks() >= Balance.CONCUSSION_STABLE_TICKS) {
+				data.setConcussion(false);
+				Notifier.message(player, "realisticdamage.msg.concussion_cleared");
+			}
 		}
 		if (data.burned() && !player.isOnFire() && averageFraction(data) >= Balance.BURNED_CLEAR_AVG_FRACTION) {
 			data.setBurned(false);

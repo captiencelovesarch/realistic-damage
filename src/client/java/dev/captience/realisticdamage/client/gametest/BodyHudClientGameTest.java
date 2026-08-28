@@ -53,6 +53,21 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("rd_04_recovered");
 			assertSynced(context, "after recovery");
 
+			// A concussion alone, everything else pristine: it must survive (it used
+			// to clear itself one tick later) and it must be visible.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.setConcussion(true);
+			});
+			context.waitTicks(40);
+			context.takeScreenshot("rd_08_concussed");
+			boolean stillConcussed = singleplayer.getServer().computeOnServer(server ->
+					server.getPlayerList().getPlayers().stream()
+							.allMatch(p -> RDAttachments.get(p).concussion()));
+			if (!stillConcussed) {
+				throw new AssertionError("concussion cleared itself immediately");
+			}
+
 			// Near-death on the ordinary health bar, body otherwise fine: the red
 			// vignette must still read (the "one heart and nothing happens" case).
 			mutate(singleplayer, RealisticDamageData::reset);

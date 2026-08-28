@@ -80,11 +80,14 @@ public final class ConsciousnessEffects {
 		if (blur > 0.15 && Minecraft.getInstance().gui.screen() == null) {
 			graphics.blurBeforeThisStratum();
 		}
-		// Ghosting layered on top: a swirled overlay that pulses with the blur so
-		// the blurred frame reads as trailing vision rather than a dirty lens.
-		if (blur > 0.01) {
+		// Ghosting: doubles as the concussion symptom. A concussion holds a
+		// constant low level of it — seeing double is what being dazed looks
+		// like — and it deepens as consciousness actually falls.
+		double ghost = Math.max(blur, ClientState.concussed()
+				? Balance.CONCUSSION_GHOST * config.afterimageIntensity : 0.0);
+		if (ghost > 0.01) {
 			double phase = pulse(50.0);
-			float strength = (float) (Math.min(1.0, blur) * (0.35 + 0.4 * phase));
+			float strength = (float) (Math.min(1.0, ghost) * (0.35 + 0.4 * phase));
 			graphics.pose().pushMatrix();
 			graphics.pose().translate(width / 2.0F, height / 2.0F);
 			graphics.pose().scale((float) (1.02 + 0.06 * phase), (float) (1.02 + 0.06 * phase));

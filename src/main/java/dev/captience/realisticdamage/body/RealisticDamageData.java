@@ -21,6 +21,8 @@ public final class RealisticDamageData {
 	private boolean unconscious;
 	private int unconsciousTicks;
 	private boolean concussion;
+	/** Continuous stable ticks accrued toward shaking off a concussion. */
+	private int concussionStableTicks;
 	private boolean burned;
 	/** Transient: health captured at ALLOW_DAMAGE so AFTER_DAMAGE can compute the true post-mitigation damage. */
 	private transient double preHurtHealth = Double.NaN;
@@ -136,7 +138,18 @@ public final class RealisticDamageData {
 	}
 
 	public void setConcussion(boolean value) {
+		if (value != concussion) {
+			concussionStableTicks = 0;
+		}
 		concussion = value;
+	}
+
+	public int concussionStableTicks() {
+		return concussionStableTicks;
+	}
+
+	public void setConcussionStableTicks(int ticks) {
+		concussionStableTicks = Math.max(0, ticks);
 	}
 
 	public boolean burned() {
@@ -287,6 +300,7 @@ public final class RealisticDamageData {
 		unconscious = false;
 		unconsciousTicks = 0;
 		concussion = false;
+		concussionStableTicks = 0;
 		burned = false;
 	}
 

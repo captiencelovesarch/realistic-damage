@@ -144,7 +144,9 @@ public final class RealisticDamageCommands {
 			statuses.add("UNCONSCIOUS (" + data.unconsciousTicks() + "t)");
 		}
 		if (data.concussion()) {
-			statuses.add("CONCUSSION");
+			statuses.add(String.format(Locale.ROOT, "CONCUSSION (stable %d/%ds)",
+					data.concussionStableTicks() / 20,
+					dev.captience.realisticdamage.config.Balance.CONCUSSION_STABLE_TICKS / 20));
 		}
 		if (data.burned()) {
 			statuses.add("BURNED");

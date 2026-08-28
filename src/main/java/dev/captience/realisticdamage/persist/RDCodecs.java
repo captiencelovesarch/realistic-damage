@@ -69,6 +69,7 @@ public final class RDCodecs {
 			boolean unconscious,
 			int unconsciousTicks,
 			boolean concussion,
+			int concussionStableTicks,
 			boolean burned,
 			List<WoundState> wounds
 	) {
@@ -79,6 +80,7 @@ public final class RDCodecs {
 				Codec.BOOL.optionalFieldOf("unconscious", false).forGetter(DataState::unconscious),
 				Codec.INT.optionalFieldOf("unconscious_ticks", 0).forGetter(DataState::unconsciousTicks),
 				Codec.BOOL.optionalFieldOf("concussion", false).forGetter(DataState::concussion),
+				Codec.INT.optionalFieldOf("concussion_stable", 0).forGetter(DataState::concussionStableTicks),
 				Codec.BOOL.optionalFieldOf("burned", false).forGetter(DataState::burned),
 				WoundState.CODEC.listOf().optionalFieldOf("wounds", List.of()).forGetter(DataState::wounds)
 		).apply(i, DataState::new));
@@ -92,7 +94,7 @@ public final class RDCodecs {
 				.map(w -> new WoundState(w.part(), w.severity(), w.decayProgress()))
 				.toList();
 		return new DataState(body, data.blood(), data.consciousness(), data.unconscious(),
-				data.unconsciousTicks(), data.concussion(), data.burned(), wounds);
+				data.unconsciousTicks(), data.concussion(), data.concussionStableTicks(), data.burned(), wounds);
 	}
 
 	private static RealisticDamageData toData(DataState state) {
@@ -111,6 +113,7 @@ public final class RDCodecs {
 		}
 		data.setBlood(state.blood());
 		data.setConcussion(state.concussion());
+		data.setConcussionStableTicks(state.concussionStableTicks());
 		data.setBurned(state.burned());
 		data.setUnconscious(state.unconscious());
 		data.setUnconsciousTicks(state.unconsciousTicks());

@@ -143,8 +143,21 @@ public final class Balance {
 	public static final double CONCUSSION_RECOVERY_FACTOR = 0.5;
 	/** ...and amplifies further head-trauma consciousness loss. */
 	public static final double CONCUSSION_EXTRA_HEAD_DRAIN = 1.5;
-	/** Concussion clears once the head is HEALTHY and consciousness has stabilized here (spec §21). */
-	public static final double CONCUSSION_CLEAR_CONSCIOUSNESS = 90.0;
+	/**
+	 * A concussion needs this much continuous stable time (healthy head, steady
+	 * consciousness, not bleeding) before it clears — about 90 seconds. Without a
+	 * timer the clear condition was satisfiable the instant it was applied.
+	 */
+	public static final int CONCUSSION_STABLE_TICKS = 1800;
+	/** How close to the cap consciousness must sit to count as "stabilized". */
+	public static final double CONCUSSION_STABLE_MARGIN = 2.0;
+	/**
+	 * Concussion makes every sensory symptom arrive sooner (spec §21): effects are
+	 * computed as if consciousness were this much lower than it really is.
+	 */
+	public static final double CONCUSSION_SYMPTOM_SHIFT = 30.0;
+	/** Constant double-vision ghosting while concussed — the signature symptom. */
+	public static final double CONCUSSION_GHOST = 0.42;
 
 	// Low-consciousness action sluggishness (spec §23).
 	public static final double SLUGGISH_PENALTY_AT_20 = 0.10;

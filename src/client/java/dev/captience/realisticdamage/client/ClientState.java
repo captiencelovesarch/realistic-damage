@@ -108,7 +108,7 @@ public final class ClientState {
 	 * Smooth and deterministic — no flicker (spec §24).
 	 */
 	public static double ramp(double threshold, double full) {
-		double consciousness = smoothedConsciousness;
+		double consciousness = effectiveConsciousness();
 		if (consciousness >= threshold) {
 			return 0.0;
 		}
@@ -116,6 +116,25 @@ public final class ClientState {
 			return 1.0;
 		}
 		return (threshold - consciousness) / (threshold - full);
+	}
+
+	/**
+	 * Consciousness as the senses experience it. A concussion makes every symptom
+	 * arrive sooner and hit harder (spec §21) by shifting the whole ladder down,
+	 * which is what gives "you feel dazed" something to actually feel like.
+	 */
+	public static double effectiveConsciousness() {
+		BodySnapshot snapshot = snapshot();
+		if (snapshot != null && snapshot.concussion()) {
+			return smoothedConsciousness - Balance.CONCUSSION_SYMPTOM_SHIFT;
+		}
+		return smoothedConsciousness;
+	}
+
+	/** True when the synced state says the player is concussed. */
+	public static boolean concussed() {
+		BodySnapshot snapshot = snapshot();
+		return snapshot != null && snapshot.concussion();
 	}
 
 	/**
