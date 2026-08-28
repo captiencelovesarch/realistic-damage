@@ -24,6 +24,11 @@ public final class ClientState {
 	private static long lastBeat = -1;
 	private static boolean beatFired;
 
+	/** Eases toward a target, quickly when it worsens and slowly when it recovers. */
+	private static double approach(double current, double target, double worseRate, double betterRate) {
+		return current + (target - current) * (target < current ? worseRate : betterRate);
+	}
+
 	@Nullable
 	public static BodySnapshot snapshot() {
 		LocalPlayer player = Minecraft.getInstance().player;
@@ -39,10 +44,14 @@ public final class ClientState {
 			unconsciousFade = 0.0;
 			return;
 		}
-		smoothedConsciousness += (snapshot.consciousness() - smoothedConsciousness) * 0.15;
-		smoothedBlood += (snapshot.blood() - smoothedBlood) * 0.15;
+		// Asymmetric on purpose. Getting hurt is an event and must land at once —
+		// a symmetric ease left a limp second after impact where the blow had
+		// already happened but nothing felt different. Recovery still eases in
+		// gently, which is where smoothing actually earns its keep.
+		smoothedConsciousness = approach(smoothedConsciousness, snapshot.consciousness(), 0.85, 0.15);
+		smoothedBlood = approach(smoothedBlood, snapshot.blood(), 0.85, 0.15);
 		double target = snapshot.unconscious() ? 1.0 : 0.0;
-		unconsciousFade += (target - unconsciousFade) * 0.12;
+		unconsciousFade += (target - unconsciousFade) * (target > unconsciousFade ? 0.45 : 0.12);
 
 		// The heart races as things get worse: a resting 55 bpm up to a hammering
 		// 165 when you are nearly gone.

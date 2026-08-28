@@ -43,8 +43,11 @@ public final class BodyHud {
 			return;
 		}
 		boolean anythingWrong = ClientEffectsConfig.get().bodyHudAlwaysVisible || isHurt(snapshot);
-		visibility += ((anythingWrong ? 1.0 : 0.0) - visibility)
-				* Math.min(1.0, deltaTracker.getGameTimeDeltaTicks() * 0.2);
+		double target = anythingWrong ? 1.0 : 0.0;
+		// Snap in when something goes wrong; drift out once it is over.
+		double rate = target > visibility ? 0.7 : 0.12;
+		visibility += (target - visibility)
+				* Math.min(1.0, deltaTracker.getGameTimeDeltaTicks() * rate);
 		if (visibility < 0.02) {
 			return;
 		}
