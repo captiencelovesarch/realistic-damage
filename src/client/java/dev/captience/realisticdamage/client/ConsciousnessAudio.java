@@ -61,7 +61,8 @@ public final class ConsciousnessAudio {
 		}
 
 		// Muffle everything else as consciousness fades; restore smoothly.
-		float targetDuck = (float) (ringLevel > 0 ? Math.min(0.8, ringLevel * 0.8) : 0.0);
+		// Gentle now: the low-pass filter does the real muffling.
+		float targetDuck = (float) (ringLevel > 0 ? Math.min(0.45, ringLevel * 0.45) : 0.0);
 		duckAmount = Mth.lerp(0.05F, duckAmount, targetDuck);
 		float gain = 1.0F - duckAmount;
 		for (SoundSource source : SoundSource.values()) {
@@ -113,6 +114,7 @@ public final class ConsciousnessAudio {
 			tinnitus = null;
 		}
 		duckAmount = 0.0F;
+		AudioMuffle.invalidate();
 		for (SoundSource source : SoundSource.values()) {
 			sounds.updateCategoryVolume(source, 1.0F);
 		}

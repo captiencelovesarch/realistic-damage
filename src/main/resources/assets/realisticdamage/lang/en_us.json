@@ -70,5 +70,6 @@
 	"realisticdamage.config.desaturation": "Colour Drain",
 	"realisticdamage.config.distortion": "Vision Warp",
 	"realisticdamage.config.tinnitus": "Ringing: Tone",
-	"realisticdamage.config.tinnitus.bell": "Ringing: Bell"
+	"realisticdamage.config.tinnitus.bell": "Ringing: Bell",
+	"realisticdamage.config.muffling": "Muffled Hearing"
 }

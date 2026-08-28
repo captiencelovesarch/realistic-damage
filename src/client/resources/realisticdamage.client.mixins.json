@@ -5,10 +5,12 @@
 	"client": [
 		"AvatarRenderStateMixin",
 		"AvatarRendererMixin",
+		"ChannelAccessor",
 		"GameRendererAccessor",
 		"ItemInHandRendererMixin",
 		"MouseHandlerMixin",
 		"PlayerModelMixin",
+		"SoundEngineMuffleMixin",
 		"WorldDistortionMixin"
 	],
 	"injectors": {
