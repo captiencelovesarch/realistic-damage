@@ -85,16 +85,16 @@ public final class VisionEffects {
 			return -1;
 		}
 		double severity = severity() * ClientEffectsConfig.get().desaturationIntensity;
-		if (severity < 0.20) {
+		if (severity < 0.45) {
 			return -1;
 		}
-		if (severity < 0.42) {
+		if (severity < 0.62) {
 			return 0;
 		}
-		if (severity < 0.62) {
+		if (severity < 0.78) {
 			return 1;
 		}
-		return severity < 0.82 ? 2 : 3;
+		return severity < 0.92 ? 2 : 3;
 	}
 
 	@Nullable

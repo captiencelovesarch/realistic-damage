@@ -160,19 +160,19 @@ public final class Balance {
 	public static final double CONCUSSION_EXTRA_HEAD_DRAIN = 1.5;
 	/**
 	 * A concussion needs this much continuous stable time (healthy head, steady
-	 * consciousness, not bleeding) before it clears — about 90 seconds. Without a
-	 * timer the clear condition was satisfiable the instant it was applied.
+	 * consciousness, not bleeding) before it clears: about 25 seconds. Without a
+	 * timer at all, the clear condition was satisfiable the instant it applied.
 	 */
-	public static final int CONCUSSION_STABLE_TICKS = 1800;
+	public static final int CONCUSSION_STABLE_TICKS = 500;
 	/** How close to the cap consciousness must sit to count as "stabilized". */
 	public static final double CONCUSSION_STABLE_MARGIN = 2.0;
 	/**
 	 * Concussion makes every sensory symptom arrive sooner (spec §21): effects are
 	 * computed as if consciousness were this much lower than it really is.
 	 */
-	public static final double CONCUSSION_SYMPTOM_SHIFT = 30.0;
+	public static final double CONCUSSION_SYMPTOM_SHIFT = 18.0;
 	/** Constant double-vision ghosting while concussed — the signature symptom. */
-	public static final double CONCUSSION_GHOST = 0.42;
+	public static final double CONCUSSION_GHOST = 0.25;
 	/**
 	 * Vanilla's gaussian blur has no intensity parameter — it is on or off — so it
 	 * is held back to a late, distinct stage while the ghosting carries the smooth

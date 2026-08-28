@@ -71,5 +71,6 @@
 	"realisticdamage.config.distortion": "Vision Warp",
 	"realisticdamage.config.tinnitus": "Ringing: Tone",
 	"realisticdamage.config.tinnitus.bell": "Ringing: Bell",
-	"realisticdamage.config.muffling": "Muffled Hearing"
+	"realisticdamage.config.muffling": "Muffled Hearing",
+	"realisticdamage.subtitle.tinnitus": "Ears ringing"
 }

@@ -9,7 +9,6 @@ import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.sounds.AudioStream;
 import net.minecraft.client.sounds.SoundBufferLibrary;
 import net.minecraft.resources.Identifier;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import org.lwjgl.BufferUtils;
@@ -31,7 +30,8 @@ public class TinnitusSound extends AbstractTickableSoundInstance {
 	private boolean fadingOut;
 
 	public TinnitusSound() {
-		super(SoundEvents.BELL_RESONATE, SoundSource.AMBIENT, net.minecraft.util.RandomSource.create());
+		super(dev.captience.realisticdamage.RealisticDamage.TINNITUS, SoundSource.AMBIENT,
+				net.minecraft.util.RandomSource.create());
 		this.looping = true;
 		this.relative = true;
 		this.attenuation = Attenuation.NONE;

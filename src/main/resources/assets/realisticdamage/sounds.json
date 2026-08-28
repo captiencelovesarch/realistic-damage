@@ -1,0 +1,11 @@
+{
+	"tinnitus": {
+		"subtitle": "realisticdamage.subtitle.tinnitus",
+		"sounds": [
+			{
+				"name": "realisticdamage:tinnitus",
+				"stream": true
+			}
+		]
+	}
+}
