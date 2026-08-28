@@ -6,6 +6,7 @@ import java.util.Locale;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
+import dev.captience.realisticdamage.body.Vitals;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -20,9 +21,14 @@ import net.minecraft.network.chat.Component;
  * names its state and lists what is wrong with it, which the compact HUD
  * diagram has no room to say.
  *
- * <p>Deliberately still no raw numbers: a filled bar shows roughly how intact a
- * region is, matching the rest of the mod. Exact values remain an admin thing
- * via {@code /rdmg info}.
+ * <p>By default still no raw numbers: a filled bar shows roughly how intact a
+ * region is, matching the rest of the mod. "Exact Numbers" opts into condition
+ * figures here and nowhere else — the HUD stays wordless, because it is the HUD
+ * being wordless that makes the mod readable at a glance.
+ *
+ * <p>Blood and Consciousness are named by band even then, never as figures. A
+ * player who could read their exact blood level would never be surprised by
+ * one, and being surprised by one is the entire point of hiding it (spec §42).
  */
 public final class BodyInspector {
 	private BodyInspector() {}
@@ -46,6 +52,47 @@ public final class BodyInspector {
 		boolean contains(int mx, int my) {
 			return mx >= x && mx < x + w && my >= y && my < y + h;
 		}
+
+		int centerX() {
+			return x + w / 2;
+		}
+
+		int centerY() {
+			return y + h / 2;
+		}
+	}
+
+	/**
+	 * Where each region was last drawn, and which one the cursor was over.
+	 * Recorded so a client gametest can drive a real cursor onto a real region
+	 * and check the hover resolved — the hover path shipped in 1.0 untested
+	 * because it was believed to be untestable.
+	 */
+	private static final java.util.Map<BodyPart, int[]> lastCenters =
+			new java.util.EnumMap<>(BodyPart.class);
+	@org.jspecify.annotations.Nullable
+	private static BodyPart lastHovered;
+
+	/** Screen position of a region as of the last frame, or null if not drawn. */
+	@org.jspecify.annotations.Nullable
+	public static int[] regionCenter(BodyPart part) {
+		return lastCenters.get(part);
+	}
+
+	/** Which region the cursor was over as of the last frame. */
+	@org.jspecify.annotations.Nullable
+	public static BodyPart hoveredPart() {
+		return lastHovered;
+	}
+
+	/**
+	 * Nothing was drawn this frame, so the recorded positions describe a panel
+	 * that is no longer on screen. Held stale, they would have a caller believe
+	 * a region is still under the cursor after the panel was hidden.
+	 */
+	private static void forget() {
+		lastCenters.clear();
+		lastHovered = null;
 	}
 
 	public static void init() {
@@ -59,32 +106,63 @@ public final class BodyInspector {
 	private static void render(net.minecraft.client.gui.screens.Screen screen, GuiGraphicsExtractor graphics,
 			int mouseX, int mouseY, float tickProgress) {
 		if (!ClientEffectsConfig.get().showBodyHud || !ClientState.active()) {
+			forget();
 			return;
 		}
 		BodySnapshot snapshot = ClientState.snapshot();
 		if (snapshot == null) {
+			forget();
 			return;
 		}
 
+		List<VitalLine> vitals = ClientEffectsConfig.get().showNumericStats
+				? vitalLines(snapshot) : List.of();
+
+		Font font = Minecraft.getInstance().font;
 		int bodyW = TORSO_W + 2 * (SEG + PAD);
 		int bodyH = HEAD_H + PAD + TORSO_H + PAD + LEG_H;
+		int textW = 0;
+		for (VitalLine line : vitals) {
+			textW = Math.max(textW, font.width(line.text()));
+		}
+		// The vitals lines are far wider than the body. Grow the panel leftward
+		// into empty screen rather than sizing the panel to the text and
+		// positioning from that: doing the latter shoved the body sideways the
+		// moment numbers were switched on, and slid the whole panel under the
+		// inventory window at narrower GUI widths.
+		int overhang = Math.max(0, textW - bodyW);
+		int panelH = bodyH + (vitals.isEmpty() ? 0 : 6 + vitals.size() * 10);
 		int guiLeft = (screen.width - GUI_WIDTH) / 2;
-		// Sit just left of the inventory, or hug the screen edge if it will not fit.
-		int panelX = Math.max(4, guiLeft - bodyW - 26);
+		// Sit just left of the inventory, or hug the screen edge if it will not
+		// fit. Overlapping the inventory is the one outcome worth avoiding at any
+		// width, so that bound wins over keeping the whole text on screen; below
+		// about 356 scaled pixels the panel is simply clipped at the left edge.
+		int bodyX = Math.min(guiLeft - bodyW - 8,
+				Math.max(10 + overhang, guiLeft - bodyW - 26));
 		int panelY = (screen.height - GUI_HEIGHT) / 2 + 6;
+		int panelLeft = Math.max(0, bodyX - overhang - 6);
+		int panelRight = bodyX + bodyW + 6;
 
-		graphics.fill(panelX - 6, panelY - 6, panelX + bodyW + 6, panelY + bodyH + 6, PANEL_BG);
-		graphics.fill(panelX - 6, panelY - 6, panelX + bodyW + 6, panelY - 5, PANEL_EDGE);
-		graphics.fill(panelX - 6, panelY + bodyH + 5, panelX + bodyW + 6, panelY + bodyH + 6, PANEL_EDGE);
+		graphics.fill(panelLeft, panelY - 6, panelRight, panelY + panelH + 6, PANEL_BG);
+		graphics.fill(panelLeft, panelY - 6, panelRight, panelY - 5, PANEL_EDGE);
+		graphics.fill(panelLeft, panelY + panelH + 5, panelRight, panelY + panelH + 6, PANEL_EDGE);
 
-		List<Region> regions = layout(panelX, panelY);
+		for (int i = 0; i < vitals.size(); i++) {
+			VitalLine line = vitals.get(i);
+			graphics.text(font, line.text(), panelLeft + 6, panelY + bodyH + 6 + i * 10,
+					line.color(), true);
+		}
+
+		List<Region> regions = layout(bodyX, panelY);
 		Region hovered = null;
 		for (Region region : regions) {
 			drawRegion(graphics, snapshot, region, region.contains(mouseX, mouseY));
+			lastCenters.put(region.part(), new int[] {region.centerX(), region.centerY()});
 			if (region.contains(mouseX, mouseY)) {
 				hovered = region;
 			}
 		}
+		lastHovered = hovered == null ? null : hovered.part();
 		if (hovered != null) {
 			drawDetail(graphics, snapshot, hovered.part(), mouseX, mouseY, screen.width);
 		}
@@ -125,6 +203,33 @@ public final class BodyInspector {
 		}
 	}
 
+	/** One line of the vitals block: dim for the label, bright for the reading. */
+	private record VitalLine(Component text, int color) {}
+
+	private static final int VITAL_LABEL = 0xFF8A8A8A;
+	private static final int VITAL_VALUE = 0xFFDDDDDD;
+
+	/**
+	 * The two hidden meters, named but never numbered. Only rendered when the
+	 * player has opted into numbers at all.
+	 *
+	 * <p>Label above reading rather than "Blood: significant loss" on one line.
+	 * Minecraft's automatic GUI scale keeps the scaled width near 320-450 however
+	 * large the window is, so there is never much room left of the inventory: a
+	 * single-line form was wider than the body and dragged the whole panel
+	 * sideways to make space for itself.
+	 */
+	private static List<VitalLine> vitalLines(BodySnapshot snapshot) {
+		return List.of(
+				new VitalLine(Component.translatable("realisticdamage.vitals.blood"), VITAL_LABEL),
+				new VitalLine(Component.translatable("realisticdamage.vitals.blood."
+						+ Vitals.bloodBand(snapshot.blood())), VITAL_VALUE),
+				new VitalLine(Component.translatable("realisticdamage.vitals.consciousness"), VITAL_LABEL),
+				new VitalLine(Component.translatable("realisticdamage.vitals.consciousness."
+						+ Vitals.consciousnessBand(snapshot.consciousness(), snapshot.unconscious())),
+						VITAL_VALUE));
+	}
+
 	private static void drawDetail(GuiGraphicsExtractor graphics, BodySnapshot snapshot, BodyPart part,
 			int mouseX, int mouseY, int screenWidth) {
 		Font font = Minecraft.getInstance().font;
@@ -132,6 +237,15 @@ public final class BodyInspector {
 		lines.add(Component.translatable("realisticdamage.part." + part.id()));
 		lines.add(Component.translatable("realisticdamage.state."
 				+ snapshot.state(part).name().toLowerCase(Locale.ROOT)));
+		if (ClientEffectsConfig.get().showNumericStats && !snapshot.destroyed(part)) {
+			// Derived from a snapshot quantized to 1%, so one decimal is as much
+			// precision as actually exists. /rdmg info remains the exact source.
+			double max = part.maxCondition();
+			lines.add(Component.translatable("realisticdamage.detail.condition",
+					String.format(Locale.ROOT, "%.1f", snapshot.fraction(part) * max),
+					String.format(Locale.ROOT, "%.0f", max),
+					Math.round(snapshot.fraction(part) * 100.0f)));
+		}
 		if (snapshot.destroyed(part)) {
 			lines.add(Component.translatable("realisticdamage.detail.destroyed"));
 		}

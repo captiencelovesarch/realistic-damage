@@ -2,6 +2,8 @@ package dev.captience.realisticdamage.client.gametest;
 
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.client.BodyInspector;
+import dev.captience.realisticdamage.client.ClientEffectsConfig;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.net.BodySnapshot;
@@ -19,6 +21,8 @@ import net.minecraft.server.level.ServerPlayer;
 public class BodyHudClientGameTest implements FabricClientGameTest {
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		assertUpgradeKeepsDisabledEffectsDisabled(context);
+
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			context.waitTicks(20);
 			context.takeScreenshot("rd_00_healthy");
@@ -124,18 +128,80 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("rd_09_firstperson_armless");
 
 			// Inventory inspector: open the inventory with a battered body and check
-			// the panel draws. (Hover detail needs a real cursor, so that part is
-			// left to play testing.)
+			// the panel draws.
 			mutate(singleplayer, data -> {
 				data.part(BodyPart.TORSO).setCondition(6.0);
 				data.part(BodyPart.LEFT_ARM).setCondition(3.0);
 				data.part(BodyPart.LEFT_ARM).setBroken(true);
 				data.addWound(BodyPart.TORSO, WoundSeverity.SEVERE);
+				data.setBlood(42.0);
 			});
 			context.setScreen(() -> new net.minecraft.client.gui.screens.inventory.InventoryScreen(
 					net.minecraft.client.Minecraft.getInstance().player));
 			context.waitTicks(5);
 			context.takeScreenshot("rd_12_inventory");
+
+			// Hover every region with a real cursor. This is the path that shipped
+			// in 1.0 unverified, on the belief that the harness could not position
+			// a pointer — it can.
+			for (BodyPart part : BodyPart.values()) {
+				hover(context, part);
+				BodyPart seen = context.computeOnClient(client -> BodyInspector.hoveredPart());
+				if (seen != part) {
+					throw new AssertionError("hovering " + part + " resolved to " + seen);
+				}
+				context.takeScreenshot("rd_13_hover_" + part.id());
+			}
+
+			// Off the body entirely: no region, and therefore no detail box.
+			setCursor(context, 4, 4);
+			context.waitTicks(2);
+			if (context.computeOnClient(client -> BodyInspector.hoveredPart()) != null) {
+				throw new AssertionError("a region was hovered with the cursor off the panel");
+			}
+
+			// The same panel with numbers turned on: condition figures per region,
+			// and the two vitals named by band rather than shown as figures.
+			// Given room beside the inventory, switching numbers on must not move
+			// the body: the first version sized the panel to the vitals text and
+			// positioned from that, which shoved every region sideways and out
+			// from under the cursor. A screenshot-only check sailed past it.
+			context.getInput().resizeWindow(1280, 720);
+			context.waitTicks(3);
+			int[] before = context.computeOnClient(client -> BodyInspector.regionCenter(BodyPart.HEAD));
+			context.runOnClient(client -> ClientEffectsConfig.get().showNumericStats = true);
+			context.waitTicks(3);
+			int[] after = context.computeOnClient(client -> BodyInspector.regionCenter(BodyPart.HEAD));
+			if (before[0] != after[0] || before[1] != after[1]) {
+				throw new AssertionError("the body moved when the numbers were switched on: "
+						+ before[0] + "," + before[1] + " -> " + after[0] + "," + after[1]);
+			}
+			hover(context, BodyPart.LEFT_ARM);
+			BodyPart seen = context.computeOnClient(client -> BodyInspector.hoveredPart());
+			if (seen != BodyPart.LEFT_ARM) {
+				throw new AssertionError("hover broke once numbers were shown: got " + seen);
+			}
+			context.takeScreenshot("rd_14_hover_numeric");
+
+			// Squeezed into the default window there is genuinely not room for the
+			// vitals text beside the inventory, so the panel shifts to stay on
+			// screen. That is the right trade, but it must still be usable: on
+			// screen, and every region still where the cursor thinks it is.
+			context.getInput().resizeWindow(854, 480);
+			context.waitTicks(3);
+			for (BodyPart part : BodyPart.values()) {
+				int[] centre = context.computeOnClient(client -> BodyInspector.regionCenter(part));
+				if (centre == null || centre[0] < 0 || centre[1] < 0) {
+					throw new AssertionError(part + " left the screen once numbers were shown");
+				}
+				hover(context, part);
+				if (context.computeOnClient(client -> BodyInspector.hoveredPart()) != part) {
+					throw new AssertionError("cramped layout broke the hover on " + part);
+				}
+			}
+			context.takeScreenshot("rd_15_numeric_cramped");
+			context.runOnClient(client -> ClientEffectsConfig.get().showNumericStats = false);
+
 			context.setScreen(() -> null);
 			context.waitTicks(3);
 
@@ -146,6 +212,58 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.setScreen(() -> null);
 			context.waitTicks(5);
 		}
+	}
+
+	/**
+	 * Look Drift was split out of Look Slowdown in 1.1, so a config written by
+	 * 1.0 has no key for it. Defaulting the new key to full strength would switch
+	 * the melty camera back on for someone who had deliberately turned it off,
+	 * which is the accessibility promise breaking on update.
+	 */
+	private void assertUpgradeKeepsDisabledEffectsDisabled(ClientGameTestContext context) {
+		double migrated = context.computeOnClient(client -> {
+			ClientEffectsConfig legacy = new com.google.gson.Gson().fromJson(
+					"{\"sensitivityReductionIntensity\":0.0}", ClientEffectsConfig.class);
+			legacy.migrate();
+			return legacy.lookInertia();
+		});
+		if (migrated != 0.0) {
+			throw new AssertionError("a 1.0 config with look slowdown off came back with drift at "
+					+ migrated);
+		}
+		double fresh = context.computeOnClient(client -> {
+			ClientEffectsConfig blank = new ClientEffectsConfig();
+			blank.migrate();
+			return blank.lookInertia();
+		});
+		if (fresh != 1.0) {
+			throw new AssertionError("a fresh config should default to full drift, got " + fresh);
+		}
+	}
+
+	/** Puts the real cursor over the centre of a body region and lets it render. */
+	private void hover(ClientGameTestContext context, BodyPart part) {
+		int[] centre = context.computeOnClient(client -> BodyInspector.regionCenter(part));
+		if (centre == null) {
+			throw new AssertionError("the inspector never drew " + part);
+		}
+		setCursor(context, centre[0], centre[1]);
+		context.waitTicks(2);
+	}
+
+	/**
+	 * Cursor positions are in physical window pixels, but the panel lays itself
+	 * out in GUI-scaled ones, so the two have to be converted between or every
+	 * hover lands in the wrong place on any scale but 1.
+	 */
+	private void setCursor(ClientGameTestContext context, int guiX, int guiY) {
+		double[] raw = context.computeOnClient(client -> {
+			var window = client.getWindow();
+			double scaleX = (double) window.getScreenWidth() / window.getGuiScaledWidth();
+			double scaleY = (double) window.getScreenHeight() / window.getGuiScaledHeight();
+			return new double[] {(guiX + 0.5) * scaleX, (guiY + 0.5) * scaleY};
+		});
+		context.getInput().setCursorPos(raw[0], raw[1]);
 	}
 
 	/** Mutates server-side state, exactly as gameplay would. */

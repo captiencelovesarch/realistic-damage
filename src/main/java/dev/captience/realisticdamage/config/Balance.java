@@ -103,9 +103,20 @@ public final class Balance {
 	public static final double WAKE_THRESHOLD = 20.0;
 	/** How far an unconscious player keeps drawing hostile attention, in blocks. */
 	public static final double UNCONSCIOUS_AGGRO_RADIUS = 12.0;
+	/**
+	 * Close enough that a hostile would plainly notice a body at its feet. The
+	 * NEARBY aggro mode uses this rather than the full radius, so collapsing in a
+	 * fight stays lethal without distant mobs crossing a cave to finish you off.
+	 */
+	public static final double UNCONSCIOUS_AGGRO_NEARBY_RADIUS = 6.0;
 
 	/** Minimum time unconscious, in ticks (~2.5s). */
 	public static final int MIN_UNCONSCIOUS_TICKS = 50;
+
+	/** How far away someone else's fracture or collapse can still be heard, in blocks. */
+	public static final double INJURY_SOUND_RADIUS = 24.0;
+	/** How loud someone else's injury is, against hearing your own. */
+	public static final float INJURY_SOUND_OTHERS_VOLUME = 0.4F;
 
 	// Symptom ladder thresholds (spec §23) — shared by server (action locks) and client (fx).
 	public static final double SYMPTOM_VIGNETTE = 75.0;

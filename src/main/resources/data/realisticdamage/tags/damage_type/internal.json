@@ -1,0 +1,8 @@
+{
+	"replace": false,
+	"values": [
+		"realisticdamage:bleed_out",
+		"realisticdamage:skull_crushed",
+		"realisticdamage:chest_crushed"
+	]
+}

@@ -56,8 +56,10 @@ public final class DestructionLogic {
 		data.part(part).setDestroyed(true);
 		Notifier.destroyed(player, part);
 		if (part.isCore()) {
-			// A destroyed head or torso is not survivable.
-			player.hurtServer(player.level(), RDDamageTypes.destroyed(player.level()), Float.MAX_VALUE);
+			// A destroyed head or torso is not survivable, and the two read as
+			// different deaths in chat.
+			player.hurtServer(player.level(),
+					RDDamageTypes.coreDestroyed(player.level(), part), Float.MAX_VALUE);
 		}
 	}
 }

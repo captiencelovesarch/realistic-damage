@@ -49,14 +49,26 @@ Injuries show on a small body diagram that fades in when something's wrong. Stat
 injuries are shown by shape and color; exact numbers stay hidden. Action-bar messages call
 out the moments that matter ("Your left leg breaks!", "You're bleeding heavily!").
 
+Open your inventory for a larger panel you can hover for detail on any region. Turn on
+**Exact Numbers** and it will also show condition figures there — but only there, and
+Blood and Consciousness are still only ever named ("heavy loss", "fading"), never
+numbered. Being surprised by your own blood level is the point of hiding it.
+
 As consciousness fails the world genuinely changes rather than being overlaid: colour
 drains out of it, the view warps and blurs, your aim goes slippery and slow, your head
 sags, and the world's audio is low-passed into a dull murmur behind a ringing tone and a
 rising heartbeat. Heavy blows flash and kick the camera on impact.
 
+Breaking, losing a limb and going down each have their own synthesised audio, in a muted
+set that sits inside Minecraft's palette and a visceral set that doesn't. Your own
+injuries are close and loud; a teammate's carry from where they're standing, quieter —
+useful for knowing someone across the cave is in trouble.
+
 Press **K** (rebindable) or use Mod Menu for accessibility settings. Every one of those
 effects has its own slider and can be turned off individually without disabling
 unconsciousness itself, and there's a one-click "turn off all sensory effects" button.
+Slow aim and sloppy aim are separate sliders (**Look Slowdown** and **Look Drift**), so
+you can have one without the other.
 Two presets: **Arcade** (limb destruction, readable effects) and **Grounded** (no
 destruction, full blackout, camera drift, everything at full strength).
 
@@ -73,6 +85,7 @@ destruction, full blackout, camera drift, everything at full strength).
 | `fallTraumaMultiplier` | 1.0 | Scales fall trauma specifically |
 | `pvpTraumaMultiplier` | 1.0 | Scales trauma from other players |
 | `enableLimbDestruction` | true | Arcade preset: limbs can be destroyed permanently |
+| `unconsciousAggro` | `NEARBY` | Who notices a body on the floor. `ATTACKERS` keeps whatever was already fighting you, `NEARBY` adds anything within 6 blocks that can see you, `ALL` pulls in every hostile with line of sight, `NONE` takes you off the menu entirely |
 | `enableBleeding` / `enableBrokenLimbs` / `enableConsciousness` / `enableBurns` / `enableHitLocation` | true | Turn whole systems off |
 
 Every tuning constant lives in one file (`config/Balance.java`) so rebalancing never means

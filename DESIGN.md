@@ -1,4 +1,4 @@
-# Realistic Damage — Design (v1.0)
+# Realistic Damage — Design (v1.1)
 
 > "Minecraft, but damage is cooler." Vanilla hearts stay authoritative; this mod adds a
 > physical layer: locational body trauma, deterministic injuries (Broken / Bleeding /
@@ -25,7 +25,9 @@ Consciousness. The client only presents.
 
 Package layout (`dev.captience.realisticdamage`):
 
-- `body/` — `BodyPart`, `BodyState`, `BodyPartData`, `RealisticDamageData`, `BleedWound`
+- `body/` — `BodyPart`, `BodyState`, `BodyPartData`, `RealisticDamageData`, `BleedWound`,
+  `Vitals` (band math for Blood/Consciousness, shared server/client so the warnings and
+  the inventory panel can never word the same state differently)
 - `damage/` — `DamageCategory`, `DamageProfile`, `DamageProfiles`, `DamageClassifier`,
   `BodyHitResolver`, `EnvironmentalRouter`, `TraumaCalculator`, `DamageHooks`
 - `systems/` — `BleedingSystem`, `ConsciousnessSystem`, `HealingSystem`,
@@ -99,8 +101,33 @@ toward most-damaged regions), Blood restoration, and wound decay; eating grants 
 immediate Blood bump scaled by nutrition+saturation; golden foods multiply strongly.
 No regeneration of body condition while starving (hunger 0).
 
-## Deliberate non-goals (v1.0)
+## Added in 1.1
 
-DESTROYED state, permanence/dismemberment, medical items, mob anatomy, rescue/carry
-mechanics, numeric HUD stats, TACZ integration (but DamageCategory + BodyHitResolver
-accept externally-supplied classification/hit-points so an adapter can slot in later).
+Injury audio is synthesised (`tools/generate_sounds.py`) in two styles, muted and
+visceral, and is **routed rather than played as a world sound**: the server sends an
+`InjurySoundPayload` to the injured player and to everyone within
+`INJURY_SOUND_RADIUS`, and each client plays its own configured style — full volume and
+non-positional for your own body, 40% and positional for anybody else's. Style is
+presentation, so the server never decides it.
+
+Every damage type the mod inflicts carries the `realisticdamage:internal` tag, and the
+recursion guards (spec §51) test that tag rather than listing keys, so a damage type
+added later cannot be forgotten in one of two places. Core destruction split into
+`skull_crushed` and `chest_crushed` so the two read as different deaths.
+
+`unconsciousAggro` (ServerConfig) governs what notices a downed player. Default
+`NEARBY` = prior attackers plus anything within 6 blocks with line of sight; `ALL` is
+1.0's behaviour, `NONE` takes you off the menu.
+
+Client presentation gained `lookInertiaIntensity` (split out of the sensitivity
+control), `showNumericStats`, `injurySoundVolume` and `visceralInjurySounds`. The
+accessibility screen is now an `OptionsSubScreen` with a scrolling, sectioned list.
+
+## Deliberate non-goals
+
+DESTROYED state beyond what 1.0 shipped, medical items, mob anatomy, rescue/carry
+mechanics (1.2), numeric HUD stats — the inventory panel may show condition figures on
+request, the HUD never does, and Blood/Consciousness are named by band and never
+numbered anywhere. TACZ integration is still deferred, but DamageCategory +
+BodyHitResolver accept externally-supplied classification/hit-points so an adapter can
+slot in later.

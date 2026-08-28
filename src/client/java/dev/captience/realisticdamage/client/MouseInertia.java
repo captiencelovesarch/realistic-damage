@@ -23,12 +23,41 @@ public final class MouseInertia {
 	private static double velX;
 	private static double velY;
 
-	/** Runaway guard: momentum can never exceed a brisk flick. */
-	private static final double MAX_VELOCITY = 60.0;
+	/**
+	 * Runaway guard on the *leftover* momentum only, applied after the immediate
+	 * portion has already been handed to the camera.
+	 *
+	 * <p>It used to clamp the buffer on the way in, which quietly made it a turn
+	 * rate limiter: a fast flick delivers hundreds of units in one frame, so
+	 * everything past the clamp was discarded rather than delayed and a 180°
+	 * turn became impossible while impaired. Worse, the limit was per frame, so
+	 * how fast you could turn depended on your frame rate. Clamping only the
+	 * residual keeps total sensitivity intact — the effect delays your input, it
+	 * never eats it — while still bounding how much can glide on afterwards.
+	 */
+	private static final double MAX_RESIDUAL = 45.0;
+
+	/**
+	 * Fraction of the buffer that lands on the frame it arrives, at full
+	 * severity. Higher means the view tracks your hand more closely; the
+	 * remainder is what produces the lag and overshoot.
+	 */
+	private static final double IMMEDIATE_AT_FULL = 0.50;
+
+	/**
+	 * Fraction of leftover momentum shed per tick at full severity. This is what
+	 * sets how long the glide lasts once you stop moving: 0.5 settles in about a
+	 * fifth of a second, which is enough to feel sloppy without feeling like the
+	 * camera has been taken away from you.
+	 */
+	private static final double RELEASE_AT_FULL = 0.50;
+
+	/** Below this the glide is imperceptible, so stop rather than trailing off. */
+	private static final double STOP_BELOW = 0.02;
 
 	/** 0 = sharp and vanilla, 1 = fully melted. */
 	public static double severity() {
-		double intensity = ClientEffectsConfig.get().sensitivityReductionIntensity;
+		double intensity = ClientEffectsConfig.get().lookInertia();
 		if (intensity <= 0.0 || !ClientState.active()) {
 			return 0.0;
 		}
@@ -52,15 +81,15 @@ public final class MouseInertia {
 		// the whole thing just felt like reduced sensitivity. Draining on a time
 		// constant instead makes the lag real and preserves total sensitivity, so
 		// it reads as slippery rather than sluggish.
-		velX = Mth.clamp(velX + xo, -MAX_VELOCITY, MAX_VELOCITY);
-		velY = Mth.clamp(velY + yo, -MAX_VELOCITY, MAX_VELOCITY);
+		velX += xo;
+		velY += yo;
 		// A floor of input always lands directly, so that even if the drain were
 		// somehow not running the mouse still responds. Never a dead mouse.
-		double immediate = Mth.lerp(severity, 1.0, 0.25);
+		double immediate = Mth.lerp(severity, 1.0, IMMEDIATE_AT_FULL);
 		double outX = velX * immediate;
 		double outY = velY * immediate;
-		velX -= outX;
-		velY -= outY;
+		velX = Mth.clamp(velX - outX, -MAX_RESIDUAL, MAX_RESIDUAL);
+		velY = Mth.clamp(velY - outY, -MAX_RESIDUAL, MAX_RESIDUAL);
 		return new double[] {outX, outY};
 	}
 
@@ -82,7 +111,9 @@ public final class MouseInertia {
 	/** Bleeds off leftover momentum each frame, which is the glide you feel. */
 	public static void frame(double deltaTicks) {
 		drainedThisTick = true;
-		if (Math.abs(velX) < 1.0e-4 && Math.abs(velY) < 1.0e-4) {
+		if (Math.abs(velX) < STOP_BELOW && Math.abs(velY) < STOP_BELOW) {
+			velX = 0.0;
+			velY = 0.0;
 			return;
 		}
 		double severity = severity();
@@ -93,12 +124,17 @@ public final class MouseInertia {
 		}
 		LocalPlayer player = Minecraft.getInstance().player;
 		if (player == null || Minecraft.getInstance().gui.screen() != null) {
+			// Drop it rather than freezing it. Momentum held across an open
+			// inventory used to be spent the instant the screen closed, so the view
+			// lurched off on its own from a standing start.
+			velX = 0.0;
+			velY = 0.0;
 			return;
 		}
 		// Friction falls as you fade: a healthy player sheds momentum almost at
 		// once, a fading one keeps sliding. Per tick, so it is frame-rate
 		// independent.
-		double release = Mth.lerp(severity, 0.95, 0.22);
+		double release = Mth.lerp(severity, 0.95, RELEASE_AT_FULL);
 		double factor = 1.0 - Math.pow(1.0 - release, Math.max(0.0, deltaTicks));
 		double outX = velX * factor;
 		double outY = velY * factor;

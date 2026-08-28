@@ -21,8 +21,6 @@ import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.monster.Enemy;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 
@@ -112,10 +110,10 @@ public final class ConsciousnessSystem {
 	}
 
 	/**
-	 * A body on the floor does not stop being prey. While unconscious, nearby
-	 * hostiles that have lost interest (or never had it) re-acquire the player,
-	 * so collapsing in a fight is genuinely dangerous rather than a way to be
-	 * forgotten about.
+	 * A body on the floor does not stop being prey. How much attention it draws
+	 * is a server setting (see {@link ServerConfig.UnconsciousAggro}): by default
+	 * anything already fighting you carries on, and anything close enough to
+	 * trip over you acquires you, but distant mobs do not come running.
 	 *
 	 * <p>Only hostile mobs, only ones that can actually see you, and only every
 	 * half second so it costs nothing.
@@ -124,8 +122,29 @@ public final class ConsciousnessSystem {
 		if (player.tickCount % 10 != 0) {
 			return;
 		}
+		ServerConfig.UnconsciousAggro mode = ServerConfig.get().unconsciousAggro;
+		if (mode == ServerConfig.UnconsciousAggro.NONE) {
+			// MobTargetMixin blocks re-acquisition, so one sweep is enough to
+			// clear the slate and it stays cleared.
+			for (Mob mob : player.level().getEntitiesOfClass(Mob.class,
+					player.getBoundingBox().inflate(Balance.UNCONSCIOUS_AGGRO_RADIUS),
+					candidate -> candidate instanceof Enemy && candidate.getTarget() == player)) {
+				mob.setTarget(null);
+			}
+			return;
+		}
+		if (mode == ServerConfig.UnconsciousAggro.ATTACKERS) {
+			// Nothing to push: the mixin already refuses every new acquisition,
+			// and whatever was engaged stays engaged.
+			return;
+		}
+		// NEARBY and ALL still actively pull mobs in, so that a body on the floor
+		// is noticed rather than merely allowed to be noticed.
+		double radius = mode == ServerConfig.UnconsciousAggro.ALL
+				? Balance.UNCONSCIOUS_AGGRO_RADIUS
+				: Balance.UNCONSCIOUS_AGGRO_NEARBY_RADIUS;
 		for (Mob mob : player.level().getEntitiesOfClass(Mob.class,
-				player.getBoundingBox().inflate(Balance.UNCONSCIOUS_AGGRO_RADIUS),
+				player.getBoundingBox().inflate(radius),
 				candidate -> candidate instanceof Enemy && candidate.isAlive()
 						&& candidate.getTarget() != player)) {
 			if (mob.getSensing().hasLineOfSight(player)) {
@@ -217,8 +236,7 @@ public final class ConsciousnessSystem {
 		}
 		player.stopUsingItem();
 		Notifier.message(player, "realisticdamage.msg.unconscious");
-		player.level().playSound(null, player.blockPosition(),
-				SoundEvents.PLAYER_BREATH, SoundSource.PLAYERS, 0.8F, 0.6F);
+		Notifier.injurySound(player, dev.captience.realisticdamage.net.InjurySound.COLLAPSE);
 	}
 
 	private static void wake(ServerPlayer player, RealisticDamageData data) {

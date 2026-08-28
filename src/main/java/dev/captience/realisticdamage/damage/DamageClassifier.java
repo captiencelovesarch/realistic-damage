@@ -29,8 +29,7 @@ public final class DamageClassifier {
 	@Nullable
 	public static ClassifiedDamage classify(ServerPlayer victim, DamageSource source) {
 		// Recursion safety (spec §51) and vanilla-behavior passthroughs.
-		if (source.is(RDDamageTypes.BLEED_OUT)
-				|| source.is(RDDamageTypes.DESTROYED)
+		if (source.is(RDDamageTypes.INTERNAL)
 				|| source.is(DamageTypes.FELL_OUT_OF_WORLD)
 				|| source.is(DamageTypes.OUTSIDE_BORDER)
 				|| source.is(DamageTypes.GENERIC_KILL)

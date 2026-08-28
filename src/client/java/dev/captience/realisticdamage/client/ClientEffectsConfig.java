@@ -21,9 +21,36 @@ public final class ClientEffectsConfig {
 	public boolean bodyHudAlwaysVisible = false;
 	/** Injury icons under the body diagram (bleeding, broken, destroyed, ...). */
 	public boolean showStatusIcons = true;
+	/**
+	 * Exact condition figures on the inventory body panel. Off by default: the
+	 * no-numbers rule is what keeps the HUD readable, and it is only on the
+	 * dedicated detail screen that numbers earn their place. Blood and
+	 * consciousness stay hidden even here — they are named in bands, never shown
+	 * as figures, because knowing them exactly would remove the fear they exist
+	 * to create.
+	 */
+	public boolean showNumericStats = false;
 
 	public double vignetteIntensity = 1.0;
 	public double sensitivityReductionIntensity = 1.0;
+	/**
+	 * How much the view keeps gliding after your hand stops (see MouseInertia).
+	 * Separate from the sensitivity reduction above because they are different
+	 * complaints: one is slow aim, the other is sloppy aim, and wanting one
+	 * without the other is reasonable.
+	 *
+	 * <p>Boxed so that "absent from the file" is distinguishable from "set to
+	 * zero". Before 1.1 this effect was governed by the sensitivity slider, so a
+	 * config written by 1.0 has no key here — and defaulting it to 1.0 would
+	 * switch the melty camera back on for someone who had deliberately turned it
+	 * off. {@link #migrate()} seeds it from the old control instead.
+	 */
+	public Double lookInertiaIntensity;
+
+	/** Never null after load; use this rather than the field. */
+	public double lookInertia() {
+		return lookInertiaIntensity == null ? sensitivityReductionIntensity : lookInertiaIntensity;
+	}
 	public double afterimageIntensity = 1.0;
 	public double exposureIntensity = 1.0;
 	public double ringingVolume = 1.0;
@@ -33,6 +60,8 @@ public final class ClientEffectsConfig {
 	public double mufflingIntensity = 1.0;
 	/** Flash, camera kick and thud when a heavy blow lands. */
 	public double impactIntensity = 1.0;
+	/** Fracture, destruction and collapse audio. */
+	public double injurySoundVolume = 1.0;
 	/** Real colour drain through vanilla's post-processing. */
 	public double desaturationIntensity = 1.0;
 	/** Real world-space warping, riding vanilla's nausea distortion. */
@@ -42,11 +71,18 @@ public final class ClientEffectsConfig {
 	public boolean fullBlackUnconscious = false;
 	/** Grounded preset: the camera sways and sags as consciousness fades. */
 	public double cameraDriftIntensity = 0.0;
+	/**
+	 * Which set of injury sounds to play: the muted set that sits inside
+	 * vanilla's palette, or the visceral set that does not. Presentation only,
+	 * so each player picks their own — the server never decides this.
+	 */
+	public boolean visceralInjurySounds = false;
 
 	/** Punchy and readable — effects present but never obscuring. */
 	public void applyArcadePreset() {
 		vignetteIntensity = 0.85;
 		sensitivityReductionIntensity = 0.5;
+		lookInertiaIntensity = 0.4;
 		afterimageIntensity = 0.6;
 		exposureIntensity = 0.6;
 		ringingVolume = 0.8;
@@ -55,12 +91,14 @@ public final class ClientEffectsConfig {
 		cameraDriftIntensity = 0.0;
 		desaturationIntensity = 0.7;
 		distortionIntensity = 0.5;
+		visceralInjurySounds = false;
 	}
 
 	/** Heavier immersion: full blackout, camera drift, everything at full strength. */
 	public void applyGroundedPreset() {
 		vignetteIntensity = 1.0;
 		sensitivityReductionIntensity = 1.0;
+		lookInertiaIntensity = 1.0;
 		afterimageIntensity = 1.0;
 		exposureIntensity = 1.0;
 		ringingVolume = 1.0;
@@ -69,6 +107,28 @@ public final class ClientEffectsConfig {
 		cameraDriftIntensity = 1.0;
 		desaturationIntensity = 1.0;
 		distortionIntensity = 1.0;
+		visceralInjurySounds = true;
+	}
+
+	/**
+	 * The panic button: every sensory effect off, gameplay untouched. Lives here
+	 * rather than in the screen so that adding an effect cannot quietly leave it
+	 * out of the one control that promises to silence everything.
+	 */
+	public void disableAllEffects() {
+		vignetteIntensity = 0.0;
+		sensitivityReductionIntensity = 0.0;
+		lookInertiaIntensity = 0.0;
+		afterimageIntensity = 0.0;
+		exposureIntensity = 0.0;
+		ringingVolume = 0.0;
+		heartbeatVolume = 0.0;
+		cameraDriftIntensity = 0.0;
+		desaturationIntensity = 0.0;
+		distortionIntensity = 0.0;
+		mufflingIntensity = 0.0;
+		impactIntensity = 0.0;
+		injurySoundVolume = 0.0;
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -95,7 +155,20 @@ public final class ClientEffectsConfig {
 				instance = new ClientEffectsConfig();
 			}
 		}
+		instance.migrate();
 		save();
+	}
+
+	/**
+	 * Carries settings forward when a control is split or renamed. An effect the
+	 * player switched off must stay off across an update — that is the whole
+	 * promise of the accessibility screen, and silently restoring one because a
+	 * new JSON key defaulted to full strength would break it.
+	 */
+	public void migrate() {
+		if (lookInertiaIntensity == null) {
+			lookInertiaIntensity = sensitivityReductionIntensity;
+		}
 	}
 
 	public static void save() {

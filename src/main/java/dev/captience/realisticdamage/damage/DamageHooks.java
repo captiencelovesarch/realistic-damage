@@ -39,7 +39,7 @@ public final class DamageHooks {
 
 	/** Damage the mod deals to itself must never re-enter the trauma pipeline (spec §51). */
 	private static boolean isInternal(net.minecraft.world.damagesource.DamageSource source) {
-		return source.is(RDDamageTypes.BLEED_OUT) || source.is(RDDamageTypes.DESTROYED);
+		return source.is(RDDamageTypes.INTERNAL);
 	}
 
 	private static boolean participates(ServerPlayer player) {

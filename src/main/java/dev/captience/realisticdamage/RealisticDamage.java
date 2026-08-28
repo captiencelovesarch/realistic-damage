@@ -18,6 +18,9 @@ public class RealisticDamage implements ModInitializer {
 		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()
 				.register(dev.captience.realisticdamage.net.ImpactPayload.TYPE,
 						dev.captience.realisticdamage.net.ImpactPayload.CODEC);
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()
+				.register(dev.captience.realisticdamage.net.InjurySoundPayload.TYPE,
+						dev.captience.realisticdamage.net.InjurySoundPayload.CODEC);
 		RDAttachments.init();
 		dev.captience.realisticdamage.systems.TickDispatcher.init();
 		dev.captience.realisticdamage.systems.ImpairmentSystem.init();
@@ -29,6 +32,7 @@ public class RealisticDamage implements ModInitializer {
 				net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT,
 				id("tinnitus"),
 				net.minecraft.sounds.SoundEvent.createVariableRangeEvent(id("tinnitus")));
+		registerInjurySounds();
 		LOGGER.info("Realistic Damage initialized");
 	}
 
@@ -39,6 +43,32 @@ public class RealisticDamage implements ModInitializer {
 	 * instead of our generated one.
 	 */
 	public static net.minecraft.sounds.SoundEvent TINNITUS;
+
+	/**
+	 * Both style variants of every injury sound, keyed by asset path. Both are
+	 * registered on the server even though only one plays: which one is a client
+	 * decision, and the registry has to be identical on both ends regardless.
+	 */
+	private static final java.util.Map<String, net.minecraft.sounds.SoundEvent> INJURY_SOUNDS =
+			new java.util.HashMap<>();
+
+	private static void registerInjurySounds() {
+		for (dev.captience.realisticdamage.net.InjurySound sound
+				: dev.captience.realisticdamage.net.InjurySound.values()) {
+			for (boolean visceral : new boolean[] {false, true}) {
+				String path = sound.assetPath(visceral);
+				INJURY_SOUNDS.put(path, net.minecraft.core.Registry.register(
+						net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT,
+						id(path),
+						net.minecraft.sounds.SoundEvent.createVariableRangeEvent(id(path))));
+			}
+		}
+	}
+
+	public static net.minecraft.sounds.SoundEvent injurySound(
+			dev.captience.realisticdamage.net.InjurySound sound, boolean visceral) {
+		return INJURY_SOUNDS.get(sound.assetPath(visceral));
+	}
 
 	public static Identifier id(String path) {
 		return Identifier.fromNamespaceAndPath(MOD_ID, path);

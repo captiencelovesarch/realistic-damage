@@ -77,21 +77,9 @@ public final class RealisticDamageData {
 		setBlood(blood + amount);
 	}
 
-	/** 0 stable, 1 light-headed, 2 greying out, 3 bleeding out, 4 catastrophic. */
+	/** 0 stable, 1 light-headed, 2 greying out, 3 barely upright, 4 bleeding out. */
 	public int bloodBand() {
-		if (blood <= 0.0) {
-			return 4;
-		}
-		if (blood < Balance.BLOOD_CRITICAL) {
-			return 4;
-		}
-		if (blood < Balance.BLOOD_SERIOUS) {
-			return 3;
-		}
-		if (blood < Balance.BLOOD_MILD) {
-			return 2;
-		}
-		return blood < Balance.BLOOD_STABLE ? 1 : 0;
+		return Vitals.bloodBand(blood);
 	}
 
 	public int lastBloodBand() {

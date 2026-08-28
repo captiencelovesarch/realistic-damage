@@ -3,10 +3,12 @@ package dev.captience.realisticdamage.client;
 import java.util.function.DoubleConsumer;
 import java.util.function.DoubleSupplier;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.options.OptionsSubScreen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.jspecify.annotations.Nullable;
@@ -15,128 +17,131 @@ import org.jspecify.annotations.Nullable;
  * Accessibility settings (spec §44): every sensory effect can be attenuated or
  * switched off without disabling unconsciousness itself. All of it is editable
  * here — the JSON on disk is storage, never the interface.
+ *
+ * <p>Built on vanilla's scrolling options list rather than a hand-placed grid.
+ * The grid ran off the bottom of the screen at large GUI scales once there were
+ * enough controls to matter, and every release adds more.
  */
-public class AccessibilityScreen extends Screen {
-	@Nullable
-	private final Screen parent;
-
+public class AccessibilityScreen extends OptionsSubScreen {
 	public AccessibilityScreen(@Nullable Screen parent) {
-		super(Component.translatable("realisticdamage.config.title"));
-		this.parent = parent;
+		super(parent, Minecraft.getInstance().options,
+				Component.translatable("realisticdamage.config.title"));
 	}
 
 	@Override
-	protected void init() {
+	protected void addOptions() {
 		ClientEffectsConfig config = ClientEffectsConfig.get();
-		int columnLeft = this.width / 2 - 155;
-		int columnRight = this.width / 2 + 5;
-		int y = 30;
 
-		addRenderableWidget(Button.builder(
-						Component.translatable("realisticdamage.config.preset")
+		this.list.addSmall(
+				Button.builder(Component.translatable("realisticdamage.config.preset")
 								.append(": ").append(Component.translatable("realisticdamage.config.preset.arcade")),
 						button -> { config.applyArcadePreset(); rebuildWidgets(); })
-				.bounds(columnLeft, y, 150, 20).build());
-		addRenderableWidget(Button.builder(
-						Component.translatable("realisticdamage.config.preset")
+						.width(150).build(),
+				Button.builder(Component.translatable("realisticdamage.config.preset")
 								.append(": ").append(Component.translatable("realisticdamage.config.preset.grounded")),
 						button -> { config.applyGroundedPreset(); rebuildWidgets(); })
-				.bounds(columnRight, y, 150, 20).build());
-		y += 28;
+						.width(150).build());
 
-		addRenderableWidget(CycleButton.onOffBuilder(config.showBodyHud)
-				.create(columnLeft, y, 150, 20, Component.translatable("realisticdamage.config.body_hud"),
-						(button, value) -> config.showBodyHud = value));
-		addRenderableWidget(CycleButton.onOffBuilder(config.bodyHudAlwaysVisible)
-				.create(columnRight, y, 150, 20, Component.translatable("realisticdamage.config.body_hud_always"),
-						(button, value) -> config.bodyHudAlwaysVisible = value));
-		y += 28;
+		this.list.addHeader(Component.translatable("realisticdamage.config.section.display"));
+		this.list.addSmall(
+				CycleButton.onOffBuilder(config.showBodyHud)
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.body_hud"),
+								(button, value) -> config.showBodyHud = value),
+				CycleButton.onOffBuilder(config.bodyHudAlwaysVisible)
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.body_hud_always"),
+								(button, value) -> config.bodyHudAlwaysVisible = value));
+		this.list.addSmall(
+				CycleButton.onOffBuilder(config.showStatusIcons)
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.status_icons"),
+								(button, value) -> config.showStatusIcons = value),
+				CycleButton.onOffBuilder(config.showNumericStats)
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.numeric_stats"),
+								(button, value) -> config.showNumericStats = value));
 
-		addRenderableWidget(CycleButton.onOffBuilder(config.showStatusIcons)
-				.create(columnLeft, y, 150, 20, Component.translatable("realisticdamage.config.status_icons"),
-						(button, value) -> config.showStatusIcons = value));
-		y += 28;
+		this.list.addHeader(Component.translatable("realisticdamage.config.section.vision"));
+		this.list.addSmall(
+				slider("realisticdamage.config.vignette",
+						() -> config.vignetteIntensity, value -> config.vignetteIntensity = value),
+				slider("realisticdamage.config.desaturation",
+						() -> config.desaturationIntensity, value -> config.desaturationIntensity = value));
+		this.list.addSmall(
+				slider("realisticdamage.config.distortion",
+						() -> config.distortionIntensity, value -> config.distortionIntensity = value),
+				slider("realisticdamage.config.afterimages",
+						() -> config.afterimageIntensity, value -> config.afterimageIntensity = value));
+		this.list.addSmall(
+				slider("realisticdamage.config.exposure",
+						() -> config.exposureIntensity, value -> config.exposureIntensity = value),
+				CycleButton.onOffBuilder(config.fullBlackUnconscious)
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.full_black"),
+								(button, value) -> config.fullBlackUnconscious = value));
 
-		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.vignette",
-				() -> config.vignetteIntensity, value -> config.vignetteIntensity = value));
-		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.sensitivity",
-				() -> config.sensitivityReductionIntensity, value -> config.sensitivityReductionIntensity = value));
-		y += 24;
+		this.list.addHeader(Component.translatable("realisticdamage.config.section.aim"));
+		this.list.addSmall(
+				slider("realisticdamage.config.sensitivity",
+						() -> config.sensitivityReductionIntensity,
+						value -> config.sensitivityReductionIntensity = value),
+				slider("realisticdamage.config.inertia",
+						config::lookInertia, value -> config.lookInertiaIntensity = value));
+		this.list.addSmall(
+				slider("realisticdamage.config.camera_drift",
+						() -> config.cameraDriftIntensity, value -> config.cameraDriftIntensity = value),
+				slider("realisticdamage.config.impact",
+						() -> config.impactIntensity, value -> config.impactIntensity = value));
 
-		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.afterimages",
-				() -> config.afterimageIntensity, value -> config.afterimageIntensity = value));
-		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.exposure",
-				() -> config.exposureIntensity, value -> config.exposureIntensity = value));
-		y += 24;
+		this.list.addHeader(Component.translatable("realisticdamage.config.section.sound"));
+		this.list.addSmall(
+				slider("realisticdamage.config.ringing",
+						() -> config.ringingVolume, value -> config.ringingVolume = value),
+				CycleButton.booleanBuilder(
+								Component.translatable("realisticdamage.config.tinnitus"),
+								Component.translatable("realisticdamage.config.tinnitus.bell"),
+								config.tinnitusTone)
+						.create(0, 0, 150, 20, Component.empty(),
+								(button, value) -> config.tinnitusTone = value));
+		this.list.addSmall(
+				slider("realisticdamage.config.heartbeat",
+						() -> config.heartbeatVolume, value -> config.heartbeatVolume = value),
+				slider("realisticdamage.config.muffling",
+						() -> config.mufflingIntensity, value -> config.mufflingIntensity = value));
+		this.list.addSmall(
+				slider("realisticdamage.config.injury_sounds",
+						() -> config.injurySoundVolume, value -> config.injurySoundVolume = value),
+				CycleButton.booleanBuilder(
+								Component.translatable("realisticdamage.config.sound_style.visceral"),
+								Component.translatable("realisticdamage.config.sound_style.muted"),
+								config.visceralInjurySounds)
+						.create(0, 0, 150, 20,
+								Component.translatable("realisticdamage.config.sound_style"),
+								(button, value) -> config.visceralInjurySounds = value));
 
-		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.ringing",
-				() -> config.ringingVolume, value -> config.ringingVolume = value));
-		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.heartbeat",
-				() -> config.heartbeatVolume, value -> config.heartbeatVolume = value));
-		y += 24;
-
-		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.muffling",
-				() -> config.mufflingIntensity, value -> config.mufflingIntensity = value));
-		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.impact",
-				() -> config.impactIntensity, value -> config.impactIntensity = value));
-		y += 24;
-
-		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.desaturation",
-				() -> config.desaturationIntensity, value -> config.desaturationIntensity = value));
-		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.distortion",
-				() -> config.distortionIntensity, value -> config.distortionIntensity = value));
-		y += 24;
-
-		addRenderableWidget(CycleButton.booleanBuilder(
-						Component.translatable("realisticdamage.config.tinnitus"),
-						Component.translatable("realisticdamage.config.tinnitus.bell"),
-						config.tinnitusTone)
-				.create(columnLeft, y, 150, 20, Component.empty(),
-						(button, value) -> config.tinnitusTone = value));
-		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.camera_drift",
-				() -> config.cameraDriftIntensity, value -> config.cameraDriftIntensity = value));
-		y += 24;
-
-		addRenderableWidget(CycleButton.onOffBuilder(config.fullBlackUnconscious)
-				.create(columnLeft, y, 150, 20, Component.translatable("realisticdamage.config.full_black"),
-						(button, value) -> config.fullBlackUnconscious = value));
-		y += 28;
-
-		addRenderableWidget(Button.builder(Component.translatable("realisticdamage.config.disable_all_effects"),
-						button -> {
-							config.vignetteIntensity = 0.0;
-							config.sensitivityReductionIntensity = 0.0;
-							config.afterimageIntensity = 0.0;
-							config.exposureIntensity = 0.0;
-							config.ringingVolume = 0.0;
-							config.heartbeatVolume = 0.0;
-							config.cameraDriftIntensity = 0.0;
-							config.desaturationIntensity = 0.0;
-							config.distortionIntensity = 0.0;
-							config.mufflingIntensity = 0.0;
-							config.impactIntensity = 0.0;
-							rebuildWidgets();
-						})
-				.bounds(this.width / 2 - 155, y, 310, 20).build());
-		y += 28;
-
-		addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> onClose())
-				.bounds(this.width / 2 - 100, y, 200, 20).build());
+		this.list.addHeader(Component.translatable("realisticdamage.config.section.everything"));
+		this.list.addBig(Button.builder(Component.translatable("realisticdamage.config.disable_all_effects"),
+						button -> { config.disableAllEffects(); rebuildWidgets(); })
+				.build());
 	}
 
 	@Override
-	public void extractRenderState(net.minecraft.client.gui.GuiGraphicsExtractor graphics,
-			int mouseX, int mouseY, float partialTick) {
-		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-		graphics.centeredText(this.font, this.title, this.width / 2, 16, 0xFFFFFFFF);
-		graphics.centeredText(this.font, Component.translatable("realisticdamage.config.note"),
-				this.width / 2, 26, 0xFFA0A0A0);
+	protected void addTitle() {
+		super.addTitle();
+		this.layout.addTitleHeader(Component.translatable("realisticdamage.config.note").withStyle(
+				style -> style.withColor(0xA0A0A0)), this.font);
+	}
+
+	@Override
+	public void removed() {
+		// Vanilla's would save Minecraft's own options; ours is the one that changed.
+		ClientEffectsConfig.save();
 	}
 
 	@Override
 	public void onClose() {
 		ClientEffectsConfig.save();
-		this.minecraft.gui.setScreen(this.parent);
+		super.onClose();
+	}
+
+	private static IntensitySlider slider(String labelKey, DoubleSupplier getter, DoubleConsumer setter) {
+		return new IntensitySlider(labelKey, getter, setter);
 	}
 
 	/** A 0-100% slider bound to one config field. */
@@ -144,8 +149,8 @@ public class AccessibilityScreen extends Screen {
 		private final String labelKey;
 		private final DoubleConsumer setter;
 
-		private IntensitySlider(int x, int y, String labelKey, DoubleSupplier getter, DoubleConsumer setter) {
-			super(x, y, 150, 20, Component.empty(), Math.clamp(getter.getAsDouble(), 0.0, 1.0));
+		private IntensitySlider(String labelKey, DoubleSupplier getter, DoubleConsumer setter) {
+			super(0, 0, 150, 20, Component.empty(), Math.clamp(getter.getAsDouble(), 0.0, 1.0));
 			this.labelKey = labelKey;
 			this.setter = setter;
 			updateMessage();

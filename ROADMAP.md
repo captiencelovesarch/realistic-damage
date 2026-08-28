@@ -16,29 +16,75 @@ than imitating them with overlays.
 
 Limb destruction was originally scoped for a later version and got pulled into
 1.0 during playtesting. That leaves the "permanence" ground partly covered
-already, which is why 1.1 to 1.5 below lean toward depth over new damage types.
+already, which is why 1.2 to 1.5 below lean toward depth over new damage types.
 
-## 1.1: Sharpening
+## Shipped in 1.1
 
-The unglamorous release. Everything here is a known rough edge, several of them
-found in play rather than in tests.
+The unglamorous release: known rough edges, several found in play rather than
+in tests.
 
-- **Verify the inventory hover panel.** The gametest harness cannot position a
-  cursor, so the hover path shipped untested. It needs a manual pass, and
-  ideally a client gametest that fakes a mouse position.
-- **Split "Look Slowdown"** into separate sensitivity and inertia sliders. They
-  are one control today, so wanting sloppy aim without slow aim is impossible.
-- **Optional numeric stats** in the inventory panel, off by default. The
-  no-numbers rule serves the HUD well; on a dedicated detail screen it mostly
-  gets in the way, and `/rdmg info` being admin-only is an awkward workaround.
-- **Aggro tuning.** Unconscious players currently attract any hostile with line
-  of sight. The gentler reading, only holding mobs that were already attacking,
-  should at least be a config option.
-- **Sound pass.** Fracture, destruction and collapse all borrow vanilla sounds.
-  Purpose-made audio would carry far more weight than any of the visuals still
-  left to polish.
-- **Death messages** for every mod-caused death, and a pass over injury
-  messages for tone consistency.
+- **Purpose-made injury audio.** Fracture, destruction and collapse no longer
+  borrow vanilla sounds. Each has a muted set that sits inside Minecraft's
+  palette and a visceral set that does not, selected by the Arcade/Grounded
+  presets and overridable on its own. All of it is synthesised by
+  `tools/generate_sounds.py`, so it is re-tunable by changing a number.
+- **Injuries are heard from the right place.** Your own play close and
+  non-positional at full volume; everyone else's play at their position and
+  quieter. Sent as a message rather than a world sound, so each client picks
+  its own style — two players on one server can disagree about how visceral
+  their game is.
+- **"Look Slowdown" split** into Look Slowdown and Look Drift. They were one
+  control, so sloppy aim without slow aim was impossible.
+- **Look Drift retuned.** It lasted far too long and read as nausea: a fast
+  flick banked enough momentum to keep turning the camera for nearly three
+  seconds. Now about half a second at worst, and momentum is dropped rather
+  than frozen while a screen is open, which was causing the view to lurch off
+  on its own the moment an inventory closed.
+- **Optional numeric stats** in the inventory panel, off by default. Condition
+  figures per region; Blood and Consciousness named by band and never as
+  figures, because a player who can read their exact blood level is never
+  surprised by one.
+- **Aggro is configurable**, defaulting to prior attackers plus anything within
+  six blocks that can see you. Pulling in every hostile within line of sight
+  did not make collapsing dangerous so much as decide the fight in advance —
+  in singleplayer nobody is coming to drag you out. `ALL` and `NONE` remain.
+  Enforcing this needed a mixin on `Mob.setTarget` rather than the obvious
+  periodic re-target: vanilla acquires a player from up to the mob's follow
+  range, 35 blocks for a zombie, which is well outside either of our radii, so
+  a version that only pushed and cleared targets left every mode behaving like
+  `ALL` and `NONE` working about half the time.
+- **A death message per cause.** The single "torn apart" covered both a crushed
+  skull and a caved-in chest; they are now separate damage types with separate
+  messages. Everything the mod inflicts carries an `internal` tag, so a damage
+  type added later cannot forget the recursion guard in two places at once.
+- **Injury message tone pass.** Second person, present tense, visceral over
+  clinical, and exclamation marks spent only on the sudden violent moments.
+- **The hover panel is verified.** The roadmap claimed the harness could not
+  position a cursor; `TestInput.setCursorPos` does exactly that. Every region
+  is now hovered by a real cursor in a client gametest that asserts the hover
+  resolved, rather than only screenshotting it.
+- **The settings screen scrolls.** It was a hand-placed grid that already ran
+  off the bottom at large GUI scales, and 1.1 added three more controls. Now
+  vanilla's scrolling options list, in labelled sections.
+
+Several bugs fell out of testing and reviewing the above. The vitals block
+originally sized the panel to its own text, which dragged the body diagram
+sideways the moment numbers were switched on and slid the panel under the
+inventory at smaller window sizes — the first version of the test screenshotted
+it and sailed straight past. It now asserts the body does not move, and the
+vitals read as a label above a value so the block stays narrower than the body.
+
+Splitting a control also turned out to be an upgrade hazard: a config written
+by 1.0 has no key for the new slider, and letting it default to full strength
+would have switched the melty camera back on for a player who had turned it
+off. Client settings now migrate, and the new value is seeded from the control
+it was split out of.
+
+The inertia guard was a rate limiter in disguise. It clamped the input buffer,
+so a fast flick had everything past the limit discarded rather than delayed,
+and because the limit applied per frame your maximum turn rate depended on your
+frame rate. It now bounds only the leftover momentum, which is what the guard
+was ever meant to be about.
 
 ## 1.2: Rescue
 

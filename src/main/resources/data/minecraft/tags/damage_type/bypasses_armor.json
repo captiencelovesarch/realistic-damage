@@ -2,6 +2,7 @@
 	"replace": false,
 	"values": [
 		"realisticdamage:bleed_out",
-		"realisticdamage:destroyed"
+		"realisticdamage:skull_crushed",
+		"realisticdamage:chest_crushed"
 	]
 }

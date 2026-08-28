@@ -1,5 +1,5 @@
 {
-	"message_id": "realisticdamage.destroyed",
+	"message_id": "realisticdamage.skullCrushed",
 	"scaling": "never",
 	"exhaustion": 0.0,
 	"effects": "hurt",

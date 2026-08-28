@@ -7,5 +7,29 @@
 				"stream": true
 			}
 		]
+	},
+	"fracture_muted": {
+		"subtitle": "realisticdamage.subtitle.fracture",
+		"sounds": ["realisticdamage:fracture_muted"]
+	},
+	"fracture_visceral": {
+		"subtitle": "realisticdamage.subtitle.fracture",
+		"sounds": ["realisticdamage:fracture_visceral"]
+	},
+	"destruction_muted": {
+		"subtitle": "realisticdamage.subtitle.destruction",
+		"sounds": ["realisticdamage:destruction_muted"]
+	},
+	"destruction_visceral": {
+		"subtitle": "realisticdamage.subtitle.destruction",
+		"sounds": ["realisticdamage:destruction_visceral"]
+	},
+	"collapse_muted": {
+		"subtitle": "realisticdamage.subtitle.collapse",
+		"sounds": ["realisticdamage:collapse_muted"]
+	},
+	"collapse_visceral": {
+		"subtitle": "realisticdamage.subtitle.collapse",
+		"sounds": ["realisticdamage:collapse_visceral"]
 	}
 }
