@@ -76,9 +76,10 @@ public final class Balance {
 	public static final double BLOOD_CRITICAL = 15.0;
 
 	/** Below BLOOD_SERIOUS: vanilla HP damage per tick-cycle begins. Half-hearts per second. */
-	public static final double BLEEDOUT_HP_PER_SEC_SERIOUS = 0.25;
-	public static final double BLEEDOUT_HP_PER_SEC_CRITICAL = 0.7;
-	public static final double BLEEDOUT_HP_PER_SEC_ZERO = 2.0;
+	public static final double BLEEDOUT_HP_PER_SEC_SERIOUS = 0.4;
+	public static final double BLEEDOUT_HP_PER_SEC_CRITICAL = 1.6;
+	/** Empty: a full-health player bleeds out in about four seconds. */
+	public static final double BLEEDOUT_HP_PER_SEC_ZERO = 5.0;
 
 	// --- Consciousness (spec §19-23) ---
 	public static final double CONSCIOUSNESS_MAX = 100.0;
@@ -117,10 +118,11 @@ public final class Balance {
 	public static final double SENSITIVITY_REDUCTION_CAP = 0.35;
 
 	// Continuous consciousness drain from blood loss (points/sec, spec §17, §19).
-	public static final double CONSCIOUSNESS_DRAIN_BLOOD_MILD = 0.4;      // blood 30..50
-	public static final double CONSCIOUSNESS_DRAIN_BLOOD_SERIOUS = 1.2;   // blood 15..30
-	public static final double CONSCIOUSNESS_DRAIN_BLOOD_CRITICAL = 3.0;  // blood 0..15
-	public static final double CONSCIOUSNESS_DRAIN_BLOOD_ZERO = 6.0;      // blood == 0
+	public static final double CONSCIOUSNESS_DRAIN_BLOOD_MILD = 0.6;      // blood 30..50
+	public static final double CONSCIOUSNESS_DRAIN_BLOOD_SERIOUS = 2.5;   // blood 15..30
+	public static final double CONSCIOUSNESS_DRAIN_BLOOD_CRITICAL = 9.0;  // blood 0..15
+	/** Empty: consciousness is gone in roughly three seconds. */
+	public static final double CONSCIOUSNESS_DRAIN_BLOOD_ZERO = 33.0;     // blood == 0
 	/** Drain while out of air (drowning/suffocating), points/sec. */
 	public static final double CONSCIOUSNESS_DRAIN_ASPHYXIA = 2.5;
 	/** Blood scales recovery down to this floor as it approaches 0 (spec §18-19). */

@@ -41,7 +41,11 @@ public final class BleedingSystem {
 			// Whole-point hurts from an accumulator: no sub-half-heart spam.
 			if (data.advanceBleedHpDrain(hpPerSecond / 20.0)) {
 				ServerLevel level = player.level();
-				player.hurtServer(level, RDDamageTypes.bleedOut(level), 1.0F);
+				if (!player.hurtServer(level, RDDamageTypes.bleedOut(level), 1.0F)) {
+					// Refused (invulnerable, already dying): keep the point rather
+					// than silently destroying accrued bleed damage.
+					data.refundBleedHpDrain(1.0);
+				}
 			}
 		}
 	}

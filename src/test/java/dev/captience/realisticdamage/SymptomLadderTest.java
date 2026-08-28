@@ -50,9 +50,20 @@ class SymptomLadderTest {
 	}
 
 	@Test
-	void catastrophicBleedOutIsFastButSurvivableForSeconds() {
-		// Spec §17: blood 0 must not instakill — 20 HP at the zero-band rate takes seconds.
+	void catastrophicBleedOutIsFastButNotInstant() {
+		// Spec §17: blood 0 is "very rapid HP loss" but must never instakill.
 		double secondsToDie = 20.0 / Balance.BLEEDOUT_HP_PER_SEC_ZERO;
-		assertTrue(secondsToDie >= 5.0, "a full-health player must survive several seconds at blood 0");
+		assertTrue(secondsToDie > 1.5, "bleeding out must not be an instant kill, got " + secondsToDie + "s");
+		assertTrue(secondsToDie < 8.0, "bleeding out at empty must actually feel fatal, got " + secondsToDie + "s");
+	}
+
+	@Test
+	void youBlackOutBeforeYouBleedToDeath() {
+		// The dramatic ordering the design wants: consciousness crashes first, so
+		// you go under and then die, rather than dying wide awake.
+		double secondsToCollapse = Balance.CONSCIOUSNESS_MAX / Balance.CONSCIOUSNESS_DRAIN_BLOOD_ZERO;
+		double secondsToDie = 20.0 / Balance.BLEEDOUT_HP_PER_SEC_ZERO;
+		assertTrue(secondsToCollapse < secondsToDie,
+				"collapse (" + secondsToCollapse + "s) must precede death (" + secondsToDie + "s)");
 	}
 }

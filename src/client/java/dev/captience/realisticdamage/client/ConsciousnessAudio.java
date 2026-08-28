@@ -3,6 +3,7 @@ package dev.captience.realisticdamage.client;
 import dev.captience.realisticdamage.config.Balance;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -18,7 +19,6 @@ public final class ConsciousnessAudio {
 	private ConsciousnessAudio() {}
 
 	private static ImpairmentSound ringing;
-	private static ImpairmentSound heartbeat;
 	private static float duckAmount;
 
 	public static void tick() {
@@ -26,14 +26,26 @@ public final class ConsciousnessAudio {
 		SoundManager sounds = client.getSoundManager();
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		boolean active = ClientState.active() && ClientState.snapshot() != null;
+		if (!active && ringing != null) {
+			// Death, respawn screen, gamemode switch: stop immediately rather than
+			// letting the loop trail on.
+			reset();
+		}
 
 		double ringLevel = active
 				? ClientState.ramp(Balance.SYMPTOM_RINGING, Balance.SYMPTOM_SEVERE) * config.ringingVolume
 				: 0.0;
-		double heartLevel = active ? heartbeatLevel() * config.heartbeatVolume : 0.0;
-
 		ringing = update(sounds, ringing, SoundEvents.BELL_RESONATE, (float) ringLevel * 0.7F, 1.9F);
-		heartbeat = update(sounds, heartbeat, SoundEvents.WARDEN_HEARTBEAT, (float) heartLevel * 1.4F, 1.0F);
+
+		// One thump per beat, on the same clock the vignette pulses to, so the
+		// sound and the visual land together.
+		double heartLevel = active ? ClientState.distress() * config.heartbeatVolume : 0.0;
+		if (heartLevel > 0.05 && ClientState.beatJustFired()) {
+			// Pitch climbs a little as the heart races — it reads as panic.
+			float pitch = (float) (0.85 + 0.35 * ClientState.distress());
+			sounds.play(SimpleSoundInstance.forLocalAmbience(
+					SoundEvents.WARDEN_HEARTBEAT, pitch, (float) Math.min(1.0, heartLevel * 1.6)));
+		}
 
 		// Muffle everything else as consciousness fades; restore smoothly.
 		float targetDuck = (float) (ringLevel > 0 ? Math.min(0.8, ringLevel * 0.8) : 0.0);
@@ -43,15 +55,6 @@ public final class ConsciousnessAudio {
 			// Our own cues ride on AMBIENT and stay audible.
 			sounds.updateCategoryVolume(source, source == SoundSource.AMBIENT ? 1.0F : gain);
 		}
-	}
-
-	/** Heartbeat rises with low consciousness, heavy blood loss, or near-death HP. */
-	private static double heartbeatLevel() {
-		double fromConsciousness = ClientState.ramp(Balance.SYMPTOM_HEARTBEAT, Balance.SYMPTOM_SEVERE);
-		double blood = ClientState.blood();
-		double fromBlood = blood >= Balance.BLOOD_SERIOUS ? 0.0
-				: Math.min(1.0, (Balance.BLOOD_SERIOUS - blood) / Balance.BLOOD_SERIOUS);
-		return Math.max(ClientState.lowHealth(), Math.max(fromConsciousness, fromBlood));
 	}
 
 	private static ImpairmentSound update(SoundManager sounds, ImpairmentSound instance,
@@ -76,10 +79,6 @@ public final class ConsciousnessAudio {
 		if (ringing != null) {
 			ringing.fadeOut();
 			ringing = null;
-		}
-		if (heartbeat != null) {
-			heartbeat.fadeOut();
-			heartbeat = null;
 		}
 		duckAmount = 0.0F;
 		for (SoundSource source : SoundSource.values()) {

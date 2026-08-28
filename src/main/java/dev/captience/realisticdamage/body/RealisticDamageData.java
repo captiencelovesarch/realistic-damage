@@ -255,6 +255,11 @@ public final class RealisticDamageData {
 		return false;
 	}
 
+	/** Puts an unspent bleed point back when the hurt was refused (i-frames, etc.). */
+	public void refundBleedHpDrain(double hp) {
+		bleedHpProgress += hp;
+	}
+
 	/** Accumulates bleed-out HP drain; returns true when one whole HP point should be dealt. */
 	public boolean advanceBleedHpDrain(double hpThisTick) {
 		bleedHpProgress += hpThisTick;

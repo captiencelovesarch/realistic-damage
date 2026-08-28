@@ -19,6 +19,10 @@ public final class ClientState {
 	private static double smoothedBlood = Balance.BLOOD_MAX;
 	/** Rises while unconscious, falls after waking — drives the blackout fade. */
 	private static double unconsciousFade;
+	/** Free-running heartbeat clock, in beats. Whole numbers are the "lub". */
+	private static double beatPhase;
+	private static long lastBeat = -1;
+	private static boolean beatFired;
 
 	@Nullable
 	public static BodySnapshot snapshot() {
@@ -39,6 +43,46 @@ public final class ClientState {
 		smoothedBlood += (snapshot.blood() - smoothedBlood) * 0.15;
 		double target = snapshot.unconscious() ? 1.0 : 0.0;
 		unconsciousFade += (target - unconsciousFade) * 0.12;
+
+		// The heart races as things get worse: a resting 55 bpm up to a hammering
+		// 165 when you are nearly gone.
+		double bpm = 55.0 + 110.0 * distress();
+		beatPhase += bpm / 60.0 / 20.0;
+		long beat = (long) beatPhase;
+		beatFired = beat != lastBeat;
+		lastBeat = beat;
+	}
+
+	/**
+	 * How much trouble the player is in, 0 to 1 — the worst of near-death health,
+	 * blood loss and fading consciousness. Drives both the heartbeat and the
+	 * near-death vignette so every dangerous state pulses.
+	 */
+	public static double distress() {
+		if (!active()) {
+			return 0.0;
+		}
+		double fromBlood = smoothedBlood >= Balance.BLOOD_SERIOUS ? 0.0
+				: Math.clamp((Balance.BLOOD_SERIOUS - smoothedBlood) / Balance.BLOOD_SERIOUS, 0.0, 1.0);
+		double fromMind = ramp(Balance.SYMPTOM_HEARTBEAT, 0.0);
+		return Math.max(lowHealth(), Math.max(fromBlood, fromMind));
+	}
+
+	/**
+	 * The cardiac envelope for the current instant: a sharp "lub", a softer "dub"
+	 * a fifth of a beat later, then quiet. Sharp transients are what make it read
+	 * as a heartbeat instead of gentle breathing.
+	 */
+	public static double heartbeatEnvelope() {
+		double f = beatPhase - Math.floor(beatPhase);
+		double lub = Math.exp(-f / 0.055);
+		double dub = f >= 0.20 ? 0.72 * Math.exp(-(f - 0.20) / 0.065) : 0.0;
+		return Math.clamp(Math.max(lub, dub), 0.0, 1.0);
+	}
+
+	/** True on the single tick a new beat begins — fire the thump sound here. */
+	public static boolean beatJustFired() {
+		return beatFired;
 	}
 
 	public static double consciousness() {
@@ -84,7 +128,7 @@ public final class ClientState {
 			return 0.0;
 		}
 		double max = player.getMaxHealth();
-		if (max <= 0.0) {
+		if (max <= 0.0 || !player.isAlive() || player.getHealth() <= 0.0F) {
 			return 0.0;
 		}
 		double fraction = player.getHealth() / max;
@@ -94,9 +138,15 @@ public final class ClientState {
 		return Math.clamp(1.0 - fraction / Balance.LOW_HP_FRACTION, 0.0, 1.0);
 	}
 
-	/** Whether Realistic Damage effects should show at all right now. */
+	/**
+	 * Whether Realistic Damage effects should show at all right now. Dead players
+	 * are excluded: zero health otherwise reads as maximum distress, so the
+	 * heartbeat and vignette would keep going on the death screen.
+	 */
 	public static boolean active() {
 		Minecraft client = Minecraft.getInstance();
-		return client.player != null && !client.player.isCreative() && !client.player.isSpectator();
+		LocalPlayer player = client.player;
+		return player != null && player.isAlive() && player.getHealth() > 0.0F
+				&& !player.isCreative() && !player.isSpectator();
 	}
 }

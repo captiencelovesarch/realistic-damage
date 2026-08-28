@@ -47,13 +47,20 @@ public final class ConsciousnessEffects {
 					ARGB.colorFromFloat(1.0F, strength * 0.80F, strength, strength));
 		}
 
-		// Near-death: a red vignette that pulses with the heartbeat. Driven by the
-		// ordinary health bar, so being one hit from death always reads.
-		double dying = ClientState.lowHealth() * config.vignetteIntensity;
-		if (dying > 0.01) {
-			float strength = (float) (Math.min(1.0, dying) * (0.72 + 0.28 * pulse(24.0)));
-			graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-					ARGB.colorFromFloat(1.0F, strength * 0.12F, strength, strength));
+		// Near-death: a red vignette that slams shut on every heartbeat. Driven by
+		// the worst of low health, blood loss and fading consciousness, so every
+		// dangerous state pulses — and the beat is the same clock the sound uses.
+		double distress = ClientState.distress() * config.vignetteIntensity;
+		if (distress > 0.01) {
+			double beat = ClientState.heartbeatEnvelope();
+			// A steady squeeze that grows with danger, plus a hard thump on each beat.
+			double steady = 0.30 * distress;
+			double thump = beat * (0.30 + 0.70 * distress);
+			float strength = (float) Math.min(1.0, (steady + thump) * distress);
+			if (strength > 0.004F) {
+				graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
+						ARGB.colorFromFloat(1.0F, strength * 0.10F, strength, strength));
+			}
 		}
 
 		// Exposure / washout (from 35 down): the world looks wrong, not hidden.
