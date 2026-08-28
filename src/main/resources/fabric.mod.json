@@ -23,7 +23,8 @@
 			"dev.captience.realisticdamage.gametest.DamageRoutingGameTest",
 			"dev.captience.realisticdamage.gametest.ImpairmentGameTest",
 			"dev.captience.realisticdamage.gametest.BleedingGameTest",
-			"dev.captience.realisticdamage.gametest.ConsciousnessGameTest"
+			"dev.captience.realisticdamage.gametest.ConsciousnessGameTest",
+			"dev.captience.realisticdamage.gametest.HealingGameTest"
 		]
 	},
 	"mixins": [

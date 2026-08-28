@@ -111,6 +111,15 @@ public final class TraumaPipeline {
 					EnvironmentalRouter.shares(classified.routing(), appliedDamage), result);
 		}
 
+		// Sustained fire and any lava contact leave the player Burned (spec §27-28).
+		if (config.enableBurns && !data.burned()
+				&& (classified.category() == DamageCategory.LAVA
+						|| (classified.category() == DamageCategory.FIRE
+								&& player.getRemainingFireTicks() >= Balance.BURNED_APPLY_FIRE_TICKS))) {
+			data.setBurned(true);
+			Notifier.message(player, "realisticdamage.msg.burned");
+		}
+
 		if (config.enableBrokenLimbs) {
 			BreakLogic.evaluate(player, data, profile, result);
 		}

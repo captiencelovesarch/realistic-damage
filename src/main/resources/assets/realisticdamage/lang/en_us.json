@@ -10,6 +10,14 @@
 	"realisticdamage.msg.concussion": "You feel dazed.",
 	"realisticdamage.msg.unconscious": "You lose consciousness.",
 	"realisticdamage.msg.wake": "You regain consciousness.",
+	"realisticdamage.msg.burned": "Your skin is badly burned.",
+	"realisticdamage.msg.burns_healed": "Your burns have healed.",
+	"realisticdamage.msg.concussion_cleared": "Your head finally feels clear.",
+	"realisticdamage.msg.totem_stabilized": "The totem stabilizes you — but you are far from whole.",
+	"realisticdamage.msg.mended.left_arm": "Your left arm has mended.",
+	"realisticdamage.msg.mended.right_arm": "Your right arm has mended.",
+	"realisticdamage.msg.mended.left_leg": "Your left leg has mended.",
+	"realisticdamage.msg.mended.right_leg": "Your right leg has mended.",
 	"death.attack.realisticdamage.bleedOut": "%1$s bled out",
 	"death.attack.realisticdamage.bleedOut.player": "%1$s bled out while fighting %2$s"
 }

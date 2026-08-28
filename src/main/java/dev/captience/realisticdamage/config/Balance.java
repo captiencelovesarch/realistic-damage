@@ -177,6 +177,15 @@ public final class Balance {
 	/** Strained severe arm (recent heavy use) pauses that arm's recovery this long (ticks). */
 	public static final int ARM_STRAIN_PAUSE_TICKS = 100;
 
+	/** Burned reduces healing efficiency (spec §27)... */
+	public static final double BURNED_HEALING_FACTOR = 0.6;
+	/** ...and clears once the body has broadly recovered (average condition fraction) while not on fire. */
+	public static final double BURNED_CLEAR_AVG_FRACTION = 0.75;
+	/** Sustained burning (fire ticks beyond this) applies Burned (spec §27). */
+	public static final int BURNED_APPLY_FIRE_TICKS = 60;
+	/** Food exhaustion charged per full-HP body-repair cycle (food powers recovery, spec §37). */
+	public static final float HEAL_EXHAUSTION_PER_CYCLE = 4.0F;
+
 	// --- Golden foods (spec §40) ---
 	public static final double GAPPLE_BLOOD_RESTORE = 40.0;
 	public static final double GAPPLE_CONSCIOUSNESS_RESTORE = 25.0;

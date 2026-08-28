@@ -35,8 +35,8 @@ public final class TickDispatcher {
 		data.tickUnconscious();
 		BleedingSystem.tick(player, data);
 		ConsciousnessSystem.tick(player, data);
+		HealingSystem.tick(player, data);
 		ImpairmentSystem.tick(player, data);
-		// Milestone 6 hooks in here: healing.
 		RDAttachments.pushSnapshot(player);
 	}
 }
