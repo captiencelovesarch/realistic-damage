@@ -21,6 +21,17 @@ public final class ConsciousnessEffects {
 	private static final Identifier VIGNETTE = Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/injury_vignette.png");
 	private static final Identifier NAUSEA = Identifier.withDefaultNamespace("textures/misc/nausea.png");
 
+	/**
+	 * Smoothed haze level. Rises instantly so a blow lands at once, then falls
+	 * linearly, because vanilla's blur is all-or-nothing and without a decay to
+	 * hide behind it simply vanishes mid-frame when you recover.
+	 */
+	private static double haze;
+	/** Blur is cut while the haze is still strong, so the ghosting covers its exit. */
+	private static final double BLUR_CUTOFF = 0.62;
+	/** Haze lost per tick on the way down: a touch under a second and a half. */
+	private static final double HAZE_FALLOFF = 0.035;
+
 	/** Slow deterministic pulse (no RNG flicker) driven by game time. */
 	private static double pulse(double periodTicks) {
 		double time = Minecraft.getInstance().level == null ? 0.0
@@ -82,20 +93,28 @@ public final class ConsciousnessEffects {
 		// the blur may only be requested once per frame and an open Screen
 		// already claims it.
 		double blur = ClientState.ramp(Balance.SYMPTOM_AFTERIMAGE, 0.0) * config.afterimageIntensity;
-		// The blur itself is all-or-nothing in vanilla, so it is held until you are
-		// genuinely going under; the ghosting above ramps smoothly to get there.
 		boolean deep = ClientState.effectiveConsciousness() < Balance.SYMPTOM_BLUR;
-		if (deep && config.afterimageIntensity > 0.0 && Minecraft.getInstance().gui.screen() == null) {
+		double hazeTarget = Math.max(blur * blur, ClientState.concussed()
+				? Balance.CONCUSSION_GHOST * config.afterimageIntensity : 0.0);
+		if (deep) {
+			hazeTarget = Math.max(hazeTarget, 0.95 * config.afterimageIntensity);
+		}
+		if (hazeTarget >= haze) {
+			haze = hazeTarget;   // getting worse lands immediately
+		} else {
+			haze = Math.max(hazeTarget, haze - HAZE_FALLOFF * deltaTracker.getGameTimeDeltaTicks());
+		}
+
+		// Vanilla's blur has no intensity, so it is kept on while the haze is
+		// strong and cut once the ghosting is heavy enough to cover its going.
+		if (haze > BLUR_CUTOFF && config.afterimageIntensity > 0.0
+				&& Minecraft.getInstance().gui.screen() == null) {
 			graphics.blurBeforeThisStratum();
 		}
 		// Ghosting: doubles as the concussion symptom. A concussion holds a
 		// constant low level of it — seeing double is what being dazed looks
 		// like — and it deepens as consciousness actually falls.
-		double ghost = Math.max(blur * blur, ClientState.concussed()
-				? Balance.CONCUSSION_GHOST * config.afterimageIntensity : 0.0);
-		if (deep) {
-			ghost = Math.max(ghost, 0.85 * config.afterimageIntensity);
-		}
+		double ghost = haze;
 		if (ghost > 0.01) {
 			double phase = pulse(50.0);
 			float strength = (float) (Math.min(1.0, ghost) * (0.35 + 0.4 * phase));
