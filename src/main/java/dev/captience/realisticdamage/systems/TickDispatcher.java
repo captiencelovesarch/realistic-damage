@@ -25,6 +25,7 @@ public final class TickDispatcher {
 	private static void tickPlayer(ServerPlayer player) {
 		// Creative/Spectator ignore Realistic Damage (spec §46).
 		if (player.isCreative() || player.isSpectator()) {
+			ImpairmentSystem.clear(player);
 			return;
 		}
 		RealisticDamageData data = RDAttachments.get(player);
@@ -32,6 +33,7 @@ public final class TickDispatcher {
 			part.tickStrain();
 		}
 		data.tickUnconscious();
+		ImpairmentSystem.tick(player, data);
 		// Milestone 4/5/6 hook in here: bleeding drain, consciousness, healing.
 		RDAttachments.pushSnapshot(player);
 	}

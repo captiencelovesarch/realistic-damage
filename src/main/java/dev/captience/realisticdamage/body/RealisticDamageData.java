@@ -24,6 +24,8 @@ public final class RealisticDamageData {
 	private boolean burned;
 	/** Transient: health captured at ALLOW_DAMAGE so AFTER_DAMAGE can compute the true post-mitigation damage. */
 	private transient double preHurtHealth = Double.NaN;
+	/** Transient: fractional progress toward stalling one item-use tick (two-handed impairment, spec §11). */
+	private transient double useStallProgress;
 
 	public RealisticDamageData() {
 		for (BodyPart part : BodyPart.values()) {
@@ -219,6 +221,20 @@ public final class RealisticDamageData {
 		double lost = Math.max(0.0, preHurtHealth - healthNow);
 		preHurtHealth = Double.NaN;
 		return lost;
+	}
+
+	/**
+	 * Advances the deterministic item-use stall accumulator by {@code penalty}
+	 * (0..1); returns true when one use tick should be stalled. A penalty of 0.3
+	 * makes bow draws take ~1/0.7x longer, smoothly and reproducibly.
+	 */
+	public boolean advanceUseStall(double penalty) {
+		useStallProgress += penalty;
+		if (useStallProgress >= 1.0) {
+			useStallProgress -= 1.0;
+			return true;
+		}
+		return false;
 	}
 
 	// --- Whole-state operations ---

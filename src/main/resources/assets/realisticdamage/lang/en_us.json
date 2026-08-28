@@ -1,0 +1,8 @@
+{
+	"realisticdamage.msg.break.left_arm": "Your left arm breaks!",
+	"realisticdamage.msg.break.right_arm": "Your right arm breaks!",
+	"realisticdamage.msg.break.left_leg": "Your left leg breaks!",
+	"realisticdamage.msg.break.right_leg": "Your right leg breaks!",
+	"death.attack.realisticdamage.bleedOut": "%1$s bled out",
+	"death.attack.realisticdamage.bleedOut.player": "%1$s bled out while fighting %2$s"
+}

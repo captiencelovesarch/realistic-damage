@@ -109,6 +109,10 @@ public final class TraumaPipeline {
 			default -> applyShares(player, data, classified, baseTrauma,
 					EnvironmentalRouter.shares(classified.routing(), appliedDamage), result);
 		}
+
+		if (config.enableBrokenLimbs) {
+			BreakLogic.evaluate(player, data, profile, result);
+		}
 		return result;
 	}
 
