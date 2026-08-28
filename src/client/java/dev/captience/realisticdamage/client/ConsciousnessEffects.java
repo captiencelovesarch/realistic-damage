@@ -16,7 +16,9 @@ import net.minecraft.util.ARGB;
 public final class ConsciousnessEffects {
 	private ConsciousnessEffects() {}
 
-	private static final Identifier VIGNETTE = Identifier.withDefaultNamespace("textures/misc/vignette.png");
+	// Our own radial falloff: vanilla's vignette texture is deliberately subtle,
+	// far too weak to read as "losing consciousness" even at full tint.
+	private static final Identifier VIGNETTE = Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/injury_vignette.png");
 	private static final Identifier NAUSEA = Identifier.withDefaultNamespace("textures/misc/nausea.png");
 
 	/** Slow deterministic pulse (no RNG flicker) driven by game time. */
@@ -38,9 +40,11 @@ public final class ConsciousnessEffects {
 		double vignette = ClientState.ramp(Balance.SYMPTOM_VIGNETTE, Balance.SYMPTOM_SEVERE)
 				* config.vignetteIntensity;
 		if (vignette > 0.01) {
+			// The VIGNETTE pipeline blends (ZERO, ONE_MINUS_SRC_COLOR): dst *= (1 - src*tint),
+			// so the tint is the darkening strength and the red bias tinges it toward blood.
 			float strength = (float) Math.min(1.0, vignette);
 			graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-					ARGB.colorFromFloat(1.0F, strength, strength * 0.55F, strength * 0.55F));
+					ARGB.colorFromFloat(1.0F, strength * 0.80F, strength, strength));
 		}
 
 		// Exposure / washout (from 35 down): the world looks wrong, not hidden.

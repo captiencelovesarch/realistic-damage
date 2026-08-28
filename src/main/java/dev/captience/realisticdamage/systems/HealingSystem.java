@@ -27,9 +27,8 @@ import net.minecraft.world.level.gamerules.GameRules;
 public final class HealingSystem {
 	private HealingSystem() {}
 
-	/** Vanilla natural-regen cadences mirrored for the full-HP path. */
+	/** Vanilla's slow natural-regen cadence, mirrored for the full-HP repair path. */
 	private static final int NORMAL_CYCLE_TICKS = 80;
-	private static final int FAST_CYCLE_TICKS = 10;
 
 	public static void init() {
 		EntitySleepEvents.STOP_SLEEPING.register((entity, sleepingPos) -> {
@@ -51,13 +50,13 @@ public final class HealingSystem {
 			data.restoreBlood(perSecond * ServerConfig.get().healingMultiplier / 20.0);
 		}
 
-		// Full-HP players keep repairing on the vanilla regen cadence — otherwise a
-		// full-heart player with a broken leg would never recover (spec §37).
+		// Full-HP players keep repairing — otherwise a full-heart player with a
+		// broken leg would never recover (spec §37). Deliberately the slow vanilla
+		// cadence, not the saturation-boosted one: body repair should take tens of
+		// seconds for a real injury, and hearts already got the fast path.
 		if (!player.isHurt() && naturalRegenAllowed(player)) {
 			FoodData food = player.getFoodData();
-			boolean fast = food.getFoodLevel() >= 20 && food.getSaturationLevel() > 0.0F;
-			int cadence = fast ? FAST_CYCLE_TICKS : NORMAL_CYCLE_TICKS;
-			if (food.getFoodLevel() >= 18 && player.tickCount % cadence == 0 && hasAnythingToHeal(data)) {
+			if (food.getFoodLevel() >= 18 && player.tickCount % NORMAL_CYCLE_TICKS == 0 && hasAnythingToHeal(data)) {
 				grantRecovery(player, data, 1.0);
 				food.addExhaustion(Balance.HEAL_EXHAUSTION_PER_CYCLE);
 			}
