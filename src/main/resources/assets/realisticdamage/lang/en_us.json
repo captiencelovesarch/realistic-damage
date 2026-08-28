@@ -7,6 +7,9 @@
 	"realisticdamage.msg.bleeding.moderate": "You're bleeding steadily.",
 	"realisticdamage.msg.bleeding.severe": "You're bleeding heavily!",
 	"realisticdamage.msg.bleeding.critical": "Blood pours from your wounds!",
+	"realisticdamage.msg.concussion": "You feel dazed.",
+	"realisticdamage.msg.unconscious": "You lose consciousness.",
+	"realisticdamage.msg.wake": "You regain consciousness.",
 	"death.attack.realisticdamage.bleedOut": "%1$s bled out",
 	"death.attack.realisticdamage.bleedOut.player": "%1$s bled out while fighting %2$s"
 }

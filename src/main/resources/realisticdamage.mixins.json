@@ -3,7 +3,8 @@
 	"package": "dev.captience.realisticdamage.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"LivingEntityUseItemMixin"
+		"LivingEntityUseItemMixin",
+		"PlayerPoseMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

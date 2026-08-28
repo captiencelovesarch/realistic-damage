@@ -96,6 +96,38 @@ public final class Balance {
 	/** Look-sensitivity reduction is capped (spec §24). */
 	public static final double SENSITIVITY_REDUCTION_CAP = 0.35;
 
+	// Continuous consciousness drain from blood loss (points/sec, spec §17, §19).
+	public static final double CONSCIOUSNESS_DRAIN_BLOOD_MILD = 0.4;      // blood 30..50
+	public static final double CONSCIOUSNESS_DRAIN_BLOOD_SERIOUS = 1.2;   // blood 15..30
+	public static final double CONSCIOUSNESS_DRAIN_BLOOD_CRITICAL = 3.0;  // blood 0..15
+	public static final double CONSCIOUSNESS_DRAIN_BLOOD_ZERO = 6.0;      // blood == 0
+	/** Drain while out of air (drowning/suffocating), points/sec. */
+	public static final double CONSCIOUSNESS_DRAIN_ASPHYXIA = 2.5;
+	/** Blood scales recovery down to this floor as it approaches 0 (spec §18-19). */
+	public static final double CONSCIOUSNESS_RECOVERY_BLOOD_FLOOR = 0.3;
+
+	// Event-driven consciousness hits (spec §19-20).
+	/** Head condition damage converts to consciousness loss at this scale. */
+	public static final double CONSCIOUSNESS_HEAD_HIT_SCALE = 4.0;
+	/** Non-head trauma converts at this scale (explosions, falls, systemic). */
+	public static final double CONSCIOUSNESS_BODY_HIT_SCALE = 1.0;
+
+	// Concussion (spec §21).
+	/** Single head trauma at/above this concusses outright. */
+	public static final double CONCUSSION_HEAD_TRAUMA_THRESHOLD = 6.0;
+	/** Lesser head trauma concusses once the head is INJURED or worse. */
+	public static final double CONCUSSION_HEAD_TRAUMA_INJURED_THRESHOLD = 3.0;
+	/** Concussion halves consciousness recovery... */
+	public static final double CONCUSSION_RECOVERY_FACTOR = 0.5;
+	/** ...and amplifies further head-trauma consciousness loss. */
+	public static final double CONCUSSION_EXTRA_HEAD_DRAIN = 1.5;
+	/** Concussion clears once the head is HEALTHY and consciousness has stabilized here (spec §21). */
+	public static final double CONCUSSION_CLEAR_CONSCIOUSNESS = 90.0;
+
+	// Low-consciousness action sluggishness (spec §23).
+	public static final double SLUGGISH_PENALTY_AT_20 = 0.10;
+	public static final double SLUGGISH_PENALTY_AT_0 = 0.30;
+
 	// --- Impairment curve anchors (spec §11-12), piecewise-linear on condition fraction ---
 	// Arms: action speed / damage penalty fraction at anchor condition fractions.
 	public static final double ARM_PENALTY_AT_50 = 0.05;

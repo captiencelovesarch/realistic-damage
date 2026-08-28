@@ -28,11 +28,14 @@ public final class RDAttachments {
 					.initializer(RealisticDamageData::new)
 					.persistent(RDCodecs.DATA));
 
+	// Synced to ALL clients (not just the owner): remote clients need the
+	// unconscious flag to render prone poses, and it keeps future teammate
+	// body-HUDs possible. The snapshot is ~60 bytes and equality-deduped.
 	public static final AttachmentType<BodySnapshot> SNAPSHOT = AttachmentRegistry.create(
 			RealisticDamage.id("snapshot"),
 			builder -> builder
 					.initializer(BodySnapshot::healthy)
-					.syncWith(BodySnapshot.STREAM_CODEC, AttachmentSyncPredicate.targetOnly()));
+					.syncWith(BodySnapshot.STREAM_CODEC, AttachmentSyncPredicate.all()));
 
 	public static RealisticDamageData get(ServerPlayer player) {
 		return player.getAttachedOrCreate(DATA);

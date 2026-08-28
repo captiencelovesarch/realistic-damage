@@ -55,18 +55,43 @@ public final class ImpairmentSystem {
 		double jump = ImpairmentMath.jumpPenalty(movement);
 		BodyPartData mainArm = data.part(armFor(player, true));
 		double armPenalty = ImpairmentMath.armPenalty(mainArm.fraction(), mainArm.broken());
+		// Low consciousness makes actions sluggish (spec §23).
+		double sluggish = sluggishPenalty(data.consciousness());
+		double actionPenalty = Math.min(Balance.ARM_PENALTY_TOTAL_CAP, armPenalty + sluggish);
+
+		if (data.unconscious()) {
+			// Voluntary movement fully suppressed; physics still applies (spec §25).
+			movement = 1.0;
+			jump = 1.0;
+		}
 
 		apply(player, Attributes.MOVEMENT_SPEED, LEG_SPEED_ID, -movement);
 		apply(player, Attributes.JUMP_STRENGTH, LEG_JUMP_ID, -jump);
-		apply(player, Attributes.ATTACK_SPEED, ARM_ATTACK_SPEED_ID, -armPenalty);
-		apply(player, Attributes.BLOCK_BREAK_SPEED, ARM_MINING_ID, -armPenalty);
+		apply(player, Attributes.ATTACK_SPEED, ARM_ATTACK_SPEED_ID, -actionPenalty);
+		apply(player, Attributes.BLOCK_BREAK_SPEED, ARM_MINING_ID, -actionPenalty);
 		apply(player, Attributes.ATTACK_DAMAGE, ARM_DAMAGE_ID, -armPenalty * ARM_DAMAGE_FACTOR);
 
-		// A Disabled leg disables sprinting (spec §12). The client re-requests, the
-		// server keeps vetoing; the speed bonus is server-side anyway.
+		// A Disabled leg (or fading consciousness) disables sprinting (spec §12, §23).
+		// The client re-requests, the server keeps vetoing; the speed bonus is
+		// server-side anyway.
 		if (player.isSprinting() && sprintBlocked(data)) {
 			player.setSprinting(false);
 		}
+	}
+
+	/** Smooth action penalty from low consciousness: 0 above 55, ramping below. */
+	public static double sluggishPenalty(double consciousness) {
+		if (consciousness >= Balance.SYMPTOM_ATTACK_RECOVERY) {
+			return 0.0;
+		}
+		if (consciousness >= Balance.SYMPTOM_SPRINT_LOSS) {
+			double t = (Balance.SYMPTOM_ATTACK_RECOVERY - consciousness)
+					/ (Balance.SYMPTOM_ATTACK_RECOVERY - Balance.SYMPTOM_SPRINT_LOSS);
+			return t * Balance.SLUGGISH_PENALTY_AT_20;
+		}
+		double t = (Balance.SYMPTOM_SPRINT_LOSS - consciousness) / Balance.SYMPTOM_SPRINT_LOSS;
+		return Balance.SLUGGISH_PENALTY_AT_20
+				+ t * (Balance.SLUGGISH_PENALTY_AT_0 - Balance.SLUGGISH_PENALTY_AT_20);
 	}
 
 	/** Removes every impairment modifier (creative/spectator switch, spec §46). */
@@ -79,9 +104,10 @@ public final class ImpairmentSystem {
 	}
 
 	public static boolean sprintBlocked(RealisticDamageData data) {
-		return data.part(BodyPart.LEFT_LEG).state() == BodyState.DISABLED
+		return data.unconscious()
+				|| data.consciousness() < Balance.SYMPTOM_SPRINT_LOSS
+				|| data.part(BodyPart.LEFT_LEG).state() == BodyState.DISABLED
 				|| data.part(BodyPart.RIGHT_LEG).state() == BodyState.DISABLED;
-		// Milestone 5 adds: consciousness < SYMPTOM_SPRINT_LOSS.
 	}
 
 	/** The two-handed (bow/crossbow/spear-charge) penalty for this player right now. */

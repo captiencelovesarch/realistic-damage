@@ -117,6 +117,8 @@ public final class TraumaPipeline {
 		if (config.enableBleeding) {
 			createWounds(player, data, classified, profile, result);
 		}
+		dev.captience.realisticdamage.systems.ConsciousnessSystem.onTrauma(
+				player, data, classified, profile, result, appliedDamage);
 		return result;
 	}
 
