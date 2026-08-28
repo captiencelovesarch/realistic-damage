@@ -96,6 +96,12 @@ Death resets everything. Creative and Spectator are ignored entirely.
 ./gradlew runClient      # dev client
 ```
 
+## What's next
+
+`ROADMAP.md` sketches 1.1 through 1.5: sharpening the rough edges, then rescuing
+downed teammates, deeper consequences, mob anatomy, and a public API for other
+mods. Medical items are explicitly not on it.
+
 ## Design
 
 `DESIGN.md` holds the full architecture and the balance tables. Version 1.0 deliberately
