@@ -32,6 +32,9 @@ public final class ConsciousnessEffects {
 		if (!ClientState.active() || ClientState.snapshot() == null) {
 			return;
 		}
+		// This callback is the per-frame hook available to us, and camera drift has
+		// to run per frame to be smooth (see CameraDrift).
+		CameraDrift.frame(deltaTracker);
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		int width = graphics.guiWidth();
 		int height = graphics.guiHeight();
