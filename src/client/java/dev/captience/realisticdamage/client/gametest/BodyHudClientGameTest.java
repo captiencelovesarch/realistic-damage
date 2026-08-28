@@ -90,7 +90,9 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.waitTicks(30);
 			context.takeScreenshot("rd_06_destroyed");
 			context.runOnClient(client -> client.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON));
-			context.waitTicks(5);
+			context.waitTicks(10);
+			// First person: the arm and anything it was holding must be gone too.
+			context.takeScreenshot("rd_09_firstperson_armless");
 
 			// The accessibility screen must open and draw.
 			context.setScreen(() -> new dev.captience.realisticdamage.client.AccessibilityScreen(null));
