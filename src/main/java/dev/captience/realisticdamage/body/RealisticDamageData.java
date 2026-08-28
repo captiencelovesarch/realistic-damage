@@ -22,6 +22,8 @@ public final class RealisticDamageData {
 	private int unconsciousTicks;
 	private boolean concussion;
 	private boolean burned;
+	/** Transient: health captured at ALLOW_DAMAGE so AFTER_DAMAGE can compute the true post-mitigation damage. */
+	private transient double preHurtHealth = Double.NaN;
 
 	public RealisticDamageData() {
 		for (BodyPart part : BodyPart.values()) {
@@ -198,6 +200,25 @@ public final class RealisticDamageData {
 
 	public void clearWounds() {
 		wounds.clear();
+	}
+
+	// --- Damage-hook bookkeeping (spec §5: post-mitigation base) ---
+
+	public void capturePreHurt(double health) {
+		preHurtHealth = health;
+	}
+
+	/**
+	 * Returns the health actually lost since {@link #capturePreHurt} (absorption
+	 * excluded per spec §39), or -1 when no capture is pending. Single-use.
+	 */
+	public double consumePreHurt(double healthNow) {
+		if (Double.isNaN(preHurtHealth)) {
+			return -1.0;
+		}
+		double lost = Math.max(0.0, preHurtHealth - healthNow);
+		preHurtHealth = Double.NaN;
+		return lost;
 	}
 
 	// --- Whole-state operations ---

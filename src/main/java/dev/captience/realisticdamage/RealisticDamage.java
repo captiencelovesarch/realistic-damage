@@ -17,6 +17,7 @@ public class RealisticDamage implements ModInitializer {
 		dev.captience.realisticdamage.config.ServerConfig.load();
 		RDAttachments.init();
 		dev.captience.realisticdamage.systems.TickDispatcher.init();
+		dev.captience.realisticdamage.damage.DamageHooks.init();
 		dev.captience.realisticdamage.command.RealisticDamageCommands.init();
 		LOGGER.info("Realistic Damage initialized");
 	}

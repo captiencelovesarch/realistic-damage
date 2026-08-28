@@ -159,7 +159,30 @@ public final class Balance {
 	/** Disabled parts are raised to this fraction of max (low CRITICAL). */
 	public static final double TOTEM_CONDITION_FLOOR_FRACTION = 0.15;
 
+	// --- Hit-location geometry (spec §6) ---
+	/** Fraction of bounding-box height where the head band starts (standing 1.8 -> 1.404, real head starts 1.4). */
+	public static final double HEAD_BAND_FRACTION = 0.78;
+	/** Fraction of bounding-box height where legs end (standing 1.8 -> 0.756, real legs ~0.75). */
+	public static final double LEG_BAND_FRACTION = 0.42;
+	/** |lateral| beyond this fraction of the half-width inside the torso band is an arm. */
+	public static final double ARM_LATERAL_FRACTION = 0.60;
+
+	// --- Environmental routing (spec §7, §29-30) ---
+	/** Post-mitigation fall damage at/above this adds secondary torso trauma. */
+	public static final double FALL_SECONDARY_TORSO_DAMAGE = 10.0;
+	/** ...and at/above this also secondary head trauma (extreme falls, spec §30). */
+	public static final double FALL_SECONDARY_HEAD_DAMAGE = 15.0;
+	/** Explosion trauma shares: nearest region / core secondary / the rest (spec §29). */
+	public static final double EXPLOSION_PRIMARY_SHARE = 0.50;
+	public static final double EXPLOSION_SECONDARY_SHARE = 0.30;
+
 	// --- Armor / enchantments (spec §31) ---
+	/** Specialized enchantments (Blast/Projectile/Fire Protection) per level on a covering piece. */
+	public static final double ENCH_SPECIALIZED_TRAUMA_PER_LEVEL = 0.06;
+	/** Overall localized-armor reduction caps. */
+	public static final double ARMOR_REDUCTION_CAP = 0.60;
+	public static final double ARMOR_FALL_REDUCTION_CAP = 0.85;
+
 	/** Localized armor: covering piece reduces body trauma by up to this fraction (scaled by piece defense). */
 	public static final double LOCAL_ARMOR_MAX_REDUCTION = 0.30;
 	/** Trauma reduction per Protection level on the covering piece(s). */

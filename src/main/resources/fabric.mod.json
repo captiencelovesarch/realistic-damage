@@ -19,7 +19,8 @@
 			"dev.captience.realisticdamage.client.RealisticDamageClient"
 		],
 		"fabric-gametest": [
-			"dev.captience.realisticdamage.gametest.FoundationGameTest"
+			"dev.captience.realisticdamage.gametest.FoundationGameTest",
+			"dev.captience.realisticdamage.gametest.DamageRoutingGameTest"
 		]
 	},
 	"mixins": [
