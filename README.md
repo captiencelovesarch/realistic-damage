@@ -17,8 +17,8 @@ Fabric · Minecraft 26.2 · Java 25
 
 **Six body regions** — head, torso, both arms, both legs — each with hidden condition that
 degrades through `Healthy → Hurt → Injured → Critical → Disabled`. A hurt arm mines and
-fights slower; hurt legs slow you down and eventually cost you your sprint. Nothing is
-permanent, and nothing soaks damage that would otherwise hit your hearts.
+fights slower; hurt legs slow you down and eventually cost you your sprint. Nothing soaks
+damage that would otherwise hit your hearts.
 
 **Real hit location.** Arrows use their actual impact point; melee reconstructs the
 attacker's swing ray. What you hit is what you damage — including left versus right.
@@ -32,6 +32,13 @@ punctures bleed, blunt trauma doesn't. Identical hits always produce identical o
 costing hearts and pulls you toward blacking out. Head trauma can knock you unconscious
 with most of your hearts intact. You wake up when you stabilize.
 
+**Limb destruction** (Arcade preset, on by default). Keep hitting a limb that is already
+Disabled and it is gone for good: no healing, no golden apple, only death restores it. A
+destroyed arm cannot use that hand and works one-handed at a heavy penalty, destroyed legs
+are a permanent limp, losing both means you crawl, and a destroyed head or torso kills.
+Destroyed limbs vanish from your body in first and third person. Turn it off with
+`/rdmg preset grounded`.
+
 **Food is the cure.** No bandages, no splints, no medical crafting. Eating, natural
 regeneration, sleeping, golden apples and healing potions repair everything — the danger
 is whether you have enough food and enough time before things spiral.
@@ -42,10 +49,16 @@ Injuries show on a small body diagram that fades in when something's wrong. Stat
 injuries are shown by shape and color; exact numbers stay hidden. Action-bar messages call
 out the moments that matter ("Your left leg breaks!", "You're bleeding heavily!").
 
-Press **K** (rebindable) or use Mod Menu for accessibility settings. Every sensory
-effect — vignette, look slowdown, afterimages, exposure shift, ear ringing, heartbeat —
-has its own slider and can be turned off individually without disabling unconsciousness
-itself. There's a one-click "turn off all sensory effects" button.
+As consciousness fails the world genuinely changes rather than being overlaid: colour
+drains out of it, the view warps and blurs, your aim goes slippery and slow, your head
+sags, and the world's audio is low-passed into a dull murmur behind a ringing tone and a
+rising heartbeat. Heavy blows flash and kick the camera on impact.
+
+Press **K** (rebindable) or use Mod Menu for accessibility settings. Every one of those
+effects has its own slider and can be turned off individually without disabling
+unconsciousness itself, and there's a one-click "turn off all sensory effects" button.
+Two presets: **Arcade** (limb destruction, readable effects) and **Grounded** (no
+destruction, full blackout, camera drift, everything at full strength).
 
 ## Server settings
 
@@ -59,6 +72,7 @@ itself. There's a one-click "turn off all sensory effects" button.
 | `healingMultiplier` | 1.0 | Scales all recovery |
 | `fallTraumaMultiplier` | 1.0 | Scales fall trauma specifically |
 | `pvpTraumaMultiplier` | 1.0 | Scales trauma from other players |
+| `enableLimbDestruction` | true | Arcade preset: limbs can be destroyed permanently |
 | `enableBleeding` / `enableBrokenLimbs` / `enableConsciousness` / `enableBurns` / `enableHitLocation` | true | Turn whole systems off |
 
 Every tuning constant lives in one file (`config/Balance.java`) so rebalancing never means
@@ -80,6 +94,8 @@ hunting magic numbers.
 /rdmg bleed <player> <part> <severity>
 /rdmg concussion <player>
 /rdmg burn <player>
+/rdmg destroy <player> <part>             destroy a limb outright
+/rdmg preset <arcade|grounded>            switch the server-side preset
 ```
 
 ## Notes
@@ -93,7 +109,8 @@ Death resets everything. Creative and Spectator are ignored entirely.
 ./gradlew build          # jar in build/libs
 ./gradlew test           # pure-math unit tests
 ./gradlew runGametest    # in-server behavior tests
-./gradlew runClient      # dev client
+./gradlew runClient          # dev client
+./gradlew runClientGametest  # boots a world and screenshots the UI
 ```
 
 ## What's next
@@ -104,7 +121,7 @@ mods. Medical items are explicitly not on it.
 
 ## Design
 
-`DESIGN.md` holds the full architecture and the balance tables. Version 1.0 deliberately
-stops at `Disabled` — no destroyed limbs, no permanent injuries, no medical items, no mob
-anatomy. Damage classification is tag- and component-driven so a future compatibility
-layer (e.g. firearms mods with exact impact coordinates) can feed the same pipeline.
+`DESIGN.md` holds the full architecture and the balance tables. Limb destruction was pulled
+forward into 1.0 during playtesting; medical items and mob anatomy remain out of scope.
+Damage classification is tag- and component-driven so a future compatibility layer (e.g.
+firearms mods with exact impact coordinates) can feed the same pipeline.
