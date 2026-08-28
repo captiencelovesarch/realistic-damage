@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"id": "realisticdamage",
+	"version": "${version}",
+	"name": "Realistic Damage",
+	"description": "Minecraft, but damage is cooler. Locational body trauma, bleeding, broken limbs, and consciousness — while vanilla hearts stay in charge.",
+	"authors": [
+		"captience"
+	],
+	"contact": {},
+	"license": "CC0-1.0",
+	"icon": "assets/realisticdamage/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"dev.captience.realisticdamage.RealisticDamage"
+		],
+		"client": [
+			"dev.captience.realisticdamage.client.RealisticDamageClient"
+		]
+	},
+	"mixins": [
+		"realisticdamage.mixins.json",
+		{
+			"config": "realisticdamage.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
