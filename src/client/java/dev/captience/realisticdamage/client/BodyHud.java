@@ -62,16 +62,8 @@ public final class BodyHud {
 		int y = graphics.guiHeight() / 2 - (HEAD_H + TORSO_H + LEG_H) / 2;
 		int alpha = (int) (Math.min(1.0, visibility) * 255.0) << 24;
 
-		// Head
-		box(graphics, x + 1, y, TORSO_W - 2, HEAD_H, snapshot, BodyPart.HEAD, alpha);
+		int legY = drawBody(graphics, snapshot, x, y, alpha);
 		int torsoY = y + HEAD_H + PAD;
-		// Arms flank the torso; screen-left is the player's right arm (mirror view).
-		box(graphics, x - SEG - PAD, torsoY, SEG, TORSO_H, snapshot, BodyPart.RIGHT_ARM, alpha);
-		box(graphics, x, torsoY, TORSO_W, TORSO_H, snapshot, BodyPart.TORSO, alpha);
-		box(graphics, x + TORSO_W + PAD, torsoY, SEG, TORSO_H, snapshot, BodyPart.LEFT_ARM, alpha);
-		int legY = torsoY + TORSO_H + PAD;
-		box(graphics, x, legY, SEG, LEG_H, snapshot, BodyPart.RIGHT_LEG, alpha);
-		box(graphics, x + TORSO_W - SEG, legY, SEG, LEG_H, snapshot, BodyPart.LEFT_LEG, alpha);
 
 		// Blood gauge: a column beside the body that drains as you bleed, so you
 		// can see bleed-out coming instead of being surprised by it. Still no
@@ -92,6 +84,31 @@ public final class BodyHud {
 			graphics.text(net.minecraft.client.Minecraft.getInstance().font, caption,
 					MARGIN, iconY + 1, 0x00FFFFFF | alpha, true);
 		}
+	}
+
+	/**
+	 * Draws the six-region diagram with its torso column starting at {@code x},
+	 * and returns the y of the leg row. Shared with the triage view so a patient
+	 * is read exactly the same way as your own body — a rescuer should not have
+	 * to learn a second diagram in the middle of an emergency.
+	 */
+	public static int drawBody(GuiGraphicsExtractor graphics, BodySnapshot snapshot,
+			int x, int y, int alpha) {
+		box(graphics, x + 1, y, TORSO_W - 2, HEAD_H, snapshot, BodyPart.HEAD, alpha);
+		int torsoY = y + HEAD_H + PAD;
+		// Arms flank the torso; screen-left is the player's right arm (mirror view).
+		box(graphics, x - SEG - PAD, torsoY, SEG, TORSO_H, snapshot, BodyPart.RIGHT_ARM, alpha);
+		box(graphics, x, torsoY, TORSO_W, TORSO_H, snapshot, BodyPart.TORSO, alpha);
+		box(graphics, x + TORSO_W + PAD, torsoY, SEG, TORSO_H, snapshot, BodyPart.LEFT_ARM, alpha);
+		int legY = torsoY + TORSO_H + PAD;
+		box(graphics, x, legY, SEG, LEG_H, snapshot, BodyPart.RIGHT_LEG, alpha);
+		box(graphics, x + TORSO_W - SEG, legY, SEG, LEG_H, snapshot, BodyPart.LEFT_LEG, alpha);
+		return legY;
+	}
+
+	/** Full height of the diagram, for callers positioning it. */
+	public static int bodyHeight() {
+		return HEAD_H + PAD + TORSO_H + PAD + LEG_H;
 	}
 
 	/** Game time in ticks, for the bleed throb. */
@@ -120,7 +137,7 @@ public final class BodyHud {
 	}
 
 	/** Draws one icon per active status; returns the y below the row. */
-	private static int drawStatusIcons(GuiGraphicsExtractor graphics, BodySnapshot snapshot, int x, int y, int alpha) {
+	static int drawStatusIcons(GuiGraphicsExtractor graphics, BodySnapshot snapshot, int x, int y, int alpha) {
 		int cursor = x;
 		boolean any = false;
 		if (snapshot.woundMask() != 0) {
@@ -191,7 +208,7 @@ public final class BodyHud {
 	}
 
 	/** The single most important thing wrong right now, or null. */
-	private static Component caption(BodySnapshot snapshot) {
+	static Component caption(BodySnapshot snapshot) {
 		BodyPart worstPart = null;
 		BodyState worstState = BodyState.HEALTHY;
 		for (BodyPart part : BodyPart.values()) {

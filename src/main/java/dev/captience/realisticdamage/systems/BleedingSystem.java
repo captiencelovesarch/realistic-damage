@@ -30,8 +30,11 @@ public final class BleedingSystem {
 			return;
 		}
 		if (data.bleeding()) {
-			data.drainBlood(data.effectiveBleedRate() * config.bleedingRateMultiplier / 20.0);
-			if (player.tickCount % PARTICLE_INTERVAL == 0) {
+			// A hand held over the wound does not close it, it only slows what is
+			// coming out. Buying time, not a cure (1.2).
+			data.drainBlood(data.effectiveBleedRate() * config.bleedingRateMultiplier
+					* data.pressureMultiplier() / 20.0);
+			if (player.tickCount % PARTICLE_INTERVAL == 0 && !data.underPressure()) {
 				spawnWoundParticles(player, data);
 			}
 		}

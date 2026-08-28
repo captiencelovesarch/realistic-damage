@@ -69,6 +69,16 @@ public final class ImpairmentSystem {
 			movement = Math.max(movement, Balance.CRAWL_MOVEMENT_PENALTY);
 			jump = 1.0;
 		}
+		if (data.dragging() != null) {
+			// Hauling a body: slow, and no jumping with your hands full.
+			movement = Math.max(movement, Balance.DRAG_MOVEMENT_PENALTY);
+			jump = 1.0;
+		}
+		if (RescueSystem.rooted(data)) {
+			// Kneeling with a hand on a wound. You can press or you can move.
+			movement = 1.0;
+			jump = 1.0;
+		}
 		if (data.unconscious()) {
 			// Voluntary movement fully suppressed; physics still applies (spec §25).
 			movement = 1.0;

@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.systems.WoundMath;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Complete Realistic Damage state for one player (spec §48). Server
@@ -32,6 +34,26 @@ public final class RealisticDamageData {
 	private transient double bleedHpProgress;
 	/** Transient: last blood band announced, so warnings fire once per crossing. */
 	private transient int lastBloodBand = -1;
+	/**
+	 * Transient rescue state (spec 1.2). None of it is persisted: a grip on
+	 * someone's arm should not survive a server restart, and a stale UUID
+	 * pointing at a player who is no longer here would be worse than nothing.
+	 */
+	private transient UUID dragging;
+	private transient UUID draggedBy;
+	private transient UUID pressureTarget;
+	/** Counts down; refreshed each tick by whoever is pressing on this body. */
+	private transient int pressureTicks;
+	/** Whether that hold is the player's own hands rather than a companion's. */
+	private transient boolean pressureBySelf;
+	/**
+	 * Counts down on the presser's own side. Without it, a client that simply
+	 * stopped asking would leave {@code pressureTarget} set forever and the
+	 * player rooted to the spot with no way out.
+	 */
+	private transient int pressureHoldTicks;
+	/** Transient: last "who you are treating" id sent, so it is only sent on change. */
+	private transient int lastTreatingSent = -1;
 
 	public RealisticDamageData() {
 		for (BodyPart part : BodyPart.values()) {
@@ -140,6 +162,91 @@ public final class RealisticDamageData {
 		if (unconscious) {
 			unconsciousTicks++;
 		}
+	}
+
+	// --- Rescue (1.2) ---
+
+	@Nullable
+	public UUID dragging() {
+		return dragging;
+	}
+
+	public void setDragging(@Nullable UUID victim) {
+		dragging = victim;
+	}
+
+	@Nullable
+	public UUID draggedBy() {
+		return draggedBy;
+	}
+
+	public void setDraggedBy(@Nullable UUID dragger) {
+		draggedBy = dragger;
+	}
+
+	@Nullable
+	public UUID pressureTarget() {
+		return pressureTarget;
+	}
+
+	public void setPressureTarget(@Nullable UUID target) {
+		pressureTarget = target;
+	}
+
+	/** True while someone (possibly this player) is holding a wound shut. */
+	public boolean underPressure() {
+		return pressureTicks > 0;
+	}
+
+	/** Called by whoever is pressing, every tick they keep it up. */
+	public void refreshPressure(boolean bySelf) {
+		pressureTicks = Balance.PRESSURE_GRACE_TICKS;
+		pressureBySelf = bySelf;
+	}
+
+	/** How effective the current hold is: your own hands are the worse option. */
+	public double pressureMultiplier() {
+		if (pressureTicks <= 0) {
+			return 1.0;
+		}
+		return pressureBySelf
+				? Balance.PRESSURE_BLEED_MULTIPLIER_SELF
+				: Balance.PRESSURE_BLEED_MULTIPLIER_COMPANION;
+	}
+
+	public void tickPressure() {
+		if (pressureTicks > 0) {
+			pressureTicks--;
+		}
+	}
+
+	/** Renewed by the presser every tick they keep the key down. */
+	public void refreshPressureHold() {
+		pressureHoldTicks = Balance.PRESSURE_GRACE_TICKS;
+	}
+
+	/** Ticks the hold down; false once it has lapsed and the grip should be dropped. */
+	public boolean tickPressureHold() {
+		if (pressureHoldTicks > 0) {
+			pressureHoldTicks--;
+		}
+		return pressureHoldTicks > 0;
+	}
+
+	public int lastTreatingSent() {
+		return lastTreatingSent;
+	}
+
+	public void setLastTreatingSent(int id) {
+		lastTreatingSent = id;
+	}
+
+	/** Rescue state is interaction state, not body state: dropped on death and respawn. */
+	public void clearRescue() {
+		dragging = null;
+		draggedBy = null;
+		pressureTarget = null;
+		pressureTicks = 0;
 	}
 
 	public void setUnconsciousTicks(int ticks) {

@@ -23,6 +23,9 @@ public class RealisticDamageClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.InjurySoundPayload.TYPE,
 				(payload, context) -> InjuryAudio.play(payload));
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.TreatingPayload.TYPE,
+				(payload, context) -> TriageHud.setTarget(payload.targetId()));
 
 		// Reachable without Mod Menu, per the "no config-file editing" rule.
 		KeyMapping.Category category = KeyMapping.Category.register(RealisticDamage.id("main"));
@@ -35,12 +38,15 @@ public class RealisticDamageClient implements ClientModInitializer {
 				RealisticDamage.id("consciousness_effects"), ConsciousnessEffects::render);
 		HudElementRegistry.attachElementAfter(VanillaHudElements.BOSS_BAR,
 				RealisticDamage.id("body_hud"), BodyHud::render);
+		HudElementRegistry.attachElementAfter(VanillaHudElements.BOSS_BAR,
+				RealisticDamage.id("triage_hud"), TriageHud::render);
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			ClientState.tick();
 			ConsciousnessAudio.tick();
 			MouseInertia.tickFallback();
 			VisionEffects.tick();
+			RescueInput.tick(client);
 			while (openSettings.consumeClick()) {
 				client.gui.setScreen(new AccessibilityScreen(client.gui.screen()));
 			}
@@ -50,6 +56,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			VisionEffects.reset();
 			MouseInertia.reset();
 			ImpactEffect.reset();
+			TriageHud.reset();
 		});
 	}
 }

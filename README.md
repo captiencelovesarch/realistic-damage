@@ -39,6 +39,12 @@ are a permanent limp, losing both means you crawl, and a destroyed head or torso
 Destroyed limbs vanish from your body in first and third person. Turn it off with
 `/rdmg preset grounded`.
 
+**Rescue.** Sneak-use a downed player to drag them out of the fire — half speed, both
+hands full. Hold use with empty hands to press a wound shut and slow the bleeding, on a
+teammate or on yourself (pressing your own pins you in place: stop the bleeding or keep
+fighting, not both). Feed food to someone who can't use their own hands. No bandages
+involved in any of it — pressure only buys time, food is still what fixes you.
+
 **Food is the cure.** No bandages, no splints, no medical crafting. Eating, natural
 regeneration, sleeping, golden apples and healing potions repair everything — the danger
 is whether you have enough food and enough time before things spiral.
@@ -71,6 +77,19 @@ Slow aim and sloppy aim are separate sliders (**Look Slowdown** and **Look Drift
 you can have one without the other.
 Two presets: **Arcade** (limb destruction, readable effects) and **Grounded** (no
 destruction, full blackout, camera drift, everything at full strength).
+
+## Practice dummy
+
+`/rdmg dummy spawn` puts down a player-equivalent target — a real player as far as the
+mod is concerned, so it bleeds, breaks, concusses and goes down exactly as you would.
+
+| Command | Effect |
+|---|---|
+| `/rdmg dummy spawn` | Spawn one in front of you, facing you |
+| `/rdmg dummy fightback <true\|false>` | Have it swing back with whatever it's holding |
+| `/rdmg dummy equip` | Copy your own held item and armour onto it |
+| `/rdmg dummy heal` | Full health and a pristine body, without respawning it |
+| `/rdmg dummy remove` | Remove them all |
 
 ## Server settings
 
@@ -109,6 +128,8 @@ hunting magic numbers.
 /rdmg burn <player>
 /rdmg destroy <player> <part>             destroy a limb outright
 /rdmg preset <arcade|grounded>            switch the server-side preset
+/rdmg dummy spawn|remove|heal|equip       practice target (see above)
+/rdmg dummy fightback <true|false>
 ```
 
 ## Notes
@@ -128,8 +149,7 @@ Death resets everything. Creative and Spectator are ignored entirely.
 
 ## What's next
 
-`ROADMAP.md` sketches 1.1 through 1.5: sharpening the rough edges, then rescuing
-downed teammates, deeper consequences, mob anatomy, and a public API for other
+`ROADMAP.md` covers 1.3 through 1.5: deeper consequences, mob anatomy, and a public API for other
 mods. Medical items are explicitly not on it.
 
 ## Design

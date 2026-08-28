@@ -85,8 +85,14 @@ public final class Balance {
 	/** Below BLOOD_SERIOUS: vanilla HP damage per tick-cycle begins. Half-hearts per second. */
 	public static final double BLEEDOUT_HP_PER_SEC_SERIOUS = 0.4;
 	public static final double BLEEDOUT_HP_PER_SEC_CRITICAL = 1.6;
-	/** Empty: a full-health player bleeds out in about four seconds. */
-	public static final double BLEEDOUT_HP_PER_SEC_ZERO = 5.0;
+	/**
+	 * Empty. Eased from 5.0 to 3.5 in 1.2: at four seconds from full health this
+	 * was not a last stand so much as an announcement, and now that a companion
+	 * can reach you and put food in you it needs to be a window rather than a
+	 * formality. Roughly six seconds from full, and far less from the health you
+	 * will actually have — still the worst place in the mod to be.
+	 */
+	public static final double BLEEDOUT_HP_PER_SEC_ZERO = 3.5;
 
 	// --- Consciousness (spec §19-23) ---
 	public static final double CONSCIOUSNESS_MAX = 100.0;
@@ -112,6 +118,38 @@ public final class Balance {
 
 	/** Minimum time unconscious, in ticks (~2.5s). */
 	public static final int MIN_UNCONSCIOUS_TICKS = 50;
+
+	// --- Rescue (1.2) ---
+
+	/** How close you must be to grab, press or feed someone. */
+	public static final double RESCUE_REACH = 3.0;
+	/** Movement penalty while hauling a body: hands full, half speed. */
+	public static final double DRAG_MOVEMENT_PENALTY = 0.50;
+	/** Where the body trails, in blocks behind the dragger. */
+	public static final double DRAG_FOLLOW_DISTANCE = 1.3;
+	/** Past this the grip is lost — a wall, a ledge, or someone sprinting off. */
+	public static final double DRAG_BREAK_DISTANCE = 5.0;
+	/** Cap on how fast the body is pulled, in blocks per tick. */
+	public static final double DRAG_PULL_SPEED = 0.34;
+	/**
+	 * What pressure does to a bleed rate. Strong enough to be worth kneeling
+	 * down for, short of a cure: pressure buys time, food is still the only
+	 * thing that puts blood back.
+	 *
+	 * <p>A companion is better at it than you are, and deliberately so. They
+	 * have two free hands, they can see the wound, and they are not the one
+	 * going into shock. At the stacking cap of 3.0 Blood/sec this is the
+	 * difference between roughly 45 seconds of blood left and 133 — which is the
+	 * gap that makes fetching someone worth the trip.
+	 */
+	public static final double PRESSURE_BLEED_MULTIPLIER_SELF = 0.40;
+	public static final double PRESSURE_BLEED_MULTIPLIER_COMPANION = 0.25;
+	/**
+	 * Grace period on a pressure claim, in ticks. The presser refreshes this
+	 * every tick; two ticks of slack keeps the effect steady if one is missed
+	 * without letting it linger after they let go.
+	 */
+	public static final int PRESSURE_GRACE_TICKS = 2;
 
 	/** How far away someone else's fracture or collapse can still be heard, in blocks. */
 	public static final double INJURY_SOUND_RADIUS = 24.0;

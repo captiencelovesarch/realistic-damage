@@ -33,6 +33,8 @@ public final class TickDispatcher {
 			part.tickStrain();
 		}
 		data.tickUnconscious();
+		// Ahead of bleeding, so a pressure hold claimed this tick counts this tick.
+		RescueSystem.tick(player, data);
 		BleedingSystem.tick(player, data);
 		ConsciousnessSystem.tick(player, data);
 		HealingSystem.tick(player, data);

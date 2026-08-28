@@ -86,23 +86,49 @@ and because the limit applied per frame your maximum turn rate depended on your
 frame rate. It now bounds only the leftover momentum, which is what the guard
 was ever meant to be about.
 
-## 1.2: Rescue
+## Shipped in 1.2
 
-The single most requested thing the original design deferred, and the one that
-changes the multiplayer game most.
+Rescue: the thing the original design deferred, and the one that changes the
+multiplayer game most.
 
-- **Drag and carry** unconscious players. Someone has to be able to haul you out
-  of the fire.
-- **Feed and treat teammates**: apply food or a golden apple to someone who is
-  unconscious and cannot use their own hands.
-- **Shared visibility**: optionally see a teammate's body state when close, so
-  triage is possible without voice chat.
-- **Bleeding pressure**: hold-to-apply pressure on a wound to slow it, using no
-  item at all. Keeps the no-medical-items rule intact while giving a companion
-  something to actually do.
+- **Drag** an unconscious player. Sneak-use to grab them; they are hauled along
+  the ground by velocity rather than teleported or mounted, so a body snags on
+  terrain, slides down slopes and can be lost over a ledge. Costs half your
+  speed and both hands.
+- **Bleeding pressure**, with no item at all. Hold use with empty hands on a
+  downed teammate, or on yourself — but pressing your own wound pins you where
+  you stand, so you can stop your own bleeding or you can keep fighting. A
+  companion is better at it than you are (×0.25 against ×0.40), which is the gap
+  that makes fetching one worth the trip.
+- **Feed a teammate** who cannot use their own hands. Routed through vanilla's
+  own consume path on the recipient, so hunger, golden-apple effects and the
+  mod's Blood restoration all land exactly as if they had eaten it.
+- **Triage view**: the patient's body, icons and status, drawn beside your own —
+  but only while you are actually treating them. You have to reach them and
+  commit a hand before you learn what is wrong.
+- **Retuned for a survivable downed state.** Bleed-out at zero blood eased from
+  5.0 to 3.5 HP/sec: at four seconds from full health that was not a last stand
+  so much as an announcement, and now that somebody can reach you and put food
+  in you it needs to be a window.
 
-Risk to watch: this is the first feature that makes being downed *survivable by
-design*, so bleed-out and consciousness timings will need retuning alongside it.
+Nothing here heals directly. Pressure buys time and feeding is still just food,
+so the spec's bet — the danger is whether you have enough food and enough time —
+is intact.
+
+**Practice dummy** (`/rdmg dummy spawn`), added alongside for testing PVP
+mechanics. It is a genuine ServerPlayer rather than a mob in a player skin,
+which is the whole point: every system is typed against ServerPlayer, so a real
+one inherits hit location, six regions, bleeding, breaks, consciousness and limb
+destruction with no code aware it is not a person. `fightback` makes it swing
+back, `equip` copies your own gear onto it, `heal` puts it back together.
+Generalising the pipeline to LivingEntity instead is the 1.4 work and would have
+meant refactoring twelve files to get one test target.
+
+**Multiplayer** is verified rather than assumed: a client gametest boots a real
+dedicated server, connects a real client, and checks that body state, a second
+player's state and the triage view all survive an actual socket. Every
+clientbound send is now gated on `canSend`, so a vanilla client on a modded
+server — or the dummy's connection, which goes nowhere — cannot break anything.
 
 ## 1.3: Consequence
 

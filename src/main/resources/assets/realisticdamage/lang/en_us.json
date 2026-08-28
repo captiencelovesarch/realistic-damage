@@ -110,5 +110,14 @@
 	"realisticdamage.vitals.consciousness.4": "out cold",
 	"realisticdamage.subtitle.fracture": "Bone snaps",
 	"realisticdamage.subtitle.destruction": "Body torn apart",
-	"realisticdamage.subtitle.collapse": "Body hits the ground"
+	"realisticdamage.subtitle.collapse": "Body hits the ground",
+	"realisticdamage.msg.drag.start": "You take hold of them.",
+	"realisticdamage.msg.drag.stop": "You let go.",
+	"realisticdamage.msg.drag.lost": "They slip from your grip.",
+	"realisticdamage.msg.pressure.self": "You press down on the wound.",
+	"realisticdamage.msg.pressure.other": "You hold their wound shut.",
+	"realisticdamage.msg.feed.given": "You get some food into them.",
+	"realisticdamage.msg.feed.received": "Someone is feeding you.",
+	"realisticdamage.msg.feed.full": "They cannot take any more.",
+	"realisticdamage.triage.unconscious": "Unconscious"
 }

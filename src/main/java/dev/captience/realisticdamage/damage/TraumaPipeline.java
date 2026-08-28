@@ -170,9 +170,13 @@ public final class TraumaPipeline {
 				yaw = (float) (Math.toDegrees(Math.atan2(delta.z, delta.x)) - 90.0);
 			}
 		}
-		net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-				new dev.captience.realisticdamage.net.ImpactPayload(
-						(float) Math.min(1.0, magnitude), yaw));
+		// A vanilla client on a modded server has no receiver for this.
+		if (net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
+				player, dev.captience.realisticdamage.net.ImpactPayload.TYPE)) {
+			net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+					new dev.captience.realisticdamage.net.ImpactPayload(
+							(float) Math.min(1.0, magnitude), yaw));
+		}
 	}
 
 	/** Deterministic wound creation from localized trauma thresholds (spec §16). */

@@ -22,7 +22,8 @@
 			"dev.captience.realisticdamage.client.ModMenuIntegration"
 		],
 		"fabric-client-gametest": [
-			"dev.captience.realisticdamage.client.gametest.BodyHudClientGameTest"
+			"dev.captience.realisticdamage.client.gametest.BodyHudClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.MultiplayerClientGameTest"
 		],
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
@@ -31,7 +32,9 @@
 			"dev.captience.realisticdamage.gametest.BleedingGameTest",
 			"dev.captience.realisticdamage.gametest.ConsciousnessGameTest",
 			"dev.captience.realisticdamage.gametest.HealingGameTest",
-			"dev.captience.realisticdamage.gametest.UnconsciousAggroGameTest"
+			"dev.captience.realisticdamage.gametest.UnconsciousAggroGameTest",
+			"dev.captience.realisticdamage.gametest.RescueGameTest",
+			"dev.captience.realisticdamage.gametest.PracticeDummyGameTest"
 		]
 	},
 	"mixins": [
