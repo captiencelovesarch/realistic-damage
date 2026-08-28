@@ -30,7 +30,19 @@ public class AccessibilityScreen extends Screen {
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		int columnLeft = this.width / 2 - 155;
 		int columnRight = this.width / 2 + 5;
-		int y = 40;
+		int y = 36;
+
+		addRenderableWidget(Button.builder(
+						Component.translatable("realisticdamage.config.preset")
+								.append(": ").append(Component.translatable("realisticdamage.config.preset.arcade")),
+						button -> { config.applyArcadePreset(); rebuildWidgets(); })
+				.bounds(columnLeft, y, 150, 20).build());
+		addRenderableWidget(Button.builder(
+						Component.translatable("realisticdamage.config.preset")
+								.append(": ").append(Component.translatable("realisticdamage.config.preset.grounded")),
+						button -> { config.applyGroundedPreset(); rebuildWidgets(); })
+				.bounds(columnRight, y, 150, 20).build());
+		y += 28;
 
 		addRenderableWidget(CycleButton.onOffBuilder(config.showBodyHud)
 				.create(columnLeft, y, 150, 20, Component.translatable("realisticdamage.config.body_hud"),
@@ -56,6 +68,13 @@ public class AccessibilityScreen extends Screen {
 				() -> config.ringingVolume, value -> config.ringingVolume = value));
 		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.heartbeat",
 				() -> config.heartbeatVolume, value -> config.heartbeatVolume = value));
+		y += 24;
+
+		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.camera_drift",
+				() -> config.cameraDriftIntensity, value -> config.cameraDriftIntensity = value));
+		addRenderableWidget(CycleButton.onOffBuilder(config.fullBlackUnconscious)
+				.create(columnRight, y, 150, 20, Component.translatable("realisticdamage.config.full_black"),
+						(button, value) -> config.fullBlackUnconscious = value));
 		y += 32;
 
 		addRenderableWidget(Button.builder(Component.translatable("realisticdamage.config.disable_all_effects"),
@@ -66,6 +85,7 @@ public class AccessibilityScreen extends Screen {
 							config.exposureIntensity = 0.0;
 							config.ringingVolume = 0.0;
 							config.heartbeatVolume = 0.0;
+							config.cameraDriftIntensity = 0.0;
 							rebuildWidgets();
 						})
 				.bounds(this.width / 2 - 155, y, 310, 20).build());

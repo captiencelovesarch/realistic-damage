@@ -53,6 +53,19 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("rd_04_recovered");
 			assertSynced(context, "after recovery");
 
+			// Limb destruction: the arm and both legs must vanish from the model,
+			// and the player drops to a crawl.
+			mutate(singleplayer, data -> {
+				data.part(BodyPart.RIGHT_ARM).setDestroyed(true);
+				data.part(BodyPart.LEFT_LEG).setDestroyed(true);
+				data.part(BodyPart.RIGHT_LEG).setDestroyed(true);
+			});
+			context.runOnClient(client -> client.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK));
+			context.waitTicks(30);
+			context.takeScreenshot("rd_06_destroyed");
+			context.runOnClient(client -> client.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON));
+			context.waitTicks(5);
+
 			// The accessibility screen must open and draw.
 			context.setScreen(() -> new dev.captience.realisticdamage.client.AccessibilityScreen(null));
 			context.waitTicks(5);

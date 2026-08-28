@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
  */
 public record BodySnapshot(
 		float head, float torso, float leftArm, float rightArm, float leftLeg, float rightLeg,
-		int brokenMask, int woundMask, int statusFlags,
+		int brokenMask, int woundMask, int statusFlags, int destroyedMask,
 		float blood, float consciousness
 ) {
 	public static final int FLAG_UNCONSCIOUS = 1;
@@ -37,6 +37,7 @@ public record BodySnapshot(
 			ByteBufCodecs.VAR_INT, BodySnapshot::brokenMask,
 			ByteBufCodecs.VAR_INT, BodySnapshot::woundMask,
 			ByteBufCodecs.VAR_INT, BodySnapshot::statusFlags,
+			ByteBufCodecs.VAR_INT, BodySnapshot::destroyedMask,
 			ByteBufCodecs.FLOAT, BodySnapshot::blood,
 			ByteBufCodecs.FLOAT, BodySnapshot::consciousness,
 			BodySnapshot::new);
@@ -44,9 +45,13 @@ public record BodySnapshot(
 	public static BodySnapshot of(RealisticDamageData data) {
 		int broken = 0;
 		int wounds = 0;
+		int destroyed = 0;
 		for (BodyPart part : BodyPart.values()) {
 			if (data.part(part).broken()) {
 				broken |= 1 << part.ordinal();
+			}
+			if (data.part(part).destroyed()) {
+				destroyed |= 1 << part.ordinal();
 			}
 			WoundSeverity worst = null;
 			for (BleedWound wound : data.wounds()) {
@@ -68,7 +73,7 @@ public record BodySnapshot(
 				quantizeFraction(data.part(BodyPart.RIGHT_ARM).fraction()),
 				quantizeFraction(data.part(BodyPart.LEFT_LEG).fraction()),
 				quantizeFraction(data.part(BodyPart.RIGHT_LEG).fraction()),
-				broken, wounds, flags,
+				broken, wounds, flags, destroyed,
 				quantizeVital(data.blood()),
 				quantizeVital(data.consciousness()));
 	}
@@ -93,11 +98,15 @@ public record BodySnapshot(
 	}
 
 	public BodyState state(BodyPart part) {
-		return BodyState.fromFraction(fraction(part));
+		return destroyed(part) ? BodyState.DESTROYED : BodyState.fromFraction(fraction(part));
 	}
 
 	public boolean broken(BodyPart part) {
 		return (brokenMask & (1 << part.ordinal())) != 0;
+	}
+
+	public boolean destroyed(BodyPart part) {
+		return (destroyedMask & (1 << part.ordinal())) != 0;
 	}
 
 	@Nullable
@@ -119,6 +128,6 @@ public record BodySnapshot(
 	}
 
 	public static BodySnapshot healthy() {
-		return new BodySnapshot(1f, 1f, 1f, 1f, 1f, 1f, 0, 0, 0, 100f, 100f);
+		return new BodySnapshot(1f, 1f, 1f, 1f, 1f, 1f, 0, 0, 0, 0, 100f, 100f);
 	}
 }

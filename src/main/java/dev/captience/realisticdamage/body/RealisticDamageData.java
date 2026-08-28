@@ -45,6 +45,11 @@ public final class RealisticDamageData {
 		return parts.values();
 	}
 
+	/** Both legs gone: the player can only crawl (Arcade preset). */
+	public boolean legless() {
+		return part(BodyPart.LEFT_LEG).destroyed() && part(BodyPart.RIGHT_LEG).destroyed();
+	}
+
 	/** Condition fraction of the worse leg, for fall amplification and sprint checks. */
 	public double worseLegFraction() {
 		return Math.min(part(BodyPart.LEFT_LEG).fraction(), part(BodyPart.RIGHT_LEG).fraction());
@@ -81,7 +86,7 @@ public final class RealisticDamageData {
 			case HURT -> Balance.HEAD_CAP_HURT;
 			case INJURED -> Balance.HEAD_CAP_INJURED;
 			case CRITICAL -> Balance.HEAD_CAP_CRITICAL;
-			case DISABLED -> Balance.HEAD_CAP_DISABLED;
+			case DISABLED, DESTROYED -> Balance.HEAD_CAP_DISABLED;
 		};
 		if (concussion) {
 			cap = Math.max(Balance.WAKE_THRESHOLD + 5.0, cap - 10.0);
@@ -266,6 +271,7 @@ public final class RealisticDamageData {
 	public void reset() {
 		for (BodyPart part : BodyPart.values()) {
 			BodyPartData data = parts.get(part);
+			data.setDestroyed(false);
 			data.setCondition(part.maxCondition());
 			data.setBroken(false);
 			data.strain(0);

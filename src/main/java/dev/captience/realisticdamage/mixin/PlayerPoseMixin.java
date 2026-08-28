@@ -1,6 +1,7 @@
 package dev.captience.realisticdamage.mixin;
 
 import dev.captience.realisticdamage.RDAttachments;
+import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Pose;
@@ -11,8 +12,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Unconscious players lie prone using the vanilla swimming/crawling pose
- * (spec §26). Server-authoritative state; clients (own and remote) read the
+ * Players lie prone using the vanilla swimming/crawling pose when unconscious,
+ * or when both legs are destroyed and crawling is all that is left (spec §26). Server-authoritative state; clients (own and remote) read the
  * synced snapshot attachment so every side computes the same desired pose.
  * Movement/interaction locks live elsewhere — this is presentation + hitbox.
  */
@@ -21,14 +22,16 @@ public abstract class PlayerPoseMixin {
 	@Inject(method = "getDesiredPose", at = @At("HEAD"), cancellable = true)
 	private void realisticdamage$unconsciousProne(CallbackInfoReturnable<Pose> cir) {
 		Player self = (Player) (Object) this;
-		boolean unconscious;
+		boolean prone;
 		if (self instanceof ServerPlayer serverPlayer) {
-			unconscious = RDAttachments.get(serverPlayer).unconscious();
+			var data = RDAttachments.get(serverPlayer);
+			prone = data.unconscious() || data.legless();
 		} else {
 			BodySnapshot snapshot = self.getAttached(RDAttachments.SNAPSHOT);
-			unconscious = snapshot != null && snapshot.unconscious();
+			prone = snapshot != null && (snapshot.unconscious()
+					|| (snapshot.destroyed(BodyPart.LEFT_LEG) && snapshot.destroyed(BodyPart.RIGHT_LEG)));
 		}
-		if (unconscious) {
+		if (prone) {
 			cir.setReturnValue(Pose.SWIMMING);
 		}
 	}

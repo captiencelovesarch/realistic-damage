@@ -15,8 +15,16 @@ public final class RDDamageTypes {
 	public static final ResourceKey<DamageType> BLEED_OUT = ResourceKey.create(
 			Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("realisticdamage", "bleed_out"));
 
+	/** Fatal loss of the head or torso (Arcade preset limb destruction). */
+	public static final ResourceKey<DamageType> DESTROYED = ResourceKey.create(
+			Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("realisticdamage", "destroyed"));
+
 	public static DamageSource bleedOut(ServerLevel level) {
 		return level.damageSources().source(BLEED_OUT);
+	}
+
+	public static DamageSource destroyed(ServerLevel level) {
+		return level.damageSources().source(DESTROYED);
 	}
 
 	private RDDamageTypes() {}

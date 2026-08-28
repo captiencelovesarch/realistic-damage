@@ -3,7 +3,10 @@
 	"package": "dev.captience.realisticdamage.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
-		"MouseHandlerMixin"
+		"AvatarRenderStateMixin",
+		"AvatarRendererMixin",
+		"MouseHandlerMixin",
+		"PlayerModelMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -1,6 +1,7 @@
 {
 	"replace": false,
 	"values": [
-		"realisticdamage:bleed_out"
+		"realisticdamage:bleed_out",
+		"realisticdamage:destroyed"
 	]
 }

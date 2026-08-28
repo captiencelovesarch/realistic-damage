@@ -26,8 +26,13 @@ import net.minecraft.world.phys.Vec3;
 public final class TraumaPipeline {
 	private TraumaPipeline() {}
 
-	/** One localized application of condition damage — the unit later systems (break/bleed/consciousness) consume. */
-	public record AppliedTrauma(BodyPart part, double conditionDamage, boolean primary) {}
+	/**
+	 * One localized application of condition damage. {@code conditionDamage} is
+	 * what the part actually lost; {@code attempted} is what the hit was worth
+	 * before clamping, which is what limb destruction reads — a part already at
+	 * zero condition can absorb no more, yet the blow still landed.
+	 */
+	public record AppliedTrauma(BodyPart part, double conditionDamage, double attempted, boolean primary) {}
 
 	/**
 	 * @param baseDamageTaken pre-shield damage as reported by AFTER_DAMAGE
@@ -56,8 +61,8 @@ public final class TraumaPipeline {
 				double shock = blockedAmount * profile.traumaMultiplier()
 						* Balance.SHIELD_HEAVY_SHOCK_FRACTION * config.bodyDamageMultiplier;
 				double dealt = data.part(shieldArm).damage(shock);
-				if (dealt > 0) {
-					result.add(new AppliedTrauma(shieldArm, dealt, false));
+				if (shock > 0) {
+					result.add(new AppliedTrauma(shieldArm, dealt, shock, false));
 				}
 			}
 		}
@@ -85,16 +90,15 @@ public final class TraumaPipeline {
 						: BodyPart.TORSO;
 				double localized = baseTrauma * (1.0 - ArmorModifier.reduction(player, part, classified.category()));
 				double dealt = data.part(part).damage(localized);
-				if (dealt >= 0) {
-					result.add(new AppliedTrauma(part, dealt, true));
-				}
+				result.add(new AppliedTrauma(part, dealt, localized, true));
 				// Direct core hits shock the limbs a little (spec §8).
 				if (part.isCore() && localized > 0) {
 					for (BodyPart limb : BodyPart.values()) {
 						if (limb.isLimb()) {
-							double shock = data.part(limb).damage(localized * Balance.CORE_HIT_LIMB_SHOCK);
-							if (shock > 0) {
-								result.add(new AppliedTrauma(limb, shock, false));
+							double attempted = localized * Balance.CORE_HIT_LIMB_SHOCK;
+							double shock = data.part(limb).damage(attempted);
+							if (attempted > 0) {
+								result.add(new AppliedTrauma(limb, shock, attempted, false));
 							}
 						}
 					}
@@ -122,6 +126,9 @@ public final class TraumaPipeline {
 
 		if (config.enableBrokenLimbs) {
 			BreakLogic.evaluate(player, data, profile, result);
+		}
+		if (config.enableLimbDestruction) {
+			DestructionLogic.evaluate(player, data, result);
 		}
 		if (config.enableBleeding) {
 			createWounds(player, data, classified, profile, result);
@@ -174,8 +181,8 @@ public final class TraumaPipeline {
 				amount *= ImpairmentMath.fallTraumaAmplifier(data.part(part).fraction());
 			}
 			double dealt = data.part(part).damage(amount);
-			if (dealt > 0) {
-				result.add(new AppliedTrauma(part, dealt, entry.getValue() >= primaryShare));
+			if (amount > 0) {
+				result.add(new AppliedTrauma(part, dealt, amount, entry.getValue() >= primaryShare));
 			}
 		}
 	}

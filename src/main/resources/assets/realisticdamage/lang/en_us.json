@@ -46,5 +46,20 @@
 	"realisticdamage.config.heartbeat": "Heartbeat",
 	"realisticdamage.config.disable_all_effects": "Turn Off All Sensory Effects",
 	"death.attack.realisticdamage.bleedOut": "%1$s bled out",
-	"death.attack.realisticdamage.bleedOut.player": "%1$s bled out while fighting %2$s"
+	"death.attack.realisticdamage.bleedOut.player": "%1$s bled out while fighting %2$s",
+	"realisticdamage.msg.destroyed.head": "Your skull is crushed.",
+	"realisticdamage.msg.destroyed.torso": "Your chest caves in.",
+	"realisticdamage.msg.destroyed.left_arm": "Your left arm is destroyed!",
+	"realisticdamage.msg.destroyed.right_arm": "Your right arm is destroyed!",
+	"realisticdamage.msg.destroyed.left_leg": "Your left leg is destroyed!",
+	"realisticdamage.msg.destroyed.right_leg": "Your right leg is destroyed!",
+	"realisticdamage.msg.offhand_gone": "That arm is gone.",
+	"realisticdamage.state.destroyed": "Destroyed",
+	"death.attack.realisticdamage.destroyed": "%1$s was torn apart",
+	"death.attack.realisticdamage.destroyed.player": "%1$s was torn apart while fighting %2$s",
+	"realisticdamage.config.preset": "Preset",
+	"realisticdamage.config.preset.arcade": "Arcade",
+	"realisticdamage.config.preset.grounded": "Grounded",
+	"realisticdamage.config.full_black": "Black Out Fully",
+	"realisticdamage.config.camera_drift": "Camera Drift"
 }

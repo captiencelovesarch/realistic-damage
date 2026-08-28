@@ -17,14 +17,14 @@ public final class DamageHooks {
 
 	public static void init() {
 		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
-			if (entity instanceof ServerPlayer player && participates(player) && !source.is(RDDamageTypes.BLEED_OUT)) {
+			if (entity instanceof ServerPlayer player && participates(player) && !isInternal(source)) {
 				RDAttachments.get(player).capturePreHurt(player.getHealth());
 			}
 			return true;
 		});
 
 		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamageTaken, damageTaken, blocked) -> {
-			if (!(entity instanceof ServerPlayer player) || !participates(player) || source.is(RDDamageTypes.BLEED_OUT)) {
+			if (!(entity instanceof ServerPlayer player) || !participates(player) || isInternal(source)) {
 				return;
 			}
 			RealisticDamageData data = RDAttachments.get(player);
@@ -35,6 +35,11 @@ public final class DamageHooks {
 			TraumaPipeline.handle(player, data, source, baseDamageTaken, damageTaken, applied, blocked);
 			RDAttachments.pushSnapshot(player);
 		});
+	}
+
+	/** Damage the mod deals to itself must never re-enter the trauma pipeline (spec §51). */
+	private static boolean isInternal(net.minecraft.world.damagesource.DamageSource source) {
+		return source.is(RDDamageTypes.BLEED_OUT) || source.is(RDDamageTypes.DESTROYED);
 	}
 
 	private static boolean participates(ServerPlayer player) {

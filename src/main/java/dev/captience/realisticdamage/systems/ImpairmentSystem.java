@@ -12,6 +12,7 @@ import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.ai.attributes.Attribute;
@@ -54,11 +55,18 @@ public final class ImpairmentSystem {
 		double movement = ImpairmentMath.combinedLegPenalty(leftLeg, rightLeg);
 		double jump = ImpairmentMath.jumpPenalty(movement);
 		BodyPartData mainArm = data.part(armFor(player, true));
-		double armPenalty = ImpairmentMath.armPenalty(mainArm.fraction(), mainArm.broken());
+		double armPenalty = mainArm.destroyed()
+				? Balance.ARM_PENALTY_TOTAL_CAP
+				: ImpairmentMath.armPenalty(mainArm.fraction(), mainArm.broken());
 		// Low consciousness makes actions sluggish (spec §23).
 		double sluggish = sluggishPenalty(data.consciousness());
 		double actionPenalty = Math.min(Balance.ARM_PENALTY_TOTAL_CAP, armPenalty + sluggish);
 
+		if (data.legless()) {
+			// Dragging yourself along: slow, and you certainly cannot jump.
+			movement = Math.max(movement, Balance.CRAWL_MOVEMENT_PENALTY);
+			jump = 1.0;
+		}
 		if (data.unconscious()) {
 			// Voluntary movement fully suppressed; physics still applies (spec §25).
 			movement = 1.0;
@@ -105,6 +113,7 @@ public final class ImpairmentSystem {
 
 	public static boolean sprintBlocked(RealisticDamageData data) {
 		return data.unconscious()
+				|| data.legless()
 				|| data.consciousness() < Balance.SYMPTOM_SPRINT_LOSS
 				|| data.part(BodyPart.LEFT_LEG).state() == BodyState.DISABLED
 				|| data.part(BodyPart.RIGHT_LEG).state() == BodyState.DISABLED;
@@ -125,7 +134,22 @@ public final class ImpairmentSystem {
 	}
 
 	private static double legPenalty(BodyPartData leg) {
-		return ImpairmentMath.legPenalty(leg.fraction(), leg.broken());
+		return leg.destroyed()
+				? ImpairmentMath.legPenaltyDestroyed()
+				: ImpairmentMath.legPenalty(leg.fraction(), leg.broken());
+	}
+
+	/**
+	 * A destroyed arm cannot use its hand at all (Arcade preset). You always keep
+	 * the other one unless both are gone, so eating and fighting stay possible.
+	 */
+	public static boolean handDisabled(ServerPlayer player, InteractionHand hand) {
+		if (player.isCreative() || player.isSpectator()) {
+			return false;
+		}
+		RealisticDamageData data = RDAttachments.get(player);
+		BodyPart arm = armFor(player, hand == InteractionHand.MAIN_HAND);
+		return data.part(arm).destroyed();
 	}
 
 	private static void strainIfSevere(Player player) {

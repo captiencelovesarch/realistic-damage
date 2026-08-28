@@ -20,6 +20,12 @@ public final class Notifier {
 				SoundEvents.NETHERITE_BLOCK_BREAK, SoundSource.PLAYERS, 0.6F, 0.7F);
 	}
 
+	public static void destroyed(ServerPlayer player, BodyPart part) {
+		message(player, "realisticdamage.msg.destroyed." + part.id());
+		player.level().playSound(null, player.blockPosition(),
+				SoundEvents.PLAYER_ATTACK_CRIT, SoundSource.PLAYERS, 1.0F, 0.5F);
+	}
+
 	public static void message(ServerPlayer player, String key) {
 		// Mock players (gametests) have no connection; skip the cosmetic packet.
 		if (player.connection != null) {

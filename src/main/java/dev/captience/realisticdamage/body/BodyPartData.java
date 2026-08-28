@@ -8,6 +8,7 @@ public final class BodyPartData {
 	private final BodyPart part;
 	private double condition;
 	private boolean broken;
+	private boolean destroyed;
 	/** While > 0, recovery for this part is paused (severe-arm strain, spec §14). */
 	private int strainPauseTicks;
 
@@ -36,7 +37,20 @@ public final class BodyPartData {
 	}
 
 	public BodyState state() {
-		return BodyState.fromFraction(fraction());
+		return destroyed ? BodyState.DESTROYED : BodyState.fromFraction(fraction());
+	}
+
+	public boolean destroyed() {
+		return destroyed;
+	}
+
+	/** Irreversible short of death: a destroyed part stays at zero condition forever. */
+	public void setDestroyed(boolean destroyed) {
+		this.destroyed = destroyed;
+		if (destroyed) {
+			condition = 0.0;
+			broken = false;
+		}
 	}
 
 	public boolean broken() {
@@ -73,7 +87,7 @@ public final class BodyPartData {
 
 	/** Heals condition, clamped at max. Returns the amount actually restored. Clears Broken on reaching HEALTHY (spec §15). */
 	public double heal(double amount) {
-		if (amount <= 0) {
+		if (amount <= 0 || destroyed) {
 			return 0.0;
 		}
 		double before = condition;
@@ -85,13 +99,17 @@ public final class BodyPartData {
 	}
 
 	public void setCondition(double value) {
+		if (destroyed) {
+			return;
+		}
 		condition = Math.clamp(value, 0.0, part.maxCondition());
 		if (broken && state() == BodyState.HEALTHY) {
 			broken = false;
 		}
 	}
 
+	/** Destroyed parts are excluded from healing budgets — nothing can repair them. */
 	public double missing() {
-		return part.maxCondition() - condition;
+		return destroyed ? 0.0 : part.maxCondition() - condition;
 	}
 }

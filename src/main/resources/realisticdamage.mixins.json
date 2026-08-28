@@ -6,6 +6,7 @@
 		"FoodPropertiesMixin",
 		"LivingEntityHealMixin",
 		"LivingEntityUseItemMixin",
+		"OffhandSwapMixin",
 		"PlayerPoseMixin",
 		"TotemDeathProtectionMixin"
 	],

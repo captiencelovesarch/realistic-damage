@@ -87,6 +87,12 @@ public final class RealisticDamageCommands {
 				.then(literal("concussion")
 						.then(argument("player", EntityArgument.player())
 								.executes(RealisticDamageCommands::concussion)))
+				.then(literal("destroy")
+						.then(argument("player", EntityArgument.player())
+								.then(partArg().executes(RealisticDamageCommands::destroyPart))))
+				.then(literal("preset")
+						.then(literal("arcade").executes(ctx -> preset(ctx, true)))
+						.then(literal("grounded").executes(ctx -> preset(ctx, false))))
 				.then(literal("burn")
 						.then(argument("player", EntityArgument.player())
 								.executes(RealisticDamageCommands::burn)));
@@ -251,6 +257,33 @@ public final class RealisticDamageCommands {
 		RDAttachments.get(player).setConcussion(true);
 		RDAttachments.pushSnapshot(player);
 		ctx.getSource().sendSuccess(() -> Component.literal("Concussed " + player.getName().getString()), true);
+		return 1;
+	}
+
+	private static int destroyPart(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		BodyPart part = parsePart(ctx);
+		if (part == null) {
+			return 0;
+		}
+		dev.captience.realisticdamage.damage.DestructionLogic.destroy(player, RDAttachments.get(player), part);
+		RDAttachments.pushSnapshot(player);
+		ctx.getSource().sendSuccess(() -> Component.literal(
+				"Destroyed " + part.id() + " of " + player.getName().getString()), true);
+		return 1;
+	}
+
+	private static int preset(CommandContext<CommandSourceStack> ctx, boolean arcade) {
+		dev.captience.realisticdamage.config.ServerConfig config =
+				dev.captience.realisticdamage.config.ServerConfig.get();
+		if (arcade) {
+			config.applyArcadePreset();
+		} else {
+			config.applyGroundedPreset();
+		}
+		dev.captience.realisticdamage.config.ServerConfig.save();
+		ctx.getSource().sendSuccess(() -> Component.literal("Realistic Damage preset: "
+				+ (arcade ? "Arcade (limb destruction ON)" : "Grounded (limb destruction OFF)")), true);
 		return 1;
 	}
 

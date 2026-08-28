@@ -11,7 +11,13 @@ public enum BodyState {
 	HURT,
 	INJURED,
 	CRITICAL,
-	DISABLED;
+	DISABLED,
+	/**
+	 * Gone. Unlike the others this is not derived from condition — it is a stored
+	 * flag set by further trauma to an already-Disabled part, and it never heals.
+	 * Only reachable when limb destruction is enabled (Arcade preset).
+	 */
+	DESTROYED;
 
 	public static BodyState fromFraction(double fraction) {
 		if (fraction <= 0.0) {

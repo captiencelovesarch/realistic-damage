@@ -32,8 +32,8 @@ public final class ConsciousnessAudio {
 				: 0.0;
 		double heartLevel = active ? heartbeatLevel() * config.heartbeatVolume : 0.0;
 
-		ringing = update(sounds, ringing, SoundEvents.BELL_RESONATE, (float) ringLevel * 0.35F, 0.55F);
-		heartbeat = update(sounds, heartbeat, SoundEvents.WARDEN_HEARTBEAT, (float) heartLevel * 0.9F, 1.0F);
+		ringing = update(sounds, ringing, SoundEvents.BELL_RESONATE, (float) ringLevel * 0.7F, 1.9F);
+		heartbeat = update(sounds, heartbeat, SoundEvents.WARDEN_HEARTBEAT, (float) heartLevel * 1.4F, 1.0F);
 
 		// Muffle everything else as consciousness fades; restore smoothly.
 		float targetDuck = (float) (ringLevel > 0 ? Math.min(0.8, ringLevel * 0.8) : 0.0);
@@ -108,6 +108,16 @@ public final class ConsciousnessAudio {
 		void fadeOut() {
 			this.fadingOut = true;
 			this.targetVolume = 0.0F;
+		}
+
+		/**
+		 * Essential: these instances start at volume 0 and fade in. Without this,
+		 * SoundEngine.play rejects them outright ("volume was zero") and they never
+		 * begin at all — which is why the ringing and heartbeat were silent.
+		 */
+		@Override
+		public boolean canStartSilent() {
+			return true;
 		}
 
 		@Override

@@ -42,6 +42,19 @@ public final class Balance {
 	public static final double BREAK_IMPACT_ARM = 5.5;
 	public static final double BREAK_IMPACT_LEG = 6.5;
 
+	// --- Limb destruction (Arcade preset) ---
+	/**
+	 * Trauma that lands on an already-Disabled part and meets this threshold
+	 * destroys it outright. Deterministic, like every other injury.
+	 */
+	public static final double DESTROY_TRAUMA_ARM = 5.0;
+	public static final double DESTROY_TRAUMA_LEG = 6.0;
+	public static final double DESTROY_TRAUMA_CORE = 9.0;
+	/** A destroyed leg is a permanent, heavy movement penalty. */
+	public static final double LEG_PENALTY_DESTROYED = 0.45;
+	/** Both legs gone: you crawl. Slow, but never a zero-speed softlock. */
+	public static final double CRAWL_MOVEMENT_PENALTY = 0.72;
+
 	// --- Bleeding (spec §16-17) ---
 	public static final double BLOOD_MAX = 100.0;
 	/** Blood points per second per wound severity. */

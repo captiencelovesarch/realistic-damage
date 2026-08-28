@@ -41,15 +41,16 @@ public final class RDCodecs {
 			},
 			severity -> severity.name().toLowerCase(Locale.ROOT));
 
-	private record PartState(double condition, boolean broken, int strain) {
+	private record PartState(double condition, boolean broken, int strain, boolean destroyed) {
 		static final Codec<PartState> CODEC = RecordCodecBuilder.create(i -> i.group(
 				Codec.DOUBLE.fieldOf("condition").forGetter(PartState::condition),
 				Codec.BOOL.optionalFieldOf("broken", false).forGetter(PartState::broken),
-				Codec.INT.optionalFieldOf("strain", 0).forGetter(PartState::strain)
+				Codec.INT.optionalFieldOf("strain", 0).forGetter(PartState::strain),
+				Codec.BOOL.optionalFieldOf("destroyed", false).forGetter(PartState::destroyed)
 		).apply(i, PartState::new));
 
 		static PartState of(BodyPartData data) {
-			return new PartState(data.condition(), data.broken(), data.strainPauseTicks());
+			return new PartState(data.condition(), data.broken(), data.strainPauseTicks(), data.destroyed());
 		}
 	}
 
@@ -101,9 +102,11 @@ public final class RDCodecs {
 			PartState saved = state.body().get(part);
 			if (saved != null) {
 				BodyPartData target = data.part(part);
+				// Condition first: setDestroyed pins the part at zero afterwards.
 				target.setCondition(saved.condition());
 				target.setBroken(saved.broken());
 				target.strain(saved.strain());
+				target.setDestroyed(saved.destroyed());
 			}
 		}
 		data.setBlood(state.blood());

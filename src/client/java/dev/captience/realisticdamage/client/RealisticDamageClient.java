@@ -31,6 +31,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			ClientState.tick();
 			ConsciousnessAudio.tick();
+			CameraDrift.tick();
 			while (openSettings.consumeClick()) {
 				client.gui.setScreen(new AccessibilityScreen(client.gui.screen()));
 			}

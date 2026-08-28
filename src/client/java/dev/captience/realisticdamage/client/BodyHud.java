@@ -18,7 +18,7 @@ public final class BodyHud {
 
 	// Colors per state: green, yellow, orange, red, dark grey.
 	private static final int[] STATE_COLORS = {
-			0xFF4CAF50, 0xFFCDDC39, 0xFFFF9800, 0xFFE53935, 0xFF4A4A4A
+			0xFF4CAF50, 0xFFCDDC39, 0xFFFF9800, 0xFFE53935, 0xFF4A4A4A, 0xFF120000
 	};
 	private static final int OUTLINE = 0x80000000;
 	private static final int BROKEN_MARK = 0xFFFFFFFF;
@@ -78,7 +78,11 @@ public final class BodyHud {
 		BodyState state = snapshot.state(part);
 		graphics.fill(x - 1, y - 1, x + w + 1, y + h + 1, OUTLINE & (alpha | 0x00FFFFFF));
 		graphics.fill(x, y, x + w, y + h, (STATE_COLORS[state.ordinal()] & 0x00FFFFFF) | alpha);
-		if (snapshot.broken(part)) {
+		if (snapshot.destroyed(part)) {
+			// Gone: a hollow outline, no fill worth marking.
+			graphics.fill(x, y + h / 2, x + w, y + h / 2 + 1, (BLEED_MARK & 0x00FFFFFF) | alpha);
+			graphics.fill(x + w / 2, y, x + w / 2 + 1, y + h, (BLEED_MARK & 0x00FFFFFF) | alpha);
+		} else if (snapshot.broken(part)) {
 			// A white fracture line across the segment.
 			graphics.fill(x, y + h / 2, x + w, y + h / 2 + 1, (BROKEN_MARK & 0x00FFFFFF) | alpha);
 		}

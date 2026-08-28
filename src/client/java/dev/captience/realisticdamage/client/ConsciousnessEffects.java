@@ -55,20 +55,26 @@ public final class ConsciousnessEffects {
 			graphics.fill(0, 0, width, height, ARGB.color(alpha, 235, 232, 220));
 		}
 
-		// Afterimages (from 45 down): a ghosted, additively-blended smear that
-		// grows with each pulse — reads as trailing vision without touching the
-		// frame graph (spec §23, honest v1.0 approach).
-		double afterimage = ClientState.ramp(Balance.SYMPTOM_AFTERIMAGE, Balance.SYMPTOM_SEVERE)
-				* config.afterimageIntensity;
-		if (afterimage > 0.01) {
+		// Vision blur (from 45 down): vanilla's own gaussian blur applied to
+		// everything already drawn — i.e. the whole world. This replaces the
+		// earlier additive-ghost fake, which was imperceptible. Guarded because
+		// the blur may only be requested once per frame and an open Screen
+		// already claims it.
+		double blur = ClientState.ramp(Balance.SYMPTOM_AFTERIMAGE, 0.0) * config.afterimageIntensity;
+		if (blur > 0.15 && Minecraft.getInstance().gui.screen() == null) {
+			graphics.blurBeforeThisStratum();
+		}
+		// Ghosting layered on top: a swirled overlay that pulses with the blur so
+		// the blurred frame reads as trailing vision rather than a dirty lens.
+		if (blur > 0.01) {
 			double phase = pulse(50.0);
-			float strength = (float) (Math.min(1.0, afterimage) * (0.25 + 0.35 * phase));
+			float strength = (float) (Math.min(1.0, blur) * (0.35 + 0.4 * phase));
 			graphics.pose().pushMatrix();
 			graphics.pose().translate(width / 2.0F, height / 2.0F);
 			graphics.pose().scale((float) (1.02 + 0.06 * phase), (float) (1.02 + 0.06 * phase));
 			graphics.pose().translate(-width / 2.0F, -height / 2.0F);
 			graphics.blit(RenderPipelines.GUI_NAUSEA_OVERLAY, NAUSEA, 0, 0, 0.0F, 0.0F, width, height,
-					width, height, ARGB.colorFromFloat(1.0F, strength * 0.35F, strength * 0.2F, strength * 0.2F));
+					width, height, ARGB.colorFromFloat(1.0F, strength * 0.55F, strength * 0.30F, strength * 0.30F));
 			graphics.pose().popMatrix();
 		}
 
@@ -80,11 +86,12 @@ public final class ConsciousnessEffects {
 		}
 		double fade = ClientState.unconsciousFade();
 		if (fade > 0.01) {
-			// Never a fully black screen: the player keeps a faint sense of place (spec §25).
-			blackout = Math.max(blackout, fade * 0.88);
+			// Grounded preset blacks out completely; otherwise the player keeps a
+			// faint sense of place.
+			blackout = Math.max(blackout, fade * (config.fullBlackUnconscious ? 1.0 : 0.88));
 		}
 		if (blackout > 0.01) {
-			graphics.fill(0, 0, width, height, ARGB.color((int) (Math.min(1.0, blackout) * 255.0), 0, 0, 0));
+			graphics.fill(0, 0, width, height, ARGB.color((int) Math.ceil(Math.min(1.0, blackout) * 255.0), 0, 0, 0));
 		}
 	}
 }

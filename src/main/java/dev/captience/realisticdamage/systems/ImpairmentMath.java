@@ -43,6 +43,11 @@ public final class ImpairmentMath {
 		return Math.min(penalty, Balance.ARM_PENALTY_TOTAL_CAP);
 	}
 
+	/** Movement penalty for a single destroyed leg: permanent and heavy. */
+	public static double legPenaltyDestroyed() {
+		return Balance.LEG_PENALTY_DESTROYED;
+	}
+
 	/** Movement penalty for a single leg. */
 	public static double legPenalty(double conditionFraction, boolean broken) {
 		double penalty = curve(conditionFraction,

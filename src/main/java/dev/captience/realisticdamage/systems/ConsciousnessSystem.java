@@ -40,12 +40,19 @@ public final class ConsciousnessSystem {
 		AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) ->
 				locked(player) ? InteractionResult.FAIL : InteractionResult.PASS);
 		UseItemCallback.EVENT.register((player, level, hand) ->
-				locked(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+				locked(player) || handGone(player, hand) ? InteractionResult.FAIL : InteractionResult.PASS);
 		UseBlockCallback.EVENT.register((player, level, hand, hitResult) ->
-				locked(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+				locked(player) || handGone(player, hand) ? InteractionResult.FAIL : InteractionResult.PASS);
 		UseEntityCallback.EVENT.register((player, level, hand, entity, hitResult) ->
-				locked(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+				locked(player) || handGone(player, hand) ? InteractionResult.FAIL : InteractionResult.PASS);
 		PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) -> !locked(player));
+	}
+
+	/** A destroyed arm's hand simply does not work any more (Arcade preset). */
+	private static boolean handGone(Player player, net.minecraft.world.InteractionHand hand) {
+		return player instanceof ServerPlayer serverPlayer
+				&& ServerConfig.get().enableLimbDestruction
+				&& ImpairmentSystem.handDisabled(serverPlayer, hand);
 	}
 
 	private static boolean locked(Player player) {

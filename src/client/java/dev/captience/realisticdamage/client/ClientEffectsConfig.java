@@ -26,6 +26,34 @@ public final class ClientEffectsConfig {
 	public double exposureIntensity = 1.0;
 	public double ringingVolume = 1.0;
 	public double heartbeatVolume = 1.0;
+	/** Grounded preset: the screen goes completely black while unconscious. */
+	public boolean fullBlackUnconscious = false;
+	/** Grounded preset: the camera sways and sags as consciousness fades. */
+	public double cameraDriftIntensity = 0.0;
+
+	/** Punchy and readable — effects present but never obscuring. */
+	public void applyArcadePreset() {
+		vignetteIntensity = 0.85;
+		sensitivityReductionIntensity = 0.5;
+		afterimageIntensity = 0.6;
+		exposureIntensity = 0.6;
+		ringingVolume = 0.8;
+		heartbeatVolume = 1.0;
+		fullBlackUnconscious = false;
+		cameraDriftIntensity = 0.0;
+	}
+
+	/** Heavier immersion: full blackout, camera drift, everything at full strength. */
+	public void applyGroundedPreset() {
+		vignetteIntensity = 1.0;
+		sensitivityReductionIntensity = 1.0;
+		afterimageIntensity = 1.0;
+		exposureIntensity = 1.0;
+		ringingVolume = 1.0;
+		heartbeatVolume = 1.0;
+		fullBlackUnconscious = true;
+		cameraDriftIntensity = 1.0;
+	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static ClientEffectsConfig instance = new ClientEffectsConfig();

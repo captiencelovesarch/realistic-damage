@@ -27,6 +27,20 @@ public final class ServerConfig {
 	public boolean enableConsciousness = true;
 	public boolean enableBurns = true;
 	public boolean enableHitLocation = true;
+	/**
+	 * Arcade preset: further trauma to an already-Disabled part destroys it
+	 * permanently. A destroyed arm can no longer use its hand, a destroyed leg
+	 * is a permanent limp, and a destroyed head or torso kills.
+	 */
+	public boolean enableLimbDestruction = true;
+
+	public void applyArcadePreset() {
+		enableLimbDestruction = true;
+	}
+
+	public void applyGroundedPreset() {
+		enableLimbDestruction = false;
+	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static ServerConfig instance = new ServerConfig();
