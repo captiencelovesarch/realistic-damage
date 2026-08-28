@@ -14,7 +14,11 @@ public class RealisticDamage implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		LOGGER.info("Realistic Damage initializing");
+		dev.captience.realisticdamage.config.ServerConfig.load();
+		RDAttachments.init();
+		dev.captience.realisticdamage.systems.TickDispatcher.init();
+		dev.captience.realisticdamage.command.RealisticDamageCommands.init();
+		LOGGER.info("Realistic Damage initialized");
 	}
 
 	public static Identifier id(String path) {
