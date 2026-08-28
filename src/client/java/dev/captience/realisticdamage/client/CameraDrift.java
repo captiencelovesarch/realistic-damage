@@ -14,9 +14,9 @@ public final class CameraDrift {
 	private CameraDrift() {}
 
 	/** Max degrees per tick of yaw sway at zero consciousness. */
-	private static final double MAX_YAW_PER_TICK = 0.42;
+	private static final double MAX_YAW_PER_TICK = 1.7;
 	/** Max degrees per tick of downward pitch sag at zero consciousness. */
-	private static final double MAX_PITCH_PER_TICK = 0.30;
+	private static final double MAX_PITCH_PER_TICK = 1.15;
 
 	public static void tick() {
 		double intensity = ClientEffectsConfig.get().cameraDriftIntensity;
@@ -28,7 +28,10 @@ public final class CameraDrift {
 			return;
 		}
 		// Begins where the other symptoms do, so drift and vignette arrive together.
-		double severity = ClientState.ramp(Balance.SYMPTOM_SENSITIVITY, 0.0) * Math.min(1.0, intensity);
+		// Squared so it stays subtle while you are merely woozy and grows sharply
+		// as you approach collapse, which is where it should be felt.
+		double ramp = ClientState.ramp(Balance.SYMPTOM_SENSITIVITY, 0.0);
+		double severity = ramp * ramp * Math.min(1.0, intensity);
 		if (severity <= 0.001) {
 			return;
 		}

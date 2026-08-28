@@ -111,6 +111,28 @@ public class DamageRoutingGameTest {
 	}
 
 	@GameTest
+	public void hugeFallKnocksYouOutNotJustYourLegs(GameTestHelper helper) {
+		ServerPlayer player = mockPlayer(helper);
+		RealisticDamageData data = RDAttachments.get(player);
+		DamageSource fall = helper.getLevel().damageSources().fall();
+
+		// A survivable-but-brutal drop: legs wrecked AND the lights go out.
+		data.reset();
+		TraumaPipeline.handle(player, data, fall, 34, 34, 34, false);
+		helper.assertTrue(data.consciousness() <= 0.0,
+				"an extreme fall must knock you out, consciousness = " + data.consciousness());
+		helper.assertTrue(data.concussion(), "an extreme fall must concuss");
+
+		// A moderate fall should rattle but never black you out.
+		data.reset();
+		TraumaPipeline.handle(player, data, fall, 7, 7, 7, false);
+		helper.assertTrue(data.consciousness() > 0.0 && data.consciousness() < 100.0,
+				"a moderate fall should dent consciousness without a blackout, got "
+						+ data.consciousness());
+		helper.succeed();
+	}
+
+	@GameTest
 	public void injuredLegsAmplifyFallTrauma(GameTestHelper helper) {
 		ServerPlayer player = mockPlayer(helper);
 		RealisticDamageData data = RDAttachments.get(player);

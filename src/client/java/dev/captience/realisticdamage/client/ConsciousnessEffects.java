@@ -77,14 +77,20 @@ public final class ConsciousnessEffects {
 		// the blur may only be requested once per frame and an open Screen
 		// already claims it.
 		double blur = ClientState.ramp(Balance.SYMPTOM_AFTERIMAGE, 0.0) * config.afterimageIntensity;
-		if (blur > 0.15 && Minecraft.getInstance().gui.screen() == null) {
+		// The blur itself is all-or-nothing in vanilla, so it is held until you are
+		// genuinely going under; the ghosting above ramps smoothly to get there.
+		boolean deep = ClientState.effectiveConsciousness() < Balance.SYMPTOM_BLUR;
+		if (deep && config.afterimageIntensity > 0.0 && Minecraft.getInstance().gui.screen() == null) {
 			graphics.blurBeforeThisStratum();
 		}
 		// Ghosting: doubles as the concussion symptom. A concussion holds a
 		// constant low level of it — seeing double is what being dazed looks
 		// like — and it deepens as consciousness actually falls.
-		double ghost = Math.max(blur, ClientState.concussed()
+		double ghost = Math.max(blur * blur, ClientState.concussed()
 				? Balance.CONCUSSION_GHOST * config.afterimageIntensity : 0.0);
+		if (deep) {
+			ghost = Math.max(ghost, 0.85 * config.afterimageIntensity);
+		}
 		if (ghost > 0.01) {
 			double phase = pulse(50.0);
 			float strength = (float) (Math.min(1.0, ghost) * (0.35 + 0.4 * phase));

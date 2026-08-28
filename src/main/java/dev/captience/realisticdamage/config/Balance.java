@@ -133,6 +133,14 @@ public final class Balance {
 	public static final double CONSCIOUSNESS_HEAD_HIT_SCALE = 4.0;
 	/** Non-head trauma converts at this scale (explosions, falls, systemic). */
 	public static final double CONSCIOUSNESS_BODY_HIT_SCALE = 1.0;
+	/**
+	 * Whole-body deceleration: a hard landing or a blast rattles you regardless of
+	 * which region absorbed it. Scales off the total damage, which is what makes a
+	 * long fall able to knock you out rather than merely wreck your legs.
+	 */
+	public static final double CONSCIOUSNESS_IMPACT_SCALE = 3.0;
+	/** Head trauma that is a knock-on rather than the primary hit still counts, at this weight. */
+	public static final double CONSCIOUSNESS_SECONDARY_HEAD_WEIGHT = 0.6;
 
 	// Concussion (spec §21).
 	/** Single head trauma at/above this concusses outright. */
@@ -158,6 +166,12 @@ public final class Balance {
 	public static final double CONCUSSION_SYMPTOM_SHIFT = 30.0;
 	/** Constant double-vision ghosting while concussed — the signature symptom. */
 	public static final double CONCUSSION_GHOST = 0.42;
+	/**
+	 * Vanilla's gaussian blur has no intensity parameter — it is on or off — so it
+	 * is held back to a late, distinct stage while the ghosting carries the smooth
+	 * build-up above it. Otherwise it simply pops in mid-ladder.
+	 */
+	public static final double SYMPTOM_BLUR = 18.0;
 
 	// Low-consciousness action sluggishness (spec §23).
 	public static final double SLUGGISH_PENALTY_AT_20 = 0.10;

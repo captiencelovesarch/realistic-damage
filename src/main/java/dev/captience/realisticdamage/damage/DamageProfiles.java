@@ -47,7 +47,7 @@ public final class DamageProfiles {
 				true, true, true, 1.0, false));
 		register(DamageCategory.FALL, new DamageProfile(
 				Balance.TRAUMA_FALL, NO_BLEED, NO_BLEED, NO_BLEED, NO_BLEED,
-				true, true, true, 0.6, false));
+				true, true, true, 0.9, false));
 		register(DamageCategory.FIRE, new DamageProfile(
 				Balance.TRAUMA_FIRE, NO_BLEED, NO_BLEED, NO_BLEED, NO_BLEED,
 				false, false, false, 0.1, false));

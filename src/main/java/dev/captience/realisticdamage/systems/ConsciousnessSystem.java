@@ -111,9 +111,14 @@ public final class ConsciousnessSystem {
 		}
 		double drain = 0.0;
 		for (TraumaPipeline.AppliedTrauma trauma : traumas) {
-			if (trauma.part() == BodyPart.HEAD && trauma.primary()) {
+			if (trauma.part() == BodyPart.HEAD) {
+				// Head trauma is head trauma whether or not it was the primary
+				// region. A long fall routes most damage to the legs, but the head
+				// it does deliver still rattles your brain — without this, falls
+				// could never knock anyone out.
+				double weight = trauma.primary() ? 1.0 : Balance.CONSCIOUSNESS_SECONDARY_HEAD_WEIGHT;
 				double hit = trauma.conditionDamage() * profile.consciousnessFactor()
-						* Balance.CONSCIOUSNESS_HEAD_HIT_SCALE;
+						* Balance.CONSCIOUSNESS_HEAD_HIT_SCALE * weight;
 				if (data.concussion()) {
 					hit *= Balance.CONCUSSION_EXTRA_HEAD_DRAIN;
 				}
@@ -123,6 +128,12 @@ public final class ConsciousnessSystem {
 				drain += trauma.conditionDamage() * profile.consciousnessFactor()
 						* Balance.CONSCIOUSNESS_BODY_HIT_SCALE * (trauma.primary() ? 1.0 : 0.5);
 			}
+		}
+
+		// Hard impacts jolt the whole body, not just whichever region took the hit.
+		if (profile.concussionCapable()) {
+			drain += appliedDamage * profile.consciousnessFactor() * Balance.CONSCIOUSNESS_IMPACT_SCALE;
+			maybeConcuss(player, data, profile, appliedDamage * profile.consciousnessFactor());
 		}
 		if (classified.routing() == ClassifiedDamage.Routing.NONE) {
 			// Sonic boom, drowning ticks: pure consciousness pressure, no limb trauma.
