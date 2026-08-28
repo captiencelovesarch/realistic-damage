@@ -35,6 +35,7 @@ public final class ConsciousnessEffects {
 		// This callback is the per-frame hook available to us, and camera drift has
 		// to run per frame to be smooth (see CameraDrift).
 		CameraDrift.frame(deltaTracker);
+		ImpactEffect.frame(deltaTracker.getGameTimeDeltaTicks());
 		MouseInertia.frame(deltaTracker.getGameTimeDeltaTicks());
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		int width = graphics.guiWidth();
@@ -119,6 +120,15 @@ public final class ConsciousnessEffects {
 			// faint sense of place.
 			blackout = Math.max(blackout, fade * (config.fullBlackUnconscious ? 1.0 : 0.88));
 		}
+		// Impact flash, last so it sits over everything: a hard white-red bloom
+		// that is gone within half a second.
+		double shock = ImpactEffect.shock();
+		if (shock > 0.01) {
+			double eased = shock * shock;
+			graphics.fill(0, 0, width, height,
+					ARGB.color((int) (eased * 190.0), 255, 205, 195));
+		}
+
 		if (blackout > 0.01) {
 			graphics.fill(0, 0, width, height, ARGB.color((int) Math.ceil(Math.min(1.0, blackout) * 255.0), 0, 0, 0));
 		}

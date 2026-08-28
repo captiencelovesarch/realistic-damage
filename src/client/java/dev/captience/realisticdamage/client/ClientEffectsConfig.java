@@ -31,6 +31,8 @@ public final class ClientEffectsConfig {
 	public boolean tinnitusTone = true;
 	/** True low-pass muffling of world audio (falls back to ducking if EFX is absent). */
 	public double mufflingIntensity = 1.0;
+	/** Flash, camera kick and thud when a heavy blow lands. */
+	public double impactIntensity = 1.0;
 	/** Real colour drain through vanilla's post-processing. */
 	public double desaturationIntensity = 1.0;
 	/** Real world-space warping, riding vanilla's nausea distortion. */

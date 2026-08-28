@@ -77,6 +77,8 @@ public class AccessibilityScreen extends Screen {
 
 		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.muffling",
 				() -> config.mufflingIntensity, value -> config.mufflingIntensity = value));
+		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.impact",
+				() -> config.impactIntensity, value -> config.impactIntensity = value));
 		y += 24;
 
 		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.desaturation",
@@ -112,6 +114,7 @@ public class AccessibilityScreen extends Screen {
 							config.desaturationIntensity = 0.0;
 							config.distortionIntensity = 0.0;
 							config.mufflingIntensity = 0.0;
+							config.impactIntensity = 0.0;
 							rebuildWidgets();
 						})
 				.bounds(this.width / 2 - 155, y, 310, 20).build());

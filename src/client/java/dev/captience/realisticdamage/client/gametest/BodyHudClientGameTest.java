@@ -84,6 +84,19 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("concussion cleared itself immediately");
 			}
 
+			// A heavy blow: the impact flash must be on screen the frame it lands.
+			mutate(singleplayer, RealisticDamageData::reset);
+			context.waitTicks(10);
+			singleplayer.getServer().runOnServer(server -> {
+				for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+					dev.captience.realisticdamage.damage.TraumaPipeline.handle(p,
+							RDAttachments.get(p),
+							p.level().damageSources().mace(p), 12, 12, 12, false);
+				}
+			});
+			context.waitTicks(1);
+			context.takeScreenshot("rd_11_impact");
+
 			// Near-death on the ordinary health bar, body otherwise fine: the red
 			// vignette must still read (the "one heart and nothing happens" case).
 			mutate(singleplayer, RealisticDamageData::reset);

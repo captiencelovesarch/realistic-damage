@@ -16,6 +16,10 @@ public class RealisticDamageClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		ClientEffectsConfig.load();
 
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.ImpactPayload.TYPE,
+				(payload, context) -> ImpactEffect.trigger(payload.magnitude(), payload.yaw()));
+
 		// Reachable without Mod Menu, per the "no config-file editing" rule.
 		KeyMapping.Category category = KeyMapping.Category.register(RealisticDamage.id("main"));
 		KeyMapping openSettings = KeyMappingHelper.registerKeyMapping(new KeyMapping(
@@ -40,6 +44,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			ConsciousnessAudio.reset();
 			VisionEffects.reset();
 			MouseInertia.reset();
+			ImpactEffect.reset();
 		});
 	}
 }

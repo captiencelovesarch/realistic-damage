@@ -15,6 +15,9 @@ public class RealisticDamage implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		dev.captience.realisticdamage.config.ServerConfig.load();
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()
+				.register(dev.captience.realisticdamage.net.ImpactPayload.TYPE,
+						dev.captience.realisticdamage.net.ImpactPayload.CODEC);
 		RDAttachments.init();
 		dev.captience.realisticdamage.systems.TickDispatcher.init();
 		dev.captience.realisticdamage.systems.ImpairmentSystem.init();

@@ -72,5 +72,6 @@
 	"realisticdamage.config.tinnitus": "Ringing: Tone",
 	"realisticdamage.config.tinnitus.bell": "Ringing: Bell",
 	"realisticdamage.config.muffling": "Muffled Hearing",
-	"realisticdamage.subtitle.tinnitus": "Ears ringing"
+	"realisticdamage.subtitle.tinnitus": "Ears ringing",
+	"realisticdamage.config.impact": "Impact Shock"
 }

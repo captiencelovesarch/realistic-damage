@@ -135,7 +135,37 @@ public final class TraumaPipeline {
 		}
 		dev.captience.realisticdamage.systems.ConsciousnessSystem.onTrauma(
 				player, data, classified, profile, result, appliedDamage);
+		sendImpact(player, source, result, appliedDamage, profile);
 		return result;
+	}
+
+	/**
+	 * Tells the client a heavy blow just landed, so it can flash and kick on the
+	 * exact frame rather than easing into it.
+	 */
+	private static void sendImpact(ServerPlayer player, DamageSource source,
+			List<AppliedTrauma> traumas, double appliedDamage, DamageProfile profile) {
+		double worst = 0.0;
+		for (AppliedTrauma trauma : traumas) {
+			worst = Math.max(worst, trauma.attempted());
+		}
+		// Scale off the bigger of the localized trauma and the raw blow, so both a
+		// pinpoint headshot and a whole-body slam register.
+		double magnitude = Math.max(worst / 12.0, appliedDamage * profile.traumaMultiplier() / 18.0);
+		if (magnitude < 0.22) {
+			return;
+		}
+		float yaw = player.getYRot();
+		Vec3 from = source.getSourcePosition();
+		if (from != null) {
+			Vec3 delta = player.position().subtract(from);
+			if (delta.horizontalDistanceSqr() > 1.0e-4) {
+				yaw = (float) (Math.toDegrees(Math.atan2(delta.z, delta.x)) - 90.0);
+			}
+		}
+		net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+				new dev.captience.realisticdamage.net.ImpactPayload(
+						(float) Math.min(1.0, magnitude), yaw));
 	}
 
 	/** Deterministic wound creation from localized trauma thresholds (spec §16). */
