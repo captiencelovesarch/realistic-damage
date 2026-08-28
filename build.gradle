@@ -10,6 +10,10 @@ repositories {
 	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
 	// for more information about repositories.
 	mavenCentral()
+	maven {
+		name = 'Terraformers'
+		url = 'https://maven.terraformersmc.com/releases'
+	}
 }
 
 loom {
@@ -30,6 +34,12 @@ loom {
 			vmArg "-Dfabric-api.gametest.report-file=${project.layout.buildDirectory.file("junit.xml").get().getAsFile()}"
 			runDir "build/gametest"
 		}
+		clientGametest {
+			inherit client
+			name "Client Game Test"
+			vmArg "-Dfabric.client.gametest"
+			runDir "build/clientgametest"
+		}
 	}
 }
 
@@ -40,6 +50,9 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Optional integration: the config screen is also reachable via keybind.
+	clientCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 
 	testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"

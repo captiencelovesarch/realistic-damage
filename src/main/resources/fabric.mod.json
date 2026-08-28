@@ -18,6 +18,12 @@
 		"client": [
 			"dev.captience.realisticdamage.client.RealisticDamageClient"
 		],
+		"modmenu": [
+			"dev.captience.realisticdamage.client.ModMenuIntegration"
+		],
+		"fabric-client-gametest": [
+			"dev.captience.realisticdamage.client.gametest.BodyHudClientGameTest"
+		],
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
 			"dev.captience.realisticdamage.gametest.DamageRoutingGameTest",
