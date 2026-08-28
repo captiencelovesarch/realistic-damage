@@ -116,32 +116,27 @@ public final class BodyHud {
 		int cursor = x;
 		boolean any = false;
 		if (snapshot.woundMask() != 0) {
-			StatusIcons.draw(graphics, StatusIcons.BLEED, cursor, y,
-					(StatusIcons.COLOR_BLEED & 0x00FFFFFF) | alpha);
+			StatusIcons.draw(graphics, StatusIcons.BLEED, cursor, y, alpha);
 			cursor += StatusIcons.SIZE + 2;
 			any = true;
 		}
 		if (snapshot.brokenMask() != 0) {
-			StatusIcons.draw(graphics, StatusIcons.BROKEN, cursor, y,
-					(StatusIcons.COLOR_BROKEN & 0x00FFFFFF) | alpha);
+			StatusIcons.draw(graphics, StatusIcons.BROKEN, cursor, y, alpha);
 			cursor += StatusIcons.SIZE + 2;
 			any = true;
 		}
 		if (snapshot.destroyedMask() != 0) {
-			StatusIcons.draw(graphics, StatusIcons.DESTROYED, cursor, y,
-					(StatusIcons.COLOR_DESTROYED & 0x00FFFFFF) | alpha);
+			StatusIcons.draw(graphics, StatusIcons.DESTROYED, cursor, y, alpha);
 			cursor += StatusIcons.SIZE + 2;
 			any = true;
 		}
 		if (snapshot.concussion()) {
-			StatusIcons.draw(graphics, StatusIcons.CONCUSSION, cursor, y,
-					(StatusIcons.COLOR_CONCUSSION & 0x00FFFFFF) | alpha);
+			StatusIcons.draw(graphics, StatusIcons.CONCUSSION, cursor, y, alpha);
 			cursor += StatusIcons.SIZE + 2;
 			any = true;
 		}
 		if (snapshot.burned()) {
-			StatusIcons.draw(graphics, StatusIcons.BURNED, cursor, y,
-					(StatusIcons.COLOR_BURNED & 0x00FFFFFF) | alpha);
+			StatusIcons.draw(graphics, StatusIcons.BURNED, cursor, y, alpha);
 			any = true;
 		}
 		return any ? y + StatusIcons.SIZE + 2 : y;
@@ -166,7 +161,7 @@ public final class BodyHud {
 			// too easy to miss, which is the point of showing bleeding at all.
 			double throb = 0.55 + 0.45 * Math.sin(pulseTime() / (7.0 - wound.ordinal()));
 			int woundAlpha = (int) (Math.min(1.0, visibility) * throb * 255.0) << 24;
-			int ring = (StatusIcons.COLOR_BLEED & 0x00FFFFFF) | woundAlpha;
+			int ring = (StatusIcons.BLEED.mid() & 0x00FFFFFF) | woundAlpha;
 			graphics.fill(x - 1, y - 1, x + w + 1, y, ring);
 			graphics.fill(x - 1, y + h, x + w + 1, y + h + 1, ring);
 			graphics.fill(x - 1, y, x, y + h, ring);
