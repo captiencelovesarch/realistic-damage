@@ -101,6 +101,9 @@ public final class Balance {
 
 	/** Collapse at 0; wake only once consciousness reaches this (hysteresis, spec §25). */
 	public static final double WAKE_THRESHOLD = 20.0;
+	/** How far an unconscious player keeps drawing hostile attention, in blocks. */
+	public static final double UNCONSCIOUS_AGGRO_RADIUS = 12.0;
+
 	/** Minimum time unconscious, in ticks (~2.5s). */
 	public static final int MIN_UNCONSCIOUS_TICKS = 50;
 

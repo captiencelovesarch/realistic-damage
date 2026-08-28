@@ -15,6 +15,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ClientEffectsConfig.load();
+		BodyInspector.init();
 
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.ImpactPayload.TYPE,

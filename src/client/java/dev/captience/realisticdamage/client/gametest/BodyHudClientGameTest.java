@@ -123,6 +123,22 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			// First person: the arm and anything it was holding must be gone too.
 			context.takeScreenshot("rd_09_firstperson_armless");
 
+			// Inventory inspector: open the inventory with a battered body and check
+			// the panel draws. (Hover detail needs a real cursor, so that part is
+			// left to play testing.)
+			mutate(singleplayer, data -> {
+				data.part(BodyPart.TORSO).setCondition(6.0);
+				data.part(BodyPart.LEFT_ARM).setCondition(3.0);
+				data.part(BodyPart.LEFT_ARM).setBroken(true);
+				data.addWound(BodyPart.TORSO, WoundSeverity.SEVERE);
+			});
+			context.setScreen(() -> new net.minecraft.client.gui.screens.inventory.InventoryScreen(
+					net.minecraft.client.Minecraft.getInstance().player));
+			context.waitTicks(5);
+			context.takeScreenshot("rd_12_inventory");
+			context.setScreen(() -> null);
+			context.waitTicks(3);
+
 			// The accessibility screen must open and draw.
 			context.setScreen(() -> new dev.captience.realisticdamage.client.AccessibilityScreen(null));
 			context.waitTicks(5);

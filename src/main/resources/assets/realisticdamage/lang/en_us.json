@@ -73,5 +73,13 @@
 	"realisticdamage.config.tinnitus.bell": "Ringing: Bell",
 	"realisticdamage.config.muffling": "Muffled Hearing",
 	"realisticdamage.subtitle.tinnitus": "Ears ringing",
-	"realisticdamage.config.impact": "Impact Shock"
+	"realisticdamage.config.impact": "Impact Shock",
+	"realisticdamage.detail.destroyed": "Destroyed beyond repair",
+	"realisticdamage.detail.broken": "Bone is broken",
+	"realisticdamage.detail.concussion": "Concussed",
+	"realisticdamage.detail.burned": "Burned",
+	"realisticdamage.detail.bleeding.minor": "Bleeding lightly",
+	"realisticdamage.detail.bleeding.moderate": "Bleeding steadily",
+	"realisticdamage.detail.bleeding.severe": "Bleeding heavily",
+	"realisticdamage.detail.bleeding.critical": "Bleeding out"
 }

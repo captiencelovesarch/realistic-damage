@@ -19,6 +19,8 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
@@ -98,10 +100,37 @@ public final class ConsciousnessSystem {
 			data.restoreConsciousness(recovery * bloodFactor / 20.0);
 		}
 
+		if (data.unconscious()) {
+			keepMobsInterested(player);
+		}
+
 		if (data.unconscious()
 				&& data.unconsciousTicks() >= Balance.MIN_UNCONSCIOUS_TICKS
 				&& data.consciousness() >= Balance.WAKE_THRESHOLD) {
 			wake(player, data);
+		}
+	}
+
+	/**
+	 * A body on the floor does not stop being prey. While unconscious, nearby
+	 * hostiles that have lost interest (or never had it) re-acquire the player,
+	 * so collapsing in a fight is genuinely dangerous rather than a way to be
+	 * forgotten about.
+	 *
+	 * <p>Only hostile mobs, only ones that can actually see you, and only every
+	 * half second so it costs nothing.
+	 */
+	private static void keepMobsInterested(ServerPlayer player) {
+		if (player.tickCount % 10 != 0) {
+			return;
+		}
+		for (Mob mob : player.level().getEntitiesOfClass(Mob.class,
+				player.getBoundingBox().inflate(Balance.UNCONSCIOUS_AGGRO_RADIUS),
+				candidate -> candidate instanceof Enemy && candidate.isAlive()
+						&& candidate.getTarget() != player)) {
+			if (mob.getSensing().hasLineOfSight(player)) {
+				mob.setTarget(player);
+			}
 		}
 	}
 

@@ -34,6 +34,11 @@ public final class BodyHud {
 
 	private static double visibility;
 
+	/** Shared with the inventory inspector so both read the same palette. */
+	public static int stateColor(BodyState state) {
+		return STATE_COLORS[state.ordinal()];
+	}
+
 	public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
 		if (!ClientEffectsConfig.get().showBodyHud || !ClientState.active()) {
 			return;
