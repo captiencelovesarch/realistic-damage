@@ -10,6 +10,7 @@ import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.damage.ClassifiedDamage.Routing;
 import dev.captience.realisticdamage.systems.ImpairmentMath;
+import dev.captience.realisticdamage.util.Notifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.HumanoidArm;
@@ -113,7 +114,41 @@ public final class TraumaPipeline {
 		if (config.enableBrokenLimbs) {
 			BreakLogic.evaluate(player, data, profile, result);
 		}
+		if (config.enableBleeding) {
+			createWounds(player, data, classified, profile, result);
+		}
 		return result;
+	}
+
+	/** Deterministic wound creation from localized trauma thresholds (spec §16). */
+	private static void createWounds(ServerPlayer player, RealisticDamageData data, ClassifiedDamage classified,
+			DamageProfile profile, List<AppliedTrauma> traumas) {
+		DamageProfile woundProfile = classified.woundAs() != null
+				? DamageProfiles.of(classified.woundAs())
+				: profile;
+		if (!woundProfile.canBleed()) {
+			return;
+		}
+		DamageCategory woundCategory = classified.woundAs() != null ? classified.woundAs() : classified.category();
+		var worstBefore = data.worstWound();
+		for (AppliedTrauma trauma : traumas) {
+			if (!trauma.primary()) {
+				continue;
+			}
+			var severity = woundProfile.woundFor(trauma.conditionDamage());
+			if (severity == null) {
+				continue;
+			}
+			severity = ArmorModifier.downgradeWound(player, trauma.part(), woundCategory, severity);
+			if (severity != null) {
+				data.addWound(trauma.part(), severity);
+			}
+		}
+		var worstAfter = data.worstWound();
+		if (worstAfter != null && (worstBefore == null || worstAfter.ordinal() > worstBefore.ordinal())) {
+			Notifier.message(player, "realisticdamage.msg.bleeding."
+					+ worstAfter.name().toLowerCase(java.util.Locale.ROOT));
+		}
 	}
 
 	private static void applyShares(ServerPlayer player, RealisticDamageData data, ClassifiedDamage classified,

@@ -21,7 +21,8 @@
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
 			"dev.captience.realisticdamage.gametest.DamageRoutingGameTest",
-			"dev.captience.realisticdamage.gametest.ImpairmentGameTest"
+			"dev.captience.realisticdamage.gametest.ImpairmentGameTest",
+			"dev.captience.realisticdamage.gametest.BleedingGameTest"
 		]
 	},
 	"mixins": [

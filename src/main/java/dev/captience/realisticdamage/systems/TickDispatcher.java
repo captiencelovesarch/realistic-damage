@@ -33,8 +33,9 @@ public final class TickDispatcher {
 			part.tickStrain();
 		}
 		data.tickUnconscious();
+		BleedingSystem.tick(player, data);
 		ImpairmentSystem.tick(player, data);
-		// Milestone 4/5/6 hook in here: bleeding drain, consciousness, healing.
+		// Milestone 5/6 hook in here: consciousness, healing.
 		RDAttachments.pushSnapshot(player);
 	}
 }

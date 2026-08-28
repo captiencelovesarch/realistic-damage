@@ -152,6 +152,15 @@ public final class BodyHitResolver {
 		return shares;
 	}
 
+	/** Approximate world-space center of a body region (particles, effects). */
+	public static Vec3 regionCenter(ServerPlayer target, BodyPart part) {
+		AABB box = target.getBoundingBox();
+		Vec3 forward = Vec3.directionFromRotation(0.0F, target.yBodyRot);
+		Vec3 right = forward.yRot((float) (-Math.PI / 2.0));
+		double halfWidth = Math.max(box.getXsize(), box.getZsize()) / 2.0;
+		return regionCenter(part, box, box.getCenter(), right, halfWidth, box.getYsize());
+	}
+
 	private static BodyPart nearestRegion(ServerPlayer target, Vec3 center) {
 		AABB box = target.getBoundingBox();
 		Vec3 boxCenter = box.getCenter();

@@ -1,6 +1,7 @@
 package dev.captience.realisticdamage.damage;
 
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -63,6 +64,39 @@ public final class ArmorModifier {
 			case FIRE, LAVA -> Enchantments.FIRE_PROTECTION;
 			default -> null;
 		};
+	}
+
+	/**
+	 * Projectile Protection also reduces bleeding severity (spec §31): a strongly
+	 * enchanted covering piece downgrades puncture wounds one step (a MINOR wound
+	 * disappears entirely). Deterministic: total level >= 3 across covering slots.
+	 */
+	@Nullable
+	public static WoundSeverity downgradeWound(ServerPlayer player,
+			BodyPart part, DamageCategory category, WoundSeverity severity) {
+		if (category != DamageCategory.PUNCTURE && category != DamageCategory.HEAVY_PUNCTURE) {
+			return severity;
+		}
+		int level = 0;
+		for (EquipmentSlot slot : EquipmentSlot.values()) {
+			if (slot.getType() != EquipmentSlot.Type.HUMANOID_ARMOR) {
+				continue;
+			}
+			double coverage = switch (slot) {
+				case HEAD -> coverageHead(part);
+				case CHEST -> coverageChest(part);
+				case LEGS -> coverageLegs(part);
+				case FEET -> coverageFeet(part, category);
+				default -> 0.0;
+			};
+			if (coverage > 0.0) {
+				ItemStack piece = player.getItemBySlot(slot);
+				if (!piece.isEmpty()) {
+					level += level(player, Enchantments.PROJECTILE_PROTECTION, piece);
+				}
+			}
+		}
+		return level >= 3 ? severity.weaker() : severity;
 	}
 
 	private static int level(ServerPlayer player, ResourceKey<Enchantment> key, ItemStack piece) {

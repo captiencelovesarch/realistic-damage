@@ -26,6 +26,8 @@ public final class RealisticDamageData {
 	private transient double preHurtHealth = Double.NaN;
 	/** Transient: fractional progress toward stalling one item-use tick (two-handed impairment, spec §11). */
 	private transient double useStallProgress;
+	/** Transient: fractional vanilla-HP bleed-out damage accumulated toward the next whole point (spec §17). */
+	private transient double bleedHpProgress;
 
 	public RealisticDamageData() {
 		for (BodyPart part : BodyPart.values()) {
@@ -150,6 +152,17 @@ public final class RealisticDamageData {
 		return !wounds.isEmpty();
 	}
 
+	/** Worst active wound severity, or null when not bleeding. */
+	public WoundSeverity worstWound() {
+		WoundSeverity worst = null;
+		for (BleedWound wound : wounds) {
+			if (worst == null || wound.severity().ordinal() > worst.ordinal()) {
+				worst = wound.severity();
+			}
+		}
+		return worst;
+	}
+
 	/** Effective total bleed rate in Blood/sec with diminishing stacking (spec §16). */
 	public double effectiveBleedRate() {
 		if (wounds.isEmpty()) {
@@ -232,6 +245,16 @@ public final class RealisticDamageData {
 		useStallProgress += penalty;
 		if (useStallProgress >= 1.0) {
 			useStallProgress -= 1.0;
+			return true;
+		}
+		return false;
+	}
+
+	/** Accumulates bleed-out HP drain; returns true when one whole HP point should be dealt. */
+	public boolean advanceBleedHpDrain(double hpThisTick) {
+		bleedHpProgress += hpThisTick;
+		if (bleedHpProgress >= 1.0) {
+			bleedHpProgress -= 1.0;
 			return true;
 		}
 		return false;
