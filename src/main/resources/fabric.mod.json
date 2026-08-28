@@ -34,7 +34,8 @@
 			"dev.captience.realisticdamage.gametest.HealingGameTest",
 			"dev.captience.realisticdamage.gametest.UnconsciousAggroGameTest",
 			"dev.captience.realisticdamage.gametest.RescueGameTest",
-			"dev.captience.realisticdamage.gametest.PracticeDummyGameTest"
+			"dev.captience.realisticdamage.gametest.PracticeDummyGameTest",
+			"dev.captience.realisticdamage.gametest.InteropGameTest"
 		]
 	},
 	"mixins": [

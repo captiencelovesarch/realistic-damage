@@ -30,6 +30,19 @@ public final class BodyHitResolver {
 	private static final double MELEE_RAY_LENGTH = 8.0;
 
 	public static BodyPart resolve(ServerPlayer target, DamageSource source) {
+		// A firearm mod has already raycast and knows exactly where it hit —
+		// better than anything reconstructed here, and for a hitscan weapon
+		// there is no projectile to reconstruct from at all (1.3).
+		if (dev.captience.realisticdamage.api.RealisticDamageApi.hasImpactPoints()) {
+			Vec3 supplied = dev.captience.realisticdamage.api.RealisticDamageApi
+					.externalImpactPoint(target, source);
+			if (supplied != null) {
+				AABB box = target.getBoundingBox();
+				// Clipped, so a point slightly off the model still lands sanely
+				// rather than resolving to some arbitrary region.
+				return classifyPoint(target, clipOrFallback(box, supplied, box.getCenter(), supplied));
+			}
+		}
 		Entity direct = source.getDirectEntity();
 		if (direct instanceof Projectile projectile) {
 			return resolveProjectile(target, projectile);

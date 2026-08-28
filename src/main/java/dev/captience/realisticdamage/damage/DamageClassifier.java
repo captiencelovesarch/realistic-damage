@@ -37,6 +37,22 @@ public final class DamageClassifier {
 			return null;
 		}
 
+		// Interoperability (1.3), most specific answer first: a mod that knows
+		// what its own weapon did, then whatever a datapack has declared, then
+		// the built-in table. Both layers can override vanilla, which is the
+		// point — a server should be able to decide a trident punctures.
+		if (dev.captience.realisticdamage.api.RealisticDamageApi.hasClassifiers()) {
+			var external = dev.captience.realisticdamage.api.RealisticDamageApi
+					.classifyExternally(victim, source);
+			if (external != null) {
+				return external.toClassified();
+			}
+		}
+		ClassifiedDamage tagged = DamageTypeClassification.classify(source);
+		if (tagged != null) {
+			return tagged;
+		}
+
 		// Heat.
 		if (source.is(DamageTypes.LAVA)) {
 			return ClassifiedDamage.of(DamageCategory.LAVA, Routing.SPREAD);

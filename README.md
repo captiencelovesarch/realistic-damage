@@ -132,6 +132,14 @@ hunting magic numbers.
 /rdmg dummy fightback <true|false>
 ```
 
+## For mod authors
+
+`API.md` covers integration. The short version: add your damage type to a
+`realisticdamage:ballistic` (or `slash`, `blunt`, ...) tag in a datapack and it's
+classified, with no dependency in either direction. There's a small API for the cases a
+tag can't answer — runtime-varying categories, and supplying an exact hit point for
+hitscan weapons that have no projectile to reconstruct from.
+
 ## Notes
 
 State persists across logout, dimension changes and restarts — logging out is not a cure.

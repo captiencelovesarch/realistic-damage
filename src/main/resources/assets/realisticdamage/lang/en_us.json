@@ -119,5 +119,7 @@
 	"realisticdamage.msg.feed.given": "You get some food into them.",
 	"realisticdamage.msg.feed.received": "Someone is feeding you.",
 	"realisticdamage.msg.feed.full": "They cannot take any more.",
-	"realisticdamage.triage.unconscious": "Unconscious"
+	"realisticdamage.triage.unconscious": "Unconscious",
+	"death.attack.realisticdamage.testBallistic": "%1$s was shot",
+	"death.attack.realisticdamage.testBallistic.player": "%1$s was shot by %2$s"
 }

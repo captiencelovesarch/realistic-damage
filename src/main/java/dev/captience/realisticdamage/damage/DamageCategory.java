@@ -11,6 +11,14 @@ public enum DamageCategory {
 	HEAVY_SLASH,
 	PUNCTURE,
 	HEAVY_PUNCTURE,
+	/**
+	 * Small-arms fire (1.3). A puncture arriving far faster than an arrow: it
+	 * bleeds harder than anything else in the table, and cannot break a bone on
+	 * impact alone because a bullet passes through rather than clubbing.
+	 */
+	BALLISTIC,
+	/** Rifle and magnum calibres — enough energy to shatter what they hit. */
+	HEAVY_BALLISTIC,
 	BLUNT,
 	HEAVY_BLUNT,
 	EXPLOSION,

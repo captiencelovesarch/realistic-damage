@@ -35,6 +35,19 @@ public final class RDDamageTypes {
 	public static final TagKey<DamageType> INTERNAL = TagKey.create(
 			Registries.DAMAGE_TYPE, RealisticDamage.id("internal"));
 
+	/**
+	 * Exists only so the datapack classification path has something real to
+	 * classify. Nothing inflicts it: without an entry that is certain to be
+	 * loaded, the tag route could only ever be tested for its negative case,
+	 * and "returns null when no tag matches" is not evidence that it works.
+	 */
+	public static final ResourceKey<DamageType> TEST_BALLISTIC = ResourceKey.create(
+			Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("realisticdamage", "test_ballistic"));
+
+	public static DamageSource testBallistic(ServerLevel level) {
+		return level.damageSources().source(TEST_BALLISTIC);
+	}
+
 	public static DamageSource bleedOut(ServerLevel level) {
 		return level.damageSources().source(BLEED_OUT);
 	}

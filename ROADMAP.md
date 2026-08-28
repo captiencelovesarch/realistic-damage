@@ -121,7 +121,7 @@ which is the whole point: every system is typed against ServerPlayer, so a real
 one inherits hit location, six regions, bleeding, breaks, consciousness and limb
 destruction with no code aware it is not a person. `fightback` makes it swing
 back, `equip` copies your own gear onto it, `heal` puts it back together.
-Generalising the pipeline to LivingEntity instead is the 1.4 work and would have
+Generalising the pipeline to LivingEntity instead is the 1.5 mob-anatomy work and would have
 meant refactoring twelve files to get one test target.
 
 **Multiplayer** is verified rather than assumed: a client gametest boots a real
@@ -130,7 +130,37 @@ player's state and the triage view all survive an actual socket. Every
 clientbound send is now gated on `canSend`, so a vanilla client on a modded
 server — or the dummy's connection, which goes nowhere — cannot break anything.
 
-## 1.3: Consequence
+## 1.3: Interoperability
+
+Make the mod a platform rather than an island. See `API.md`.
+
+Done:
+
+- **Public API** (`api` package): classify a damage source, supply an exact
+  impact point, read body state. Built on the `DamageCategory` and
+  `BodyHitResolver` seams that were designed for this from the start.
+- **Data-driven classification** by damage-type tag, consulted ahead of the
+  built-in table so a datapack can classify a modded weapon — or overrule how
+  vanilla damage is read — with no code and no dependency in either direction.
+  Tags rather than a bespoke JSON format because they already merge across
+  packs, already reload with `/reload`, and pack authors already know them.
+- **Ballistic categories**, small arms and heavy. They bleed sooner than
+  anything else in the table, and small arms cannot break a bone on impact: a
+  bullet passes through rather than clubbing, though a wrecked limb still gives
+  way by accumulation.
+
+Still open:
+
+- **A real firearm mod to test against.** TACZ is Forge-only and the unofficial
+  Fabric port stops well short of this Minecraft version, so there is nothing to
+  integrate with yet. Its four bullet damage types ship as *optional* tag
+  entries, which cost nothing while absent and classify the moment a port
+  appears — but that path has never run against the real mod, only against a
+  stand-in damage type.
+- **Compatibility passes** against the big combat and armour mods, which have
+  the same availability problem for now.
+
+## 1.4: Consequence
 
 Deepen what injuries mean rather than adding more of them.
 
@@ -143,10 +173,10 @@ Deepen what injuries mean rather than adding more of them.
 - **Injury-aware mob AI**: hostiles preferring targets that are visibly limping
   or bleeding. Predators pick off the wounded.
 
-## 1.4: Anatomy for everyone
+## 1.5: Anatomy for everyone
 
-Mobs get bodies. Deliberately late, because it doubles the surface area of
-every system and needs 1.0 to 1.3 to be stable first.
+Mobs get bodies. Deliberately last, because it doubles the surface area of
+every system and needs everything before it to be stable first.
 
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly.
@@ -155,19 +185,6 @@ every system and needs 1.0 to 1.3 to be stable first.
 - **Crippling**: hobbled mobs move slower, disarmed ones stop using weapons.
 - **Performance work**: per-entity state at mob scale needs pooling and a much
   cheaper tick than the per-player path gets away with.
-
-## 1.5: Interoperability
-
-Make the mod a platform rather than an island.
-
-- **Public API** for other mods to classify damage, supply exact impact points,
-  and read body state, built on the existing `DamageCategory` and
-  `BodyHitResolver` seams that were designed for this from the start.
-- **TACZ and firearm mods**: ballistic damage as heavy puncture with exact hit
-  coordinates, which the pipeline already accepts.
-- **Data-driven profiles**: damage classification from datapacks so servers can
-  retune weapon behaviour without touching code.
-- **Compatibility passes** against the big combat and armour mods.
 
 ## Deliberately not planned
 

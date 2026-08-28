@@ -26,6 +26,14 @@ public final class Balance {
 	public static final double TRAUMA_HEAVY_SLASH = 1.15;
 	public static final double TRAUMA_PUNCTURE = 1.10;
 	public static final double TRAUMA_HEAVY_PUNCTURE = 1.20;
+	/**
+	 * Firearms (1.3). Above heavy puncture because a bullet dumps its energy
+	 * inside the region it enters, but the real difference is in the bleed
+	 * thresholds rather than here: guns are dangerous because of what they open,
+	 * not because of raw condition damage.
+	 */
+	public static final double TRAUMA_BALLISTIC = 1.30;
+	public static final double TRAUMA_HEAVY_BALLISTIC = 1.55;
 	public static final double TRAUMA_BLUNT = 1.20;
 	public static final double TRAUMA_HEAVY_BLUNT = 1.40;
 	public static final double TRAUMA_EXPLOSION = 1.35;

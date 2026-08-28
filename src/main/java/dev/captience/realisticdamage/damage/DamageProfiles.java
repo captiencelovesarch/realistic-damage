@@ -36,6 +36,16 @@ public final class DamageProfiles {
 		register(DamageCategory.HEAVY_PUNCTURE, new DamageProfile(
 				Balance.TRAUMA_HEAVY_PUNCTURE, 1.2, 3.0, 5.5, 8.5,
 				false, true, false, 0.3, false));
+		// Firearms (1.3). Lower bleed thresholds than anything else in the table
+		// — a hit that would merely graze with a sword opens a serious wound —
+		// but breakImpact is false: a bullet passes through, it does not club.
+		// Bones still break by accumulation once a limb is wrecked.
+		register(DamageCategory.BALLISTIC, new DamageProfile(
+				Balance.TRAUMA_BALLISTIC, 0.8, 2.0, 4.0, 6.5,
+				false, true, false, 0.35, false));
+		register(DamageCategory.HEAVY_BALLISTIC, new DamageProfile(
+				Balance.TRAUMA_HEAVY_BALLISTIC, 0.6, 1.6, 3.2, 5.0,
+				true, true, false, 0.5, false));
 		register(DamageCategory.BLUNT, new DamageProfile(
 				Balance.TRAUMA_BLUNT, NO_BLEED, NO_BLEED, NO_BLEED, NO_BLEED,
 				true, true, true, 0.8, false));
