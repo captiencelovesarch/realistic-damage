@@ -19,6 +19,7 @@ public final class ConsciousnessAudio {
 	private ConsciousnessAudio() {}
 
 	private static ImpairmentSound ringing;
+	private static TinnitusSound tinnitus;
 	private static float duckAmount;
 
 	public static void tick() {
@@ -26,7 +27,7 @@ public final class ConsciousnessAudio {
 		SoundManager sounds = client.getSoundManager();
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		boolean active = ClientState.active() && ClientState.snapshot() != null;
-		if (!active && ringing != null) {
+		if (!active && (ringing != null || tinnitus != null)) {
 			// Death, respawn screen, gamemode switch: stop immediately rather than
 			// letting the loop trail on.
 			reset();
@@ -35,7 +36,19 @@ public final class ConsciousnessAudio {
 		double ringLevel = active
 				? ClientState.ramp(Balance.SYMPTOM_RINGING, Balance.SYMPTOM_SEVERE) * config.ringingVolume
 				: 0.0;
-		ringing = update(sounds, ringing, SoundEvents.BELL_RESONATE, (float) ringLevel * 0.7F, 1.9F);
+		if (config.tinnitusTone) {
+			if (ringing != null) {
+				ringing.fadeOut();
+				ringing = null;
+			}
+			tinnitus = updateTone(sounds, tinnitus, (float) ringLevel * 0.5F);
+		} else {
+			if (tinnitus != null) {
+				tinnitus.fadeOut();
+				tinnitus = null;
+			}
+			ringing = update(sounds, ringing, SoundEvents.BELL_RESONATE, (float) ringLevel * 0.7F, 1.9F);
+		}
 
 		// One thump per beat, on the same clock the vignette pulses to, so the
 		// sound and the visual land together.
@@ -55,6 +68,21 @@ public final class ConsciousnessAudio {
 			// Our own cues ride on AMBIENT and stay audible.
 			sounds.updateCategoryVolume(source, source == SoundSource.AMBIENT ? 1.0F : gain);
 		}
+	}
+
+	private static TinnitusSound updateTone(SoundManager sounds, TinnitusSound instance, float volume) {
+		if (volume <= 0.01F) {
+			if (instance != null) {
+				instance.fadeOut();
+			}
+			return null;
+		}
+		if (instance == null || !sounds.isActive(instance)) {
+			instance = new TinnitusSound();
+			sounds.play(instance);
+		}
+		instance.setTargetVolume(volume);
+		return instance;
 	}
 
 	private static ImpairmentSound update(SoundManager sounds, ImpairmentSound instance,
@@ -79,6 +107,10 @@ public final class ConsciousnessAudio {
 		if (ringing != null) {
 			ringing.fadeOut();
 			ringing = null;
+		}
+		if (tinnitus != null) {
+			tinnitus.fadeOut();
+			tinnitus = null;
 		}
 		duckAmount = 0.0F;
 		for (SoundSource source : SoundSource.values()) {

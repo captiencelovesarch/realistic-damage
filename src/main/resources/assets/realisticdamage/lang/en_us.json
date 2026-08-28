@@ -13,7 +13,7 @@
 	"realisticdamage.msg.burned": "Your skin is badly burned.",
 	"realisticdamage.msg.burns_healed": "Your burns have healed.",
 	"realisticdamage.msg.concussion_cleared": "Your head finally feels clear.",
-	"realisticdamage.msg.totem_stabilized": "The totem stabilizes you — but you are far from whole.",
+	"realisticdamage.msg.totem_stabilized": "The totem stabilizes you, but you are far from whole.",
 	"realisticdamage.msg.mended.left_arm": "Your left arm has mended.",
 	"realisticdamage.msg.mended.right_arm": "Your right arm has mended.",
 	"realisticdamage.msg.mended.left_leg": "Your left leg has mended.",
@@ -34,7 +34,7 @@
 	"realisticdamage.hud.burned": "Burned",
 	"key.realisticdamage.open_settings": "Realistic Damage Settings",
 	"key.category.realisticdamage.main": "Realistic Damage",
-	"realisticdamage.config.title": "Realistic Damage — Accessibility",
+	"realisticdamage.config.title": "Realistic Damage, Accessibility",
 	"realisticdamage.config.note": "These settings only change what you see and hear.",
 	"realisticdamage.config.body_hud": "Body Display",
 	"realisticdamage.config.body_hud_always": "Always Show Body",
@@ -64,7 +64,11 @@
 	"realisticdamage.config.camera_drift": "Camera Drift",
 	"realisticdamage.msg.blood.1": "You feel light-headed.",
 	"realisticdamage.msg.blood.2": "Your vision is greying at the edges.",
-	"realisticdamage.msg.blood.3": "You're bleeding out — stop the bleeding!",
+	"realisticdamage.msg.blood.3": "You're bleeding out, stop the bleeding!",
 	"realisticdamage.msg.blood.4": "You're about to bleed out!",
-	"realisticdamage.config.status_icons": "Injury Icons"
+	"realisticdamage.config.status_icons": "Injury Icons",
+	"realisticdamage.config.desaturation": "Colour Drain",
+	"realisticdamage.config.distortion": "Vision Warp",
+	"realisticdamage.config.tinnitus": "Ringing: Tone",
+	"realisticdamage.config.tinnitus.bell": "Ringing: Bell"
 }

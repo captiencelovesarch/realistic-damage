@@ -30,7 +30,7 @@ public class AccessibilityScreen extends Screen {
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		int columnLeft = this.width / 2 - 155;
 		int columnRight = this.width / 2 + 5;
-		int y = 36;
+		int y = 30;
 
 		addRenderableWidget(Button.builder(
 						Component.translatable("realisticdamage.config.preset")
@@ -75,12 +75,26 @@ public class AccessibilityScreen extends Screen {
 				() -> config.heartbeatVolume, value -> config.heartbeatVolume = value));
 		y += 24;
 
-		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.camera_drift",
+		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.desaturation",
+				() -> config.desaturationIntensity, value -> config.desaturationIntensity = value));
+		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.distortion",
+				() -> config.distortionIntensity, value -> config.distortionIntensity = value));
+		y += 24;
+
+		addRenderableWidget(CycleButton.booleanBuilder(
+						Component.translatable("realisticdamage.config.tinnitus"),
+						Component.translatable("realisticdamage.config.tinnitus.bell"),
+						config.tinnitusTone)
+				.create(columnLeft, y, 150, 20, Component.empty(),
+						(button, value) -> config.tinnitusTone = value));
+		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.camera_drift",
 				() -> config.cameraDriftIntensity, value -> config.cameraDriftIntensity = value));
+		y += 24;
+
 		addRenderableWidget(CycleButton.onOffBuilder(config.fullBlackUnconscious)
-				.create(columnRight, y, 150, 20, Component.translatable("realisticdamage.config.full_black"),
+				.create(columnLeft, y, 150, 20, Component.translatable("realisticdamage.config.full_black"),
 						(button, value) -> config.fullBlackUnconscious = value));
-		y += 32;
+		y += 28;
 
 		addRenderableWidget(Button.builder(Component.translatable("realisticdamage.config.disable_all_effects"),
 						button -> {
@@ -91,6 +105,8 @@ public class AccessibilityScreen extends Screen {
 							config.ringingVolume = 0.0;
 							config.heartbeatVolume = 0.0;
 							config.cameraDriftIntensity = 0.0;
+							config.desaturationIntensity = 0.0;
+							config.distortionIntensity = 0.0;
 							rebuildWidgets();
 						})
 				.bounds(this.width / 2 - 155, y, 310, 20).build());

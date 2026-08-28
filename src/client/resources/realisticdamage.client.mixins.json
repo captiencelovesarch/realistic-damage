@@ -5,9 +5,11 @@
 	"client": [
 		"AvatarRenderStateMixin",
 		"AvatarRendererMixin",
+		"GameRendererAccessor",
 		"ItemInHandRendererMixin",
 		"MouseHandlerMixin",
-		"PlayerModelMixin"
+		"PlayerModelMixin",
+		"WorldDistortionMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

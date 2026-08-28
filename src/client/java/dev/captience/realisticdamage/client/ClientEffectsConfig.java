@@ -27,6 +27,12 @@ public final class ClientEffectsConfig {
 	public double afterimageIntensity = 1.0;
 	public double exposureIntensity = 1.0;
 	public double ringingVolume = 1.0;
+	/** true = synthesised tinnitus tone, false = the resonant bell ring. */
+	public boolean tinnitusTone = true;
+	/** Real colour drain through vanilla's post-processing. */
+	public double desaturationIntensity = 1.0;
+	/** Real world-space warping, riding vanilla's nausea distortion. */
+	public double distortionIntensity = 1.0;
 	public double heartbeatVolume = 1.0;
 	/** Grounded preset: the screen goes completely black while unconscious. */
 	public boolean fullBlackUnconscious = false;
@@ -43,6 +49,8 @@ public final class ClientEffectsConfig {
 		heartbeatVolume = 1.0;
 		fullBlackUnconscious = false;
 		cameraDriftIntensity = 0.0;
+		desaturationIntensity = 0.7;
+		distortionIntensity = 0.5;
 	}
 
 	/** Heavier immersion: full blackout, camera drift, everything at full strength. */
@@ -55,6 +63,8 @@ public final class ClientEffectsConfig {
 		heartbeatVolume = 1.0;
 		fullBlackUnconscious = true;
 		cameraDriftIntensity = 1.0;
+		desaturationIntensity = 1.0;
+		distortionIntensity = 1.0;
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();

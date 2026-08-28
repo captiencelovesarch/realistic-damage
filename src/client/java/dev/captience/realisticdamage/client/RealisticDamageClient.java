@@ -31,10 +31,15 @@ public class RealisticDamageClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			ClientState.tick();
 			ConsciousnessAudio.tick();
+			VisionEffects.tick();
 			while (openSettings.consumeClick()) {
 				client.gui.setScreen(new AccessibilityScreen(client.gui.screen()));
 			}
 		});
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ConsciousnessAudio.reset());
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			ConsciousnessAudio.reset();
+			VisionEffects.reset();
+			MouseInertia.reset();
+		});
 	}
 }

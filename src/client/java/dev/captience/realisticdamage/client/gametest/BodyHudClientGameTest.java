@@ -48,6 +48,16 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.waitTicks(30);
 			context.takeScreenshot("rd_02_fading");
 
+			// Deep unconsciousness: the greyout chain should be live, so the world
+			// genuinely loses its colour rather than being tinted over.
+			mutate(singleplayer, data -> {
+				data.setBlood(6.0);
+				data.drainConsciousness(100.0);
+				data.restoreConsciousness(12.0);
+			});
+			context.waitTicks(30);
+			context.takeScreenshot("rd_10_greyout");
+
 			// Collapse: prone pose plus the heavy blackout fade.
 			mutate(singleplayer, data -> data.drainConsciousness(100.0));
 			context.waitTicks(40);

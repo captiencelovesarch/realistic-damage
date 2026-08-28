@@ -35,6 +35,7 @@ public final class ConsciousnessEffects {
 		// This callback is the per-frame hook available to us, and camera drift has
 		// to run per frame to be smooth (see CameraDrift).
 		CameraDrift.frame(deltaTracker);
+		MouseInertia.frame(deltaTracker.getGameTimeDeltaTicks());
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		int width = graphics.guiWidth();
 		int height = graphics.guiHeight();
