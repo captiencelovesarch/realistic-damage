@@ -53,6 +53,17 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("rd_04_recovered");
 			assertSynced(context, "after recovery");
 
+			// Near-death on the ordinary health bar, body otherwise fine: the red
+			// vignette must still read (the "one heart and nothing happens" case).
+			mutate(singleplayer, RealisticDamageData::reset);
+			singleplayer.getServer().runOnServer(server -> {
+				for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+					player.setHealth(1.0F);
+				}
+			});
+			context.waitTicks(20);
+			context.takeScreenshot("rd_07_near_death");
+
 			// Limb destruction: the arm and both legs must vanish from the model,
 			// and the player drops to a crawl.
 			mutate(singleplayer, data -> {

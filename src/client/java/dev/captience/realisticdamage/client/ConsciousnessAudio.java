@@ -45,13 +45,13 @@ public final class ConsciousnessAudio {
 		}
 	}
 
-	/** Heartbeat rises with either low consciousness or heavy blood loss (spec §23). */
+	/** Heartbeat rises with low consciousness, heavy blood loss, or near-death HP. */
 	private static double heartbeatLevel() {
 		double fromConsciousness = ClientState.ramp(Balance.SYMPTOM_HEARTBEAT, Balance.SYMPTOM_SEVERE);
 		double blood = ClientState.blood();
 		double fromBlood = blood >= Balance.BLOOD_SERIOUS ? 0.0
 				: Math.min(1.0, (Balance.BLOOD_SERIOUS - blood) / Balance.BLOOD_SERIOUS);
-		return Math.max(fromConsciousness, fromBlood);
+		return Math.max(ClientState.lowHealth(), Math.max(fromConsciousness, fromBlood));
 	}
 
 	private static ImpairmentSound update(SoundManager sounds, ImpairmentSound instance,

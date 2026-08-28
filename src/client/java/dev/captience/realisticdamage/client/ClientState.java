@@ -74,6 +74,26 @@ public final class ClientState {
 		return (threshold - consciousness) / (threshold - full);
 	}
 
+	/**
+	 * How close to death the player is on the ordinary health bar, 0 (fine) to 1
+	 * (about to die). Read straight from vanilla client state — no sync needed.
+	 */
+	public static double lowHealth() {
+		LocalPlayer player = Minecraft.getInstance().player;
+		if (player == null) {
+			return 0.0;
+		}
+		double max = player.getMaxHealth();
+		if (max <= 0.0) {
+			return 0.0;
+		}
+		double fraction = player.getHealth() / max;
+		if (fraction >= Balance.LOW_HP_FRACTION) {
+			return 0.0;
+		}
+		return Math.clamp(1.0 - fraction / Balance.LOW_HP_FRACTION, 0.0, 1.0);
+	}
+
 	/** Whether Realistic Damage effects should show at all right now. */
 	public static boolean active() {
 		Minecraft client = Minecraft.getInstance();

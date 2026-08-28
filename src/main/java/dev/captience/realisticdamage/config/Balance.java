@@ -106,6 +106,13 @@ public final class Balance {
 	public static final double SYMPTOM_HEARTBEAT = 25.0;
 	public static final double SYMPTOM_SPRINT_LOSS = 20.0;
 	public static final double SYMPTOM_SEVERE = 10.0;
+	/**
+	 * Near-death feedback. Vanilla HP answers "am I dying?", and the answer
+	 * deserves to be felt: below this fraction of max health the heartbeat rises
+	 * and a red vignette closes in, independently of body condition.
+	 */
+	public static final double LOW_HP_FRACTION = 0.35;
+
 	/** Look-sensitivity reduction is capped (spec §24). */
 	public static final double SENSITIVITY_REDUCTION_CAP = 0.35;
 

@@ -47,6 +47,15 @@ public final class ConsciousnessEffects {
 					ARGB.colorFromFloat(1.0F, strength * 0.80F, strength, strength));
 		}
 
+		// Near-death: a red vignette that pulses with the heartbeat. Driven by the
+		// ordinary health bar, so being one hit from death always reads.
+		double dying = ClientState.lowHealth() * config.vignetteIntensity;
+		if (dying > 0.01) {
+			float strength = (float) (Math.min(1.0, dying) * (0.72 + 0.28 * pulse(24.0)));
+			graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
+					ARGB.colorFromFloat(1.0F, strength * 0.12F, strength, strength));
+		}
+
 		// Exposure / washout (from 35 down): the world looks wrong, not hidden.
 		double exposure = ClientState.ramp(Balance.SYMPTOM_EXPOSURE, 0.0) * config.exposureIntensity;
 		if (exposure > 0.01) {
