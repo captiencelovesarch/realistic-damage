@@ -54,6 +54,13 @@ public final class Balance {
 	public static final double LEG_PENALTY_DESTROYED = 0.45;
 	/** Both legs gone: you crawl. Slow, but never a zero-speed softlock. */
 	public static final double CRAWL_MOVEMENT_PENALTY = 0.72;
+	/**
+	 * With the main arm gone you work one-handed: mining and swinging still
+	 * function, but slowly. Deliberately above the ordinary injury cap — this is
+	 * worse than any survivable injury, yet never a hard block, so losing an arm
+	 * underground is a crisis rather than an instant run-ender.
+	 */
+	public static final double ONE_HANDED_PENALTY = 0.80;
 
 	// --- Bleeding (spec §16-17) ---
 	public static final double BLOOD_MAX = 100.0;

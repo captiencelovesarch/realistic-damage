@@ -36,6 +36,13 @@ public final class BleedingSystem {
 			}
 		}
 
+		// Tell the player they are heading for a bleed-out before it happens.
+		int band = data.bloodBand();
+		if (band > data.lastBloodBand() && data.lastBloodBand() >= 0 && band > 0) {
+			dev.captience.realisticdamage.util.Notifier.message(player, "realisticdamage.msg.blood." + band);
+		}
+		data.setLastBloodBand(band);
+
 		double hpPerSecond = bleedOutHpPerSecond(data.blood());
 		if (hpPerSecond > 0.0) {
 			// Whole-point hurts from an accumulator: no sub-half-heart spam.

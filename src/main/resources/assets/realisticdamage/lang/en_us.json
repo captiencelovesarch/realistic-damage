@@ -61,5 +61,10 @@
 	"realisticdamage.config.preset.arcade": "Arcade",
 	"realisticdamage.config.preset.grounded": "Grounded",
 	"realisticdamage.config.full_black": "Black Out Fully",
-	"realisticdamage.config.camera_drift": "Camera Drift"
+	"realisticdamage.config.camera_drift": "Camera Drift",
+	"realisticdamage.msg.blood.1": "You feel light-headed.",
+	"realisticdamage.msg.blood.2": "Your vision is greying at the edges.",
+	"realisticdamage.msg.blood.3": "You're bleeding out — stop the bleeding!",
+	"realisticdamage.msg.blood.4": "You're about to bleed out!",
+	"realisticdamage.config.status_icons": "Injury Icons"
 }

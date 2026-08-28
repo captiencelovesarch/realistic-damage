@@ -52,6 +52,11 @@ public class AccessibilityScreen extends Screen {
 						(button, value) -> config.bodyHudAlwaysVisible = value));
 		y += 28;
 
+		addRenderableWidget(CycleButton.onOffBuilder(config.showStatusIcons)
+				.create(columnLeft, y, 150, 20, Component.translatable("realisticdamage.config.status_icons"),
+						(button, value) -> config.showStatusIcons = value));
+		y += 28;
+
 		addRenderableWidget(new IntensitySlider(columnLeft, y, "realisticdamage.config.vignette",
 				() -> config.vignetteIntensity, value -> config.vignetteIntensity = value));
 		addRenderableWidget(new IntensitySlider(columnRight, y, "realisticdamage.config.sensitivity",

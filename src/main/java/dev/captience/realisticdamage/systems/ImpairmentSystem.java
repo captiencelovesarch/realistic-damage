@@ -55,12 +55,14 @@ public final class ImpairmentSystem {
 		double movement = ImpairmentMath.combinedLegPenalty(leftLeg, rightLeg);
 		double jump = ImpairmentMath.jumpPenalty(movement);
 		BodyPartData mainArm = data.part(armFor(player, true));
-		double armPenalty = mainArm.destroyed()
-				? Balance.ARM_PENALTY_TOTAL_CAP
+		boolean oneHanded = mainArm.destroyed();
+		double armPenalty = oneHanded
+				? Balance.ONE_HANDED_PENALTY
 				: ImpairmentMath.armPenalty(mainArm.fraction(), mainArm.broken());
 		// Low consciousness makes actions sluggish (spec §23).
 		double sluggish = sluggishPenalty(data.consciousness());
-		double actionPenalty = Math.min(Balance.ARM_PENALTY_TOTAL_CAP, armPenalty + sluggish);
+		double cap = oneHanded ? Balance.ONE_HANDED_PENALTY : Balance.ARM_PENALTY_TOTAL_CAP;
+		double actionPenalty = Math.min(cap, armPenalty + sluggish);
 
 		if (data.legless()) {
 			// Dragging yourself along: slow, and you certainly cannot jump.

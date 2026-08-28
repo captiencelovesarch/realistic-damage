@@ -30,6 +30,8 @@ public final class RealisticDamageData {
 	private transient double useStallProgress;
 	/** Transient: fractional vanilla-HP bleed-out damage accumulated toward the next whole point (spec §17). */
 	private transient double bleedHpProgress;
+	/** Transient: last blood band announced, so warnings fire once per crossing. */
+	private transient int lastBloodBand = -1;
 
 	public RealisticDamageData() {
 		for (BodyPart part : BodyPart.values()) {
@@ -73,6 +75,31 @@ public final class RealisticDamageData {
 
 	public void restoreBlood(double amount) {
 		setBlood(blood + amount);
+	}
+
+	/** 0 stable, 1 light-headed, 2 greying out, 3 bleeding out, 4 catastrophic. */
+	public int bloodBand() {
+		if (blood <= 0.0) {
+			return 4;
+		}
+		if (blood < Balance.BLOOD_CRITICAL) {
+			return 4;
+		}
+		if (blood < Balance.BLOOD_SERIOUS) {
+			return 3;
+		}
+		if (blood < Balance.BLOOD_MILD) {
+			return 2;
+		}
+		return blood < Balance.BLOOD_STABLE ? 1 : 0;
+	}
+
+	public int lastBloodBand() {
+		return lastBloodBand;
+	}
+
+	public void setLastBloodBand(int band) {
+		lastBloodBand = band;
 	}
 
 	// --- Consciousness ---

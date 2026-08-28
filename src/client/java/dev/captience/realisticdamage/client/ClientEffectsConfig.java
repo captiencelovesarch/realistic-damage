@@ -19,6 +19,8 @@ public final class ClientEffectsConfig {
 	public boolean showBodyHud = true;
 	/** 0 = only show the body HUD when something is wrong; 1 = always visible. */
 	public boolean bodyHudAlwaysVisible = false;
+	/** Injury icons under the body diagram (bleeding, broken, destroyed, ...). */
+	public boolean showStatusIcons = true;
 
 	public double vignetteIntensity = 1.0;
 	public double sensitivityReductionIntensity = 1.0;

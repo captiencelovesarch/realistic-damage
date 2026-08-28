@@ -35,20 +35,20 @@ public final class ConsciousnessSystem {
 
 	public static void init() {
 		// Voluntary-action locks while unconscious (spec §25).
-		// Mining and swinging are main-hand actions: a destroyed main arm cannot do
-		// either, any more than it can use an item.
+		// Mining and swinging stay possible with a destroyed main arm — you work
+		// one-handed, very slowly (see ImpairmentSystem). Only item *use* is
+		// genuinely impossible without that hand.
 		AttackEntityCallback.EVENT.register((player, level, hand, entity, hitResult) ->
-				locked(player) || mainHandGone(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+				locked(player) ? InteractionResult.FAIL : InteractionResult.PASS);
 		AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) ->
-				locked(player) || mainHandGone(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+				locked(player) ? InteractionResult.FAIL : InteractionResult.PASS);
 		UseItemCallback.EVENT.register((player, level, hand) ->
 				locked(player) || handGone(player, hand) ? InteractionResult.FAIL : InteractionResult.PASS);
 		UseBlockCallback.EVENT.register((player, level, hand, hitResult) ->
 				locked(player) || handGone(player, hand) ? InteractionResult.FAIL : InteractionResult.PASS);
 		UseEntityCallback.EVENT.register((player, level, hand, entity, hitResult) ->
 				locked(player) || handGone(player, hand) ? InteractionResult.FAIL : InteractionResult.PASS);
-		PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) ->
-				!locked(player) && !mainHandGone(player));
+		PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) -> !locked(player));
 	}
 
 	/** A destroyed arm's hand simply does not work any more (Arcade preset). */
@@ -56,10 +56,6 @@ public final class ConsciousnessSystem {
 		return player instanceof ServerPlayer serverPlayer
 				&& ServerConfig.get().enableLimbDestruction
 				&& ImpairmentSystem.handDisabled(serverPlayer, hand);
-	}
-
-	private static boolean mainHandGone(Player player) {
-		return handGone(player, net.minecraft.world.InteractionHand.MAIN_HAND);
 	}
 
 	private static boolean locked(Player player) {

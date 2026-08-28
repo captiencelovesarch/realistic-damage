@@ -29,6 +29,12 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 				data.part(BodyPart.RIGHT_ARM).setCondition(4.0);
 				data.part(BodyPart.RIGHT_ARM).setBroken(true);
 				data.addWound(BodyPart.RIGHT_ARM, WoundSeverity.MODERATE);
+				// Every status at once, so the icon row and blood gauge are all
+				// exercised in one frame.
+				data.setConcussion(true);
+				data.setBurned(true);
+				data.part(BodyPart.LEFT_ARM).setDestroyed(true);
+				data.setBlood(34.0);
 			});
 			context.waitTicks(20);
 			assertSynced(context, "moderate injuries");
