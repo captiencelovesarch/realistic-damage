@@ -568,6 +568,10 @@ public final class RealisticDamageData {
 			data.setCondition(part.maxCondition());
 			data.setBroken(false);
 			data.strain(0);
+			// Last: a full restore forgets the history too. Nothing above may
+			// re-raise it, which is why this is the final statement and not the
+			// tidiest-looking one.
+			data.clearScar();
 		}
 		wounds.clear();
 		blood = Balance.BLOOD_MAX;
@@ -586,8 +590,10 @@ public final class RealisticDamageData {
 	 * The body a player is reborn into (1.6). Everything is forgotten — condition,
 	 * fractures, wounds, blood, statuses, pending state — except the marks.
 	 *
-	 * <p>Ceilings only under the hardcore toggle, and each carried part starts AT
-	 * its ceiling — full, for the body it now is.
+	 * <p>Scars always: a scar that died with the body would make "once lost" a
+	 * mark nobody could ever see, because a destroyed limb never heals inside one
+	 * life. Ceilings only under the hardcore toggle, and each carried part starts
+	 * AT its ceiling — full, for the body it now is.
 	 *
 	 * <p>Forget by default, carry what is listed. Pure, so a unit test can prove
 	 * nothing else leaks across a death.
@@ -595,6 +601,9 @@ public final class RealisticDamageData {
 	public static RealisticDamageData freshCarrying(RealisticDamageData old, boolean keepCeilings) {
 		RealisticDamageData fresh = new RealisticDamageData();
 		for (BodyPart part : BodyPart.values()) {
+			// Unconditional, and deliberately outside the toggle below: the two
+			// carries answer different questions, and one of them is not a setting.
+			fresh.part(part).markScar(old.part(part).scar());
 			if (keepCeilings) {
 				fresh.part(part).lowerCeilingTo(old.part(part).ceilingBand());
 			}

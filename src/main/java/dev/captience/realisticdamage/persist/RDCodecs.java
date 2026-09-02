@@ -11,6 +11,7 @@ import dev.captience.realisticdamage.body.BleedWound;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyPartData;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import net.minecraft.util.Util;
 
@@ -41,7 +42,7 @@ public final class RDCodecs {
 			},
 			severity -> severity.name().toLowerCase(Locale.ROOT));
 
-	private record PartState(double condition, boolean broken, int strain, boolean destroyed, int ceiling) {
+	private record PartState(double condition, boolean broken, int strain, boolean destroyed, int ceiling, int scar) {
 		static final Codec<PartState> CODEC = RecordCodecBuilder.create(i -> i.group(
 				Codec.DOUBLE.fieldOf("condition").forGetter(PartState::condition),
 				Codec.BOOL.optionalFieldOf("broken", false).forGetter(PartState::broken),
@@ -51,12 +52,16 @@ public final class RDCodecs {
 				// a 1.5 save has no such key and must decode silently, a pristine 1.6
 				// body must write no key at all, and a malformed one must WARN and
 				// default rather than drop the whole body back to pristine.
-				Codec.INT.optionalFieldOf("ceiling", 0).forGetter(PartState::ceiling)
+				Codec.INT.optionalFieldOf("ceiling", 0).forGetter(PartState::ceiling),
+				// Same reasoning, and the same fixed default: an unscarred body must
+				// write no key, so a pristine 1.6 save stays byte-identical to a
+				// pristine 1.5 one.
+				Codec.INT.optionalFieldOf("scar", 0).forGetter(PartState::scar)
 		).apply(i, PartState::new));
 
 		static PartState of(BodyPartData data) {
 			return new PartState(data.condition(), data.broken(), data.strainPauseTicks(), data.destroyed(),
-					data.ceilingBand());
+					data.ceilingBand(), data.scar().ordinal());
 		}
 	}
 
@@ -119,6 +124,12 @@ public final class RDCodecs {
 				target.setBroken(saved.broken());
 				target.strain(saved.strain());
 				target.setDestroyed(saved.destroyed());
+				// Last, and as a max — which makes it order-independent. setBroken
+				// and setDestroyed above have already raised whatever scar a 1.5
+				// save implies, so an existing world's currently-broken limb wakes
+				// up marked for free; a written scar can never be lowered by a
+				// load; and byOrdinal clamps, so a hand-edited value cannot throw.
+				target.markScar(ScarLevel.byOrdinal(saved.scar()));
 			}
 		}
 		data.setBlood(state.blood());

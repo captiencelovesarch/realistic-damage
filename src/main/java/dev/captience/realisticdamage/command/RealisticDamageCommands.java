@@ -23,6 +23,7 @@ import dev.captience.realisticdamage.body.BleedWound;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyPartData;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.dummy.PracticeDummy;
@@ -112,6 +113,15 @@ public final class RealisticDamageCommands {
 												.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
 														Stream.of("max", "hurt", "injured", "critical"), builder))
 												.executes(RealisticDamageCommands::ceiling)))))
+				.then(literal("scar")
+						.then(argument("player", EntityArgument.player())
+								.then(partArg()
+										.then(argument("level", StringArgumentType.word())
+												.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
+														Arrays.stream(ScarLevel.values())
+																.map(l -> l.name().toLowerCase(Locale.ROOT)),
+														builder))
+												.executes(RealisticDamageCommands::scar)))))
 				.then(literal("preset")
 						.then(literal("arcade").executes(ctx -> preset(ctx, true)))
 						.then(literal("grounded").executes(ctx -> preset(ctx, false))))
@@ -228,6 +238,11 @@ public final class RealisticDamageCommands {
 			if (partData.ceilingBand() > 0) {
 				line.append(String.format(Locale.ROOT, " ceiling %s (%.2f)",
 						CeilingMath.pinnedState(partData.ceilingBand()), partData.ceiling()));
+			}
+			// A word, not a figure — but this is the one place the history is
+			// legible at all, since every player-facing surface only ever marks it.
+			if (partData.scar() != ScarLevel.NONE) {
+				line.append(" scar=").append(partData.scar().name().toLowerCase(Locale.ROOT));
 			}
 			out.add(line.toString());
 		}
@@ -418,6 +433,34 @@ public final class RealisticDamageCommands {
 		ctx.getSource().sendSuccess(() -> Component.literal(
 				player.getName().getString() + " ceilings: " + out), true);
 		return parts.size();
+	}
+
+	/**
+	 * Writes a region's history directly, including erasing it. Cosmetic on both
+	 * sides: a scar changes no outcome, so unlike every other verb here this one
+	 * can only ever be worth a screenshot.
+	 */
+	private static int scar(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		BodyPart part = parsePart(ctx);
+		if (part == null) {
+			return 0;
+		}
+		String name = StringArgumentType.getString(ctx, "level");
+		ScarLevel level;
+		try {
+			level = ScarLevel.valueOf(name.toUpperCase(Locale.ROOT));
+		} catch (IllegalArgumentException e) {
+			ctx.getSource().sendFailure(Component.literal(
+					"Unknown scar level '" + name + "' (none, broken, destroyed)"));
+			return 0;
+		}
+		// setScar, not markScar: the debug verb is the one path allowed to lower one.
+		RDAttachments.get(player).part(part).setScar(level);
+		RDAttachments.pushSnapshot(player);
+		ctx.getSource().sendSuccess(() -> Component.literal("Scar on " + part.id() + " of "
+				+ player.getName().getString() + " set to " + name.toLowerCase(Locale.ROOT)), true);
+		return 1;
 	}
 
 	// --- /rdmg config (1.6) ---

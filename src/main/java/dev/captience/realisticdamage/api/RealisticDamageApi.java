@@ -154,6 +154,12 @@ public final class RealisticDamageApi {
 		}
 
 		@Override
+		public dev.captience.realisticdamage.body.ScarLevel scar(
+				dev.captience.realisticdamage.body.BodyPart part) {
+			return data.part(part).scar();
+		}
+
+		@Override
 		public int bloodBand() {
 			return data.bloodBand();
 		}

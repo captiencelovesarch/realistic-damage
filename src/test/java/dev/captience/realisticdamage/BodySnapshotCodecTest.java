@@ -2,6 +2,8 @@ package dev.captience.realisticdamage;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
+import dev.captience.realisticdamage.body.ScarLevel;
+import dev.captience.realisticdamage.body.ScarMask;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.RegistryAccess;
@@ -70,6 +72,7 @@ class BodySnapshotCodecTest {
 			assertEquals(1f, healthy.fraction(part), part.id());
 			assertEquals(0, healthy.ceilingBand(part), part.id());
 			assertEquals(BodyState.HEALTHY, healthy.ceilingState(part), part.id());
+			assertEquals(ScarLevel.NONE, healthy.scar(part), part.id());
 			assertFalse(healthy.belowCeiling(part), part.id());
 		}
 	}
@@ -86,6 +89,32 @@ class BodySnapshotCodecTest {
 						pinned.id() + " pinned, reading " + part.id());
 			}
 			assertEquals(BodyState.CRITICAL, snapshot.ceilingState(pinned));
+		}
+	}
+
+	/**
+	 * The scar mask is read through {@code ScarMask}, which is unit-tested on its
+	 * own — but the pairing of that packing with <em>this</em> record's component
+	 * is what a consumer actually calls, and a mask read at the wrong offset would
+	 * quietly hand every player their neighbour's history.
+	 */
+	@Test
+	void scarIsPerPartWithoutBleedingIntoNeighbours() {
+		for (BodyPart marked : BodyPart.values()) {
+			BodySnapshot snapshot = new BodySnapshot(
+					new BodySnapshot.Regions(1f, 1f, 1f, 1f, 1f, 1f, 0, 0, 0, 0,
+							ScarMask.with(0, marked, ScarLevel.DESTROYED)),
+					new BodySnapshot.Meters(0, 100f, 100f));
+			for (BodyPart part : BodyPart.values()) {
+				assertEquals(part == marked ? ScarLevel.DESTROYED : ScarLevel.NONE, snapshot.scar(part),
+						marked.id() + " marked, reading " + part.id());
+			}
+			// A mark is history, so none of the state the HUD reads may move with it.
+			assertEquals(0, snapshot.brokenMask());
+			assertEquals(0, snapshot.destroyedMask());
+			assertEquals(0, snapshot.woundMask());
+			assertEquals(0, snapshot.ceilingMask());
+			assertFalse(snapshot.belowCeiling(marked), marked.id());
 		}
 	}
 

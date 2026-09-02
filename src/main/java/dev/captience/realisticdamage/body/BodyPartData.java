@@ -22,6 +22,19 @@ public final class BodyPartData {
 	 * does, and nothing but restoreCeiling() ever raises it.
 	 */
 	private int ceilingBand;
+	/**
+	 * What this region has been through (1.6). Raised inside the setters below so
+	 * that no caller — the accumulation path, {@code /rdmg break}, explosive
+	 * dismemberment, anything added later — can forget it, and never lowered by
+	 * healing: Broken clears itself silently at HEALTHY, so by the time anyone
+	 * could ask "was this ever broken" the answer is already gone unless it was
+	 * written down here.
+	 *
+	 * <p>Purely cosmetic. Nothing in the mod's own gameplay reads it — not
+	 * impairment, not healing, not the prey score — so a scar can never change
+	 * an outcome.
+	 */
+	private ScarLevel scar = ScarLevel.NONE;
 
 	public BodyPartData(BodyPart part) {
 		this.part = part;
@@ -59,7 +72,11 @@ public final class BodyPartData {
 		this.destroyed = destroyed;
 		if (destroyed) {
 			condition = 0.0;
+			// Recorded here rather than at the call sites, and before broken is
+			// wiped: whatever the part was, losing it outranks it, and anything
+			// downstream trying to derive "was this broken" is already too late.
 			broken = false;
+			scar = scar.max(ScarLevel.DESTROYED);
 		}
 	}
 
@@ -69,6 +86,11 @@ public final class BodyPartData {
 
 	public void setBroken(boolean broken) {
 		this.broken = broken;
+		// Inside the setter, because /rdmg break bypasses BreakLogic entirely and
+		// a future destruction path would otherwise have to remember to mark.
+		if (broken) {
+			scar = scar.max(ScarLevel.BROKEN);
+		}
 	}
 
 	public int strainPauseTicks() {
@@ -83,6 +105,25 @@ public final class BodyPartData {
 		if (strainPauseTicks > 0) {
 			strainPauseTicks--;
 		}
+	}
+
+	public ScarLevel scar() {
+		return scar;
+	}
+
+	/** Only ever raises: history accumulates, it does not heal. */
+	public void markScar(ScarLevel level) {
+		scar = scar.max(level);
+	}
+
+	/** Raw overwrite for {@code /rdmg scar}; gameplay goes through the setters above. */
+	public void setScar(ScarLevel level) {
+		scar = level == null ? ScarLevel.NONE : level;
+	}
+
+	/** The debug heal and the practice dummy are full restores. Death is not this path. */
+	public void clearScar() {
+		scar = ScarLevel.NONE;
 	}
 
 	public int ceilingBand() {

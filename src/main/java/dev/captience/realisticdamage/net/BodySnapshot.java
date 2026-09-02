@@ -4,6 +4,8 @@ import dev.captience.realisticdamage.body.BleedWound;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.body.ScarLevel;
+import dev.captience.realisticdamage.body.ScarMask;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.systems.CeilingMath;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -125,8 +127,14 @@ public record BodySnapshot(Regions regions, Meters meters) {
 				wounds |= (worst.ordinal() + 1) << (part.ordinal() * 3);
 			}
 		}
-		// Scars are feature 3's; the slot ships now so the wire shape changes once.
-		int scars = 0;
+		// Unlike the ceiling band above, a destroyed part DOES send its scar. The
+		// two are suppressed for opposite reasons: a band is a recovery target and
+		// a crossed-out region has no recovery to describe, while a scar is the
+		// record of exactly what happened to that region — suppressing it here
+		// would delete the mark at the moment it is most earned. Each client
+		// surface decides for itself whether to draw a mark under its own
+		// crossed-out region; that judgment belongs there, not on the wire.
+		int scars = ScarMask.pack(data);
 		int flags = (data.unconscious() ? FLAG_UNCONSCIOUS : 0)
 				| (data.concussion() ? FLAG_CONCUSSION : 0)
 				| (data.burned() ? FLAG_BURNED : 0)
@@ -193,7 +201,7 @@ public record BodySnapshot(Regions regions, Meters meters) {
 		return regions.ceilingMask();
 	}
 
-	/** History, not state (1.6 slot, filled by scarring): never consulted by hurt(), the icon row or the caption. */
+	/** History, not state (1.6): never consulted by hurt(), the icon row or the caption. */
 	public int scarMask() {
 		return regions.scarMask();
 	}
@@ -255,6 +263,15 @@ public record BodySnapshot(Regions regions, Meters meters) {
 		int band = ceilingBand(part);
 		return band == 0 ? state(part) != BodyState.HEALTHY
 				: fraction(part) < (float) CeilingMath.fraction(band);
+	}
+
+	/**
+	 * What this region has been through — broken before, or lost before (1.6).
+	 * History, not state: {@code hurt()}, the icon row and the caption must never
+	 * read it, or a healed body would go on reading as an injured one forever.
+	 */
+	public ScarLevel scar(BodyPart part) {
+		return ScarMask.level(scarMask(), part);
 	}
 
 	@Nullable

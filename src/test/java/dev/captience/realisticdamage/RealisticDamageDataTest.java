@@ -3,6 +3,7 @@ package dev.captience.realisticdamage;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class RealisticDamageDataTest {
 		data.setUnconscious(true);
 		data.setConcussion(true);
 		data.setBurned(true);
+		data.part(BodyPart.RIGHT_ARM).markScar(ScarLevel.DESTROYED);
 
 		data.reset();
 
@@ -46,6 +48,56 @@ class RealisticDamageDataTest {
 		assertFalse(data.burned());
 		assertFalse(data.part(BodyPart.LEFT_LEG).broken());
 		assertEquals(BodyState.HEALTHY, data.part(BodyPart.LEFT_LEG).state());
+		// The debug heal is a full restore, so it forgets the history as well —
+		// this is the one path in the mod that erases a scar without a command
+		// saying the word.
+		for (BodyPart part : BodyPart.values()) {
+			assertEquals(ScarLevel.NONE, data.part(part).scar(), part.id());
+		}
+	}
+
+	/**
+	 * Death is not {@code reset()}. The reborn body forgets everything except the
+	 * marks, and it forgets them <em>unconditionally</em> — the hardcore toggle
+	 * governs ceilings only, so this passes with it off, which is the whole
+	 * reason the assertion is written that way round.
+	 */
+	@Test
+	void freshCarryingCopiesScarsAndNothingElse() {
+		RealisticDamageData old = new RealisticDamageData();
+		old.part(BodyPart.LEFT_ARM).setDestroyed(true);
+		old.part(BodyPart.RIGHT_LEG).setCondition(2.0);
+		old.part(BodyPart.RIGHT_LEG).setBroken(true);
+		old.part(BodyPart.LEFT_LEG).lowerCeilingTo(2);
+		old.addWound(BodyPart.TORSO, WoundSeverity.SEVERE);
+		old.setBlood(10.0);
+		old.setUnconscious(true);
+		old.setConcussion(true);
+		old.setBurned(true);
+
+		RealisticDamageData fresh = RealisticDamageData.freshCarrying(old, false);
+		assertTrue(fresh != old, "a new body, not the old one handed back");
+
+		assertEquals(ScarLevel.DESTROYED, fresh.part(BodyPart.LEFT_ARM).scar());
+		assertEquals(ScarLevel.BROKEN, fresh.part(BodyPart.RIGHT_LEG).scar());
+		for (BodyPart part : BodyPart.values()) {
+			if (part != BodyPart.LEFT_ARM && part != BodyPart.RIGHT_LEG) {
+				assertEquals(ScarLevel.NONE, fresh.part(part).scar(), part.id());
+			}
+			// Everything else really is forgotten, including the ceiling: with the
+			// toggle off, a scar test that also passed for a ceiling reason would be
+			// no test at all.
+			assertEquals(part.maxCondition(), fresh.part(part).condition(), 1e-9, part.id());
+			assertEquals(0, fresh.part(part).ceilingBand(), part.id());
+			assertFalse(fresh.part(part).broken(), part.id());
+			assertFalse(fresh.part(part).destroyed(), part.id());
+		}
+		assertEquals(Balance.BLOOD_MAX, fresh.blood());
+		assertEquals(Balance.CONSCIOUSNESS_MAX, fresh.consciousness());
+		assertTrue(fresh.wounds().isEmpty());
+		assertFalse(fresh.unconscious());
+		assertFalse(fresh.concussion());
+		assertFalse(fresh.burned());
 	}
 
 	@Test

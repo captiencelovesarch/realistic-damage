@@ -7,6 +7,7 @@ import com.mojang.serialization.DataResult;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.persist.RDCodecs;
 import net.minecraft.nbt.CompoundTag;
@@ -66,6 +67,9 @@ class RDCodecsCompatTest {
 			assertEquals(BodyState.HEALTHY, data.part(part).state(), part.id());
 			assertFalse(data.part(part).broken(), part.id());
 			assertFalse(data.part(part).destroyed(), part.id());
+			// Nothing to seed either: a body that was whole when it was saved has no
+			// history the save could have recorded.
+			assertEquals(ScarLevel.NONE, data.part(part).scar(), part.id());
 		}
 		assertEquals(100.0, data.blood());
 		assertEquals(100.0, data.consciousness());
@@ -93,6 +97,20 @@ class RDCodecsCompatTest {
 		// A world that turns the hardcore mode on starts everybody whole.
 		for (BodyPart part : BodyPart.values()) {
 			assertEquals(0, data.part(part).ceilingBand(), part.id());
+		}
+
+		// Scars, by contrast, ARE seeded — and for free. toData replays the save
+		// through setBroken and setDestroyed, and 1.6 raises the mark inside those
+		// setters, so an existing world's currently-broken arm wakes up marked with
+		// no migration code anywhere. What cannot be recovered is a limb that broke
+		// in 1.5 and had already healed: 1.5 wrote nothing down, so that history
+		// starts empty and there is no honest way to invent it.
+		assertEquals(ScarLevel.BROKEN, data.part(BodyPart.LEFT_ARM).scar());
+		assertEquals(ScarLevel.DESTROYED, data.part(BodyPart.RIGHT_ARM).scar());
+		for (BodyPart part : BodyPart.values()) {
+			if (part != BodyPart.LEFT_ARM && part != BodyPart.RIGHT_ARM) {
+				assertEquals(ScarLevel.NONE, data.part(part).scar(), part.id());
+			}
 		}
 	}
 
@@ -128,6 +146,15 @@ class RDCodecsCompatTest {
 				blood:100.0d,consciousness:100.0d}""");
 		assertEquals(1, deepHead.part(BodyPart.HEAD).ceilingBand());
 		assertEquals(15.0, deepHead.part(BodyPart.HEAD).condition(), 1e-9);
+
+		// The scar sanitiser goes the other way on purpose: out of range saturates
+		// to the nearest end rather than becoming "no scar". A corrupt ceiling would
+		// be a permanent injury nobody earned, so 0 is the safe answer there; a
+		// corrupt scar is only a mark, so keeping one costs nothing.
+		assertEquals(ScarLevel.DESTROYED,
+				decode(withLeftLeg("condition:16.0d,scar:7")).part(BodyPart.LEFT_LEG).scar());
+		assertEquals(ScarLevel.NONE,
+				decode(withLeftLeg("condition:16.0d,scar:-3")).part(BodyPart.LEFT_LEG).scar());
 
 		// A malformed value is an error WITH a partial, which Fabric's promotePartial
 		// keeps: one WARN, the field at its default, and the body still loads. A

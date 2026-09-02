@@ -2,6 +2,7 @@ package dev.captience.realisticdamage.api;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
+import dev.captience.realisticdamage.body.ScarLevel;
 
 /**
  * A read-only look at one player's body (1.3). Snapshot semantics: read what
@@ -38,6 +39,13 @@ public interface BodyView {
 	 * gives you the raw fraction if you need arithmetic.
 	 */
 	int ceilingBand(BodyPart part);
+
+	/**
+	 * What the region has been through — never, broken before, lost before (1.6).
+	 * Cosmetic history: it carries no penalty and nothing in the mod reads it, so
+	 * an integrating mod that reads it is choosing to.
+	 */
+	ScarLevel scar(BodyPart part);
 
 	/** 0 stable through 4 bleeding out — the banding the mod itself presents. */
 	int bloodBand();
