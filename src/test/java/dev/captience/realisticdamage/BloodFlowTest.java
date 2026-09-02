@@ -89,13 +89,76 @@ class BloodFlowTest {
 		assertTrue(slow < fast, "a seep and a spurt must not look the same");
 	}
 
+	/**
+	 * Kept pointed at the <em>drop</em> ceiling rather than the pool one after the
+	 * two were split apart. What this test is about has not changed — one drop,
+	 * one mark, bounded — and asserting it against the pool ceiling instead would
+	 * quietly stop testing anything, because the pool ceiling is deliberately the
+	 * looser of the two.
+	 */
 	@Test
 	void stainsStayWithinTheirSizeRange() {
 		for (double scale = 0.0; scale <= 1.0; scale += 0.01) {
 			double size = BloodFlow.stainSize(scale);
-			assertTrue(size >= Balance.STAIN_SIZE_MIN && size <= Balance.STAIN_SIZE_MAX,
+			assertTrue(size >= Balance.STAIN_DROP_SIZE_MIN && size <= Balance.STAIN_DROP_SIZE_MAX,
 					"stain size " + size + " out of range at scale " + scale);
 		}
+	}
+
+	/**
+	 * The one-line guard that makes the whole class of bug unrepeatable.
+	 *
+	 * <p>1.5 shipped with a single constant capping both what one drop could mark
+	 * and what a mark fed by many drops could grow to. It followed that a
+	 * fully-fed pool was exactly the size of one arterial splat: there was no size
+	 * the field could reach that a single drop could not have produced on its own,
+	 * so pooling was not weakly expressed, it was unexpressible. The playtest
+	 * report on it is titled with the author's own words — "blood doesn't really
+	 * pool? it just makes these weird splatters".
+	 *
+	 * <p>Nothing about that needed a running client to catch. This is the
+	 * assertion that would have.
+	 */
+	@Test
+	void aPoolCanGetBiggerThanAnySingleDropEverMarks() {
+		assertTrue(Balance.STAIN_POOL_SIZE_MAX > Balance.STAIN_DROP_SIZE_MAX,
+				"a fed pool cannot grow past what one drop already marks, so pooling has no size to express");
+		// ...and it stays inside its own block. A stain is a flat quad of
+		// half-extent radius, so a mark of this size lying against a wall pokes
+		// exactly this far through it.
+		assertTrue(Balance.STAIN_POOL_SIZE_MAX < 0.5,
+				"a pool quad this big clips more than half a block into whatever is beside it");
+		// The sprite tier can only be reached by accretion: no single drop may
+		// land already drawn as a puddle.
+		assertTrue(Balance.STAIN_POOL_SPRITE_RADIUS < Balance.STAIN_POOL_SIZE_MAX,
+				"nothing ever reaches the pool sprite");
+	}
+
+	/**
+	 * How long a pool takes to fill, which is the difference between watching it
+	 * happen and finding it already finished.
+	 *
+	 * <p>At the old growth of 0.35 a seep mark took five feeds — two and a half
+	 * seconds — to saturate, and every drop after that was discarded. Fifteen
+	 * feeds is the floor at which the growth is slow enough to be a thing the
+	 * player sees rather than a state they arrive at; the value in {@link Balance}
+	 * currently buys twenty-three.
+	 */
+	@Test
+	void aPoolFillsSlowlyEnoughToWatch() {
+		double seep = BloodFlow.stainSize(BloodFlow.dropScale(Balance.DROP_SEEP_SPEED / 20.0));
+		int feeds = 0;
+		double radius = seep;
+		while (radius < Balance.STAIN_POOL_SIZE_MAX && feeds < 1000) {
+			radius = Math.min(Balance.STAIN_POOL_SIZE_MAX, radius + seep * Balance.STAIN_MERGE_GROWTH);
+			feeds++;
+		}
+		assertTrue(feeds >= 15,
+				"a seep mark saturates in " + feeds + " drops, which is over before anyone looks down");
+		// And it must actually get there: growth that never reaches the ceiling is
+		// a pool that stops looking like it is filling.
+		assertEquals(Balance.STAIN_POOL_SIZE_MAX, radius, 1.0e-9,
+				"feeding a mark forever never fills it");
 	}
 
 	/**

@@ -37,9 +37,21 @@ import org.jspecify.annotations.Nullable;
 public final class BloodEmitter {
 	private BloodEmitter() {}
 
-	/** Sprites 0-3 of {@code blood.json} are drops; 4-7 are the splats stains use. */
+	/**
+	 * Sprites 0-3 of {@code blood.json} are drops, 4-7 the splats a stain is born
+	 * with, 8-11 the round pool shapes a stain swaps to once it has been fed enough
+	 * to stop being a splat (see {@link BloodStain#grow}).
+	 *
+	 * <p>Every call site passes {@code SPRITE_COUNT - 1} as the {@code max} argument
+	 * of {@link net.minecraft.client.particle.SpriteSet#get}, whose implementation
+	 * is {@code sprites.get(index * (size - 1) / max)} — so with {@code max} one
+	 * short of the number of sprites the expression collapses to {@code index} and
+	 * the atlas can be addressed directly. Adding sprites without moving this number
+	 * skews every index silently, which is why {@code BloodStains} no longer keeps a
+	 * copy of its own.
+	 */
 	public static final int DROP_SPRITE_COUNT = 4;
-	public static final int SPRITE_COUNT = 8;
+	public static final int SPRITE_COUNT = 12;
 	/** Beyond this, someone else's bleeding is not worth the particles. */
 	private static final double EMIT_RANGE = 28.0;
 	/** However bad an artery is, one beat may not throw more than this. */

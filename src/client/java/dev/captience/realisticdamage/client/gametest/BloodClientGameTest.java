@@ -10,6 +10,7 @@ import dev.captience.realisticdamage.client.BloodBody;
 import dev.captience.realisticdamage.client.BloodLens;
 import dev.captience.realisticdamage.client.BloodStains;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
+import dev.captience.realisticdamage.config.Balance;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
@@ -125,6 +126,99 @@ public class BloodClientGameTest implements FabricClientGameTest {
 			}
 			context.takeScreenshot("rd_blood_07_ground");
 
+			// Standing still over an open wound has to build a pool, and a pool is
+			// a thing that keeps getting bigger while the wound is open. That is
+			// the whole of the feature and nothing above asserts it: the count
+			// check on the line above passes with two splats, with one, and with
+			// seven hundred, which is exactly how 1.5 shipped a stain field that
+			// threw away ninety-two per cent of every drop it was given — a full
+			// minute of bleeding leaving the same two marks three seconds had.
+			//
+			// The count is the wrong measure — merging deliberately keeps it low —
+			// so this measures ink actually laid down, which is what pooling means.
+			//
+			// Two deliberate choices. The wound is freshened and the field cleared
+			// first, so the window below is this pool's own first eight seconds
+			// rather than the tail of everything else this test has already done —
+			// a pool that has been growing for twenty seconds is nearly flat over
+			// any six of them, and the assertion would be measuring the test's
+			// history instead of the field's behaviour. And the numbers are not
+			// guesses: running this same scenario against 1.5's stain field gives
+			// 3.00 -> 4.04 over these ticks, a ratio of 1.34, and it has plateaued
+			// completely by twenty seconds. This build gives 3.09 -> 9.50, a ratio
+			// of 3.08, and is still climbing at thirty. The threshold sits between
+			// the two with room on both sides.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.clearWounds();
+				data.addWound(BodyPart.TORSO, WoundSeverity.CRITICAL);
+			});
+			context.runOnClient(client -> BloodStains.reset());
+			context.waitTicks(40);
+			double inkEarly = context.computeOnClient(client -> BloodStains.inkArea());
+			if (inkEarly <= 0.0) {
+				throw new AssertionError("two seconds of an open wound put no ink on the ground at all");
+			}
+			context.waitTicks(120);
+			double inkLate = context.computeOnClient(client -> BloodStains.inkArea());
+			if (inkLate < inkEarly * 1.5) {
+				throw new AssertionError("six more seconds of bleeding grew the pool from " + inkEarly
+						+ " to " + inkLate + " — it is splattering, not pooling");
+			}
+			// ...and the size the pool got to has to be one a single drop could not
+			// have produced. This is the other half, and the ratio above cannot
+			// prove it: a field that only ever laid fresh splats side by side would
+			// also gain ink. Nothing but accretion gets a mark past the ceiling on
+			// what one drop marks, so this is the assertion that the two ceilings
+			// have not quietly become one number again.
+			double biggest = context.computeOnClient(client -> BloodStains.largestMark());
+			if (biggest <= Balance.STAIN_DROP_SIZE_MAX) {
+				throw new AssertionError("the largest mark is " + biggest
+						+ ", no bigger than one splat — a fed pool is not growing past a single drop");
+			}
+
+			// ...and the pool has to be still getting bigger long after every mark
+			// in it is full, because that is the only thing accretion does. The two
+			// assertions above do not ask this and cannot: over the first eight
+			// seconds the marks are still filling, so a field that fed a full mark
+			// and threw the drop away — 1.5's actual bug — still gains ink at very
+			// nearly the same rate and still reaches a 0.46 mark. Both pass it.
+			//
+			// Twenty seconds in, filling is finished and the difference is the
+			// whole difference. Measured, same wound and same scenario, by running
+			// the accretion fall-through out of the field above and putting it
+			// back: with it, ink reaches 14.21 at this tick and is still climbing
+			// past 17 at forty-four seconds. Without it the field freezes solid at
+			// 8.464 — ten marks at the 0.46 ceiling, 10 * 4 * 0.46^2 — and never
+			// moves again however long the wound stays open. 1.5 as shipped froze
+			// lower still, at 4.62. Eleven is the gap between the live number and
+			// the frozen one, with about thirty per cent of room on either side.
+			context.waitTicks(240);
+			double inkSettled = context.computeOnClient(client -> BloodStains.inkArea());
+			if (inkSettled < 11.0) {
+				throw new AssertionError("twenty seconds of an open critical wound left " + inkSettled
+						+ " square blocks of blood; a pool that only fills and never widens stops at 8.46"
+						+ " — the drops are being thrown away again");
+			}
+			context.takeScreenshot("rd_blood_08_pool");
+
+			// The other half of the same promise, and the half nothing has ever
+			// tested: standing still grows a pool, walking lays a trail. Same
+			// wound, same length of time, same settling time for the drops still in
+			// the air — the only difference is whether the player moved, and moving
+			// has to spread the blood out into more marks rather than feeding one.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.clearWounds();
+				data.addWound(BodyPart.TORSO, WoundSeverity.SEVERE);
+			});
+			int standing = marksLaidOver(context, 60, false);
+			int walking = marksLaidOver(context, 60, true);
+			if (walking <= standing) {
+				throw new AssertionError("walking left " + walking + " marks and standing left " + standing
+						+ " — a trail and a pool are supposed to look different");
+			}
+
 			// Healing closes the wounds; the blood must then dry off rather than
 			// staying forever. Slowly — blood dries on, it does not rinse — so
 			// this only has to fall, not vanish.
@@ -198,6 +292,26 @@ public class BloodClientGameTest implements FabricClientGameTest {
 			}
 			return total;
 		});
+	}
+
+	/**
+	 * Marks laid on the world over {@code ticks}, from an empty field, either
+	 * standing still or walking forward.
+	 *
+	 * <p>The twenty ticks on the end are the drops still in the air: a drop takes
+	 * about seven ticks to fall from the torso to the floor, and counting without
+	 * waiting for them would systematically undercount whichever leg of the
+	 * comparison ran last. Both legs get the same allowance for the same reason.
+	 */
+	private static int marksLaidOver(ClientGameTestContext context, int ticks, boolean walking) {
+		context.runOnClient(client -> BloodStains.reset());
+		if (walking) {
+			context.getInput().holdKeyFor(options -> options.keyUp, ticks);
+		} else {
+			context.waitTicks(ticks);
+		}
+		context.waitTicks(20);
+		return context.computeOnClient(client -> BloodStains.count());
 	}
 
 	private static void assertStain(ClientGameTestContext context, BodyPart part, String when) {

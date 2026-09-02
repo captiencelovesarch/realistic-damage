@@ -29,6 +29,13 @@ import org.joml.Quaternionf;
  * artery would otherwise spend the whole stain budget on one square of floor
  * and erase the trail that led to it, so a drop landing near an existing mark
  * feeds that mark instead of adding another (see {@link BloodStains}).
+ *
+ * <p>Growing has a ceiling, and what happens at the ceiling is the difference
+ * between a pool and a splat. A full mark does not swallow the next drop — the
+ * field lays that one beside it, and the pool gets wider rather than staying
+ * the size of the first quad forever. Past
+ * {@link Balance#STAIN_POOL_SPRITE_RADIUS} the mark also stops drawing itself
+ * with a splat sprite, because a magnified splat is a magnified splat.
  */
 public class BloodStain extends SingleQuadParticle {
 	/**
@@ -36,13 +43,22 @@ public class BloodStain extends SingleQuadParticle {
 	 * about that normal so repeated splats on one floor do not all line up.
 	 */
 	private final Quaternionf orientation;
+	/**
+	 * The round, dense sprite a mark swaps to once it is plainly no longer a single
+	 * splat. Held from construction rather than looked up on demand because the
+	 * {@link net.minecraft.client.particle.SpriteSet} lives in {@link BloodStains}
+	 * and a particle should not have to reach back out to its manager to draw
+	 * itself.
+	 */
+	private final TextureAtlasSprite poolSprite;
 	private final Direction face;
 	private double radius;
 
 	BloodStain(ClientLevel level, double x, double y, double z, Direction face, double radius, long seed,
-			TextureAtlasSprite sprite) {
+			TextureAtlasSprite sprite, TextureAtlasSprite poolSprite) {
 		super(level, x, y, z, sprite);
 		this.face = face;
+		this.poolSprite = poolSprite;
 		this.radius = radius;
 		this.hasPhysics = false;
 		this.gravity = 0.0F;
@@ -66,6 +82,16 @@ public class BloodStain extends SingleQuadParticle {
 		return radius;
 	}
 
+	/**
+	 * Whether this mark has taken all the blood one quad can hold. A drop arriving
+	 * at a saturated mark used to be thrown away; it now lays a mark beside it
+	 * instead, which is how a pool gets wider than the quad it started as (see
+	 * {@link BloodStains#land}).
+	 */
+	boolean saturated() {
+		return radius >= Balance.STAIN_POOL_SIZE_MAX - 1.0e-9;
+	}
+
 	// Particle keeps its position in protected fields, reachable from a subclass
 	// but not from the manager alongside it. Reading the bounding box instead
 	// would give the wrong answer: Particle sizes its box independently of the
@@ -82,9 +108,17 @@ public class BloodStain extends SingleQuadParticle {
 		return z;
 	}
 
-	/** Feeds another drop into this mark, growing it toward the maximum. */
+	/** Feeds another drop into this mark, growing it toward the pool maximum. */
 	void grow(double incomingRadius) {
-		radius = Math.min(Balance.STAIN_SIZE_MAX, radius + incomingRadius * Balance.STAIN_MERGE_GROWTH);
+		radius = Math.min(Balance.STAIN_POOL_SIZE_MAX, radius + incomingRadius * Balance.STAIN_MERGE_GROWTH);
+		// Past a certain size the splat sprite stops being the truth about what
+		// this is. A splat is an off-centre mass with flung satellite droplets
+		// around it, and scaling that up gives a magnified splatter rather than a
+		// pool — which is precisely what the playtest report called it. The swap
+		// is one-way: blood accumulating never turns back into a thrown drop.
+		if (radius >= Balance.STAIN_POOL_SPRITE_RADIUS) {
+			setSprite(poolSprite);
+		}
 		// A mark that is still being fed is a mark that is still wet. Winding the
 		// clock back is what makes a pool under a standing player read as active
 		// bleeding rather than as something that happened and stopped.

@@ -77,10 +77,16 @@ public final class BloodFlow {
 		return Math.clamp(perSecond / Balance.DROP_SCALE_FULL_SPEED, 0.0, 1.0);
 	}
 
-	/** Radius of the mark a drop leaves, in blocks, from its {@link #dropScale}. */
+	/**
+	 * Radius of the mark a <em>single</em> drop leaves, in blocks, from its
+	 * {@link #dropScale}. Bounded by {@link Balance#STAIN_DROP_SIZE_MAX} and not by
+	 * the pool ceiling: what one drop can mark and what many drops can build up to
+	 * are different questions, and answering both with one number is what made a
+	 * fed pool the same size as one splat.
+	 */
 	public static double stainSize(double dropScale) {
-		return Balance.STAIN_SIZE_MIN
-				+ (Balance.STAIN_SIZE_MAX - Balance.STAIN_SIZE_MIN) * Math.clamp(dropScale, 0.0, 1.0);
+		return Balance.STAIN_DROP_SIZE_MIN
+				+ (Balance.STAIN_DROP_SIZE_MAX - Balance.STAIN_DROP_SIZE_MIN) * Math.clamp(dropScale, 0.0, 1.0);
 	}
 
 	/**

@@ -15,6 +15,11 @@ baked in could not do the second half.
                         blob, satellite droplets, a couple of directional
                         flicks — the things that make a splat read as thrown
                         rather than placed.
+  particle/blood_pool_0..3
+                        what a mark becomes once enough drops have fed it: a
+                        round, dense, contiguous puddle. The opposite of a
+                        splat in every respect that matters, because a splat
+                        magnified is a magnified splat and not a pool.
   misc/blood_lens       2x2 atlas of droplets on the camera. Teardrops with the
                         tail pointing up, because they are running down.
   misc/scar_body        old injuries over the player model: sparse, thin,
@@ -174,6 +179,78 @@ def splat_sprites(cell=32):
         _write(mask, OUT / "particle" / f"blood_splat_{index}.png")
 
 
+def pool_sprites(cell=32):
+    """What a mark grows into: a puddle, not a bigger splat.
+
+    A stain swaps to one of these once accretion has taken it past
+    Balance.STAIN_POOL_SPRITE_RADIUS. It has to be the opposite of splat_sprites
+    on every axis that made the author call the old blood "weird splatters":
+
+      round, not lobed and off-centre  — liquid that has come to rest finds its
+                                         own level, so the mass sits in the
+                                         middle of the quad and the merge
+                                         distance, measured from quad centres,
+                                         finally corresponds to where the ink is
+      contiguous, no satellites        — a satellite droplet is a record of
+                                         impact. Nothing about a pool was thrown
+      dense, not sparse                — the splats measure 14-18% mean alpha;
+                                         these measure 52-60%, three and a half
+                                         times as much ink for the same quad,
+                                         which is what "you are standing in it"
+                                         needs
+      solid to the rim                 — the entity translucent pipeline discards
+                                         texels under a tenth alpha, so a soft
+                                         wash would not be faint, it would be
+                                         absent. Only the last pixel or two of
+                                         the edge is allowed to ramp
+
+    Radius 0.93 rather than 1.0: a sprite that runs into its own edge picks up
+    the neighbouring texture through the atlas mipmaps, and a puddle with a
+    straight side reads as a decal.
+    """
+    print("pool sprites:")
+    for index in range(4):
+        rng = np.random.default_rng(SEED + 500 + index)
+
+        # One dominant disc with a barely-wobbly edge. The wobble is a fifth of
+        # what the splats use: enough that four variants have four silhouettes,
+        # far too little to read as torn.
+        radius = 0.84 + 0.09 * rng.uniform(-1.0, 1.0)
+        mask = _blob(cell, 0.0, 0.0, radius, wobble=0.17, rng=rng, softness=2.0 / cell)
+
+        # Two or three shallow bulges, each overlapping the middle by more than
+        # half its own radius so the result stays one mass. This is what stops it
+        # from being a circle without letting it become a blob of lobes.
+        for _ in range(int(rng.integers(2, 4))):
+            angle = rng.uniform(0.0, 2.0 * np.pi)
+            offset = rng.uniform(0.14, 0.26)
+            mask = np.maximum(mask, _blob(
+                cell, offset * np.cos(angle), offset * np.sin(angle),
+                rng.uniform(0.62, 0.78), wobble=0.14, rng=rng, softness=2.0 / cell))
+
+        # A tongue or two: liquid creeping out along the grain of whatever it is
+        # lying on. Rooted inside the mass and reaching only a little past the
+        # rim, so it widens the silhouette without ever detaching — the
+        # difference between "spreading" and "spattered". Rooted at 0.52 rather
+        # than 0.30, because a tongue that starts inside the disc and ends inside
+        # it too is a tongue nobody can see: the first pass drew four of these
+        # per sprite and produced four indistinguishable circles.
+        for _ in range(int(rng.integers(1, 4))):
+            angle = rng.uniform(0.0, 2.0 * np.pi)
+            mask = np.maximum(mask, _streak(
+                cell, 0.52 * np.cos(angle), 0.52 * np.sin(angle),
+                angle, rng.uniform(0.38, 0.50), rng.uniform(0.20, 0.30), taper_power=0.5))
+
+        # Everything above is drawn near full strength already; this pushes the
+        # interior the rest of the way to opaque and leaves the ramp only where
+        # the shape actually ends. Without it the smoothstep edges of the lobes
+        # show up as seams across the middle of the puddle.
+        mask = np.clip(mask * 1.35, 0.0, 1.0)
+        # Nothing on the outermost ring, for the mipmap reason in the docstring.
+        mask[0, :] = mask[-1, :] = mask[:, 0] = mask[:, -1] = 0.0
+        _write(mask, OUT / "particle" / f"blood_pool_{index}.png")
+
+
 def lens_atlas(cell=32):
     """2x2 atlas of droplets clinging to the camera.
 
@@ -329,6 +406,7 @@ def main():
         sys.exit(f"run from the repo root: {OUT.parent} not found")
     drop_sprites()
     splat_sprites()
+    pool_sprites()
     lens_atlas()
     body_overlay()
     scar_overlay()
