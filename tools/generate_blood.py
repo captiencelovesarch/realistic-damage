@@ -17,6 +17,8 @@ baked in could not do the second half.
                         rather than placed.
   misc/blood_lens       2x2 atlas of droplets on the camera. Teardrops with the
                         tail pointing up, because they are running down.
+  misc/scar_body        old injuries over the player model: sparse, thin,
+                        solid-cored lines.
 
 Run from the repo root:  python3 tools/generate_blood.py
 Requires numpy and Pillow.
@@ -255,6 +257,73 @@ def body_overlay(size=64):
     _write(np.clip(mask, 0.0, 1.0), OUT / "misc" / "blood_body.png")
 
 
+def scar_overlay(size=64):
+    """Old injuries drawn over a player model, in the vanilla skin layout.
+
+    Uniform in density for the same reason body_overlay is: the six regions this
+    mod tracks occupy six unrelated rectangles of the skin UV, so anything
+    authored around the image as a whole lands differently on every limb, and
+    the per-region level is what carries the signal.
+
+    Sparse and thin where the blood is dense and soft, because a scar is a line
+    and not a stain -- and every stroke has a solid core, because the entity
+    translucent pipeline discards texels under 0.1 alpha: a soft, faint stroke
+    would not be faint, it would be absent.
+
+    What the result has to satisfy, and what the numbers below were tuned to:
+    alpha above zero on 3-12% of texels, a maximum alpha of at least 229, and
+    every 16x16 tile holding at least one texel at 153 or above, so no region's
+    UV rectangle can come up empty.
+    """
+    print("scar overlay:")
+    rng = np.random.default_rng(SEED + 400)
+    mask = np.zeros((size, size), dtype=np.float64)
+    rows = np.arange(size)[:, None].astype(np.float64) + 0.5
+    cols = np.arange(size)[None, :].astype(np.float64) + 0.5
+
+    def segment(x0, y0, x1, y1, width, strength):
+        # Distance from every texel to the segment, then a hard-edged line.
+        dx, dy = x1 - x0, y1 - y0
+        length_sq = max(dx * dx + dy * dy, 1e-6)
+        t = np.clip(((cols - x0) * dx + (rows - y0) * dy) / length_sq, 0.0, 1.0)
+        dist = np.hypot(cols - (x0 + t * dx), rows - (y0 + t * dy))
+        return np.clip((width - dist) / 0.9, 0.0, 1.0) * strength
+
+    # One stroke per cell of a jittered 5x5 grid rather than 25 free throws.
+    # Free placement clumps, and a clump is not a stylistic problem here: every
+    # region's UV rectangle is only a sixteenth of this image, so one bare
+    # sixteenth means one limb that can never show a scar however badly it was
+    # hurt. The jitter inside the cell is what keeps it from reading as a grid.
+    cells = [(row, col) for row in range(5) for col in range(5)]
+    step = size / 5.0
+    for row, col in cells:
+        x = (col + rng.uniform(0.15, 0.85)) * step
+        y = (row + rng.uniform(0.15, 0.85)) * step
+        angle = rng.uniform(0.0, 2.0 * np.pi)
+        strength = rng.uniform(0.68, 0.95)         # the core stays well above the cutout
+        # Wider than a hairline on purpose: the falloff below only reaches full
+        # strength where the width exceeds it, so a thinner stroke would have no
+        # solid core at all and the pipeline would eat the whole thing.
+        width = rng.uniform(0.85, 1.15)
+        for _ in range(int(rng.integers(2, 5))):   # 2-4 jagged segments of 2-4 px
+            angle += rng.uniform(-0.6, 0.6)
+            length = rng.uniform(2.0, 4.0)
+            ex, ey = x + length * np.cos(angle), y + length * np.sin(angle)
+            mask = np.maximum(mask, segment(x, y, ex, ey, width, strength))
+            # A stitch tick across the middle of every other segment, fainter
+            # than the cut itself but still over the cutout.
+            if rng.uniform() < 0.5:
+                mx, my = (x + ex) / 2.0, (y + ey) / 2.0
+                px, py = -np.sin(angle), np.cos(angle)
+                mask = np.maximum(mask, segment(mx - 1.2 * px, my - 1.2 * py,
+                                                mx + 1.2 * px, my + 1.2 * py, 0.5, strength * 0.45))
+            x, y = ex, ey
+    # Nothing on the very edge, or a stroke bleeds across a UV boundary onto the
+    # neighbouring region -- a mark on the arm showing up on the leg beside it.
+    mask[0, :] = mask[-1, :] = mask[:, 0] = mask[:, -1] = 0.0
+    _write(np.clip(mask, 0.0, 1.0), OUT / "misc" / "scar_body.png")
+
+
 def main():
     if not OUT.parent.exists():
         sys.exit(f"run from the repo root: {OUT.parent} not found")
@@ -262,6 +331,7 @@ def main():
     splat_sprites()
     lens_atlas()
     body_overlay()
+    scar_overlay()
     print("done")
 
 

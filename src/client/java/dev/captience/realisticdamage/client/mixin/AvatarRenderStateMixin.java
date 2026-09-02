@@ -6,13 +6,18 @@ import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-/** Storage slots for the destroyed-limb mask and blood staining on the player's render state. */
+/**
+ * Storage slots for the destroyed-limb mask, blood staining and scars on the
+ * player's render state.
+ */
 @Mixin(AvatarRenderState.class)
 public abstract class AvatarRenderStateMixin implements DestroyedLimbHolder, BloodStainHolder {
 	@Unique
 	private int realisticdamage$destroyedMask;
 	@Unique
 	private float[] realisticdamage$bloodStains;
+	@Unique
+	private int realisticdamage$scarMask;
 
 	@Override
 	public int realisticdamage$destroyedMask() {
@@ -32,5 +37,15 @@ public abstract class AvatarRenderStateMixin implements DestroyedLimbHolder, Blo
 	@Override
 	public void realisticdamage$setBloodStains(float[] stains) {
 		this.realisticdamage$bloodStains = stains;
+	}
+
+	@Override
+	public int realisticdamage$scarMask() {
+		return this.realisticdamage$scarMask;
+	}
+
+	@Override
+	public void realisticdamage$setScarMask(int mask) {
+		this.realisticdamage$scarMask = mask;
 	}
 }

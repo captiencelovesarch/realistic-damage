@@ -16,4 +16,19 @@ public interface BloodStainHolder {
 	float[] realisticdamage$bloodStains();
 
 	void realisticdamage$setBloodStains(float[] stains);
+
+	/**
+	 * The synced scar mask (1.6), two bits per part holding a
+	 * {@code ScarLevel} ordinal; 0 means unmarked everywhere.
+	 *
+	 * <p>The rule this interface states is one carrier per <em>consumer</em>,
+	 * not one per datum: the body layer paints both blood and scars, so both
+	 * ride here, while the destroyed mask stays on {@link DestroyedLimbHolder}
+	 * because it is the model rather than the layer that reads it. Splitting
+	 * these two apart would give one class two casts to make on the way to one
+	 * draw.
+	 */
+	int realisticdamage$scarMask();
+
+	void realisticdamage$setScarMask(int mask);
 }

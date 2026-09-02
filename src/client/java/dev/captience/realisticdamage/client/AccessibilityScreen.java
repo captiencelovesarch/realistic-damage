@@ -57,6 +57,15 @@ public class AccessibilityScreen extends OptionsSubScreen {
 				CycleButton.onOffBuilder(config.showNumericStats)
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.numeric_stats"),
 								(button, value) -> config.showNumericStats = value));
+		// Display rather than Blood, even though it also gates the pass on the
+		// player model: what this switch turns off is a piece of information
+		// about your body, and the place a player will look for it is beside the
+		// other two switches that decide what the body diagram says.
+		this.list.addSmall(
+				CycleButton.onOffBuilder(config.showScars)
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.scars"),
+								(button, value) -> config.showScars = value),
+				null);
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.vision"));
 		this.list.addSmall(

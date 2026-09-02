@@ -30,6 +30,20 @@ public final class ClientEffectsConfig {
 	 * to create.
 	 */
 	public boolean showNumericStats = false;
+	/**
+	 * Marks on the body panel and the HUD for regions that have been broken or
+	 * lost before (1.6). Information, not atmosphere — kept out of the presets
+	 * and out of {@link #disableAllEffects()} like the injury icons, because it
+	 * is a fact about your body rather than something happening to your senses.
+	 *
+	 * <p>Absent from a 1.5 config file, which Gson answers with the initialiser
+	 * above, so there is nothing for {@link #migrate()} to do either.
+	 *
+	 * <p>The matching seam on the player model is paint on a body, so it rides
+	 * Blood on Bodies as well as this one: the panic button silences that pass
+	 * without ever having to learn that scars exist.
+	 */
+	public boolean showScars = true;
 
 	public double vignetteIntensity = 1.0;
 	public double sensitivityReductionIntensity = 1.0;

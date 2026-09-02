@@ -2,6 +2,7 @@ package dev.captience.realisticdamage.client;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
+import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import net.minecraft.client.DeltaTracker;
@@ -28,6 +29,13 @@ public final class BodyHud {
 	// colour, warm enough not to look like the panel background showing through.
 	private static final int CEILING_DARK = 0xFF2A2222;
 	private static final int CEILING_LIGHT = 0xFF3A3030;
+	// Old scar tissue: pale and slightly pink against skin, the darker two for
+	// the shadow and the outline the inspector's seam needs at three times this
+	// size. Package-private so BodyInspector can share them the way it already
+	// shares stateColor — one visual language for history, in both places.
+	static final int SCAR_LIGHT = 0xFFC9A6A0;
+	static final int SCAR_DARK = 0xFF8A6A66;
+	static final int SCAR_OUTLINE = 0xFF3A2A2A;
 
 	private static final int SEG = 4;      // limb thickness
 	private static final int TORSO_W = 8;
@@ -229,6 +237,21 @@ public final class BodyHud {
 		} else if (snapshot.broken(part)) {
 			// A white fracture line across the segment.
 			graphics.fill(x, y + h / 2, x + w, y + h / 2 + 1, (BROKEN_MARK & 0x00FFFFFF) | alpha);
+		}
+		// History, in the one corner nothing else uses: a two-pixel stair up from
+		// the bottom-left, three pixels for a region that was once lost. Never a
+		// reason for the HUD to be on screen — hurt() does not read the scar mask
+		// and never will, so a scarred but healed body fades out exactly as a
+		// healed one always did. Not drawn on a destroyed region, where the cross
+		// already says everything a mark could.
+		ScarLevel scar = snapshot.scar(part);
+		if (ClientEffectsConfig.get().showScars && scar != ScarLevel.NONE && !snapshot.destroyed(part)) {
+			int mark = (SCAR_LIGHT & 0x00FFFFFF) | alpha;
+			graphics.fill(x, y + h - 1, x + 1, y + h, mark);
+			graphics.fill(x + 1, y + h - 2, x + 2, y + h - 1, mark);
+			if (scar == ScarLevel.DESTROYED) {
+				graphics.fill(x + 2, y + h - 3, x + 3, y + h - 2, mark);
+			}
 		}
 		WoundSeverity wound = snapshot.wound(part);
 		if (wound != null) {

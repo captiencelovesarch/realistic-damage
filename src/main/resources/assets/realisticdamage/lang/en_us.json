@@ -154,5 +154,10 @@
 	"realisticdamage.config.death": "Dying Fade",
 	"realisticdamage.config.death_style": "Death Style",
 	"realisticdamage.config.death_style.cinematic": "Cinematic",
-	"realisticdamage.config.death_style.realistic": "Realistic"
+	"realisticdamage.config.death_style.realistic": "Realistic",
+	"realisticdamage.config.scars": "Scars",
+	"realisticdamage.detail.scarred.broken": "Scarred where it once broke",
+	"realisticdamage.detail.scarred.destroyed": "Scarred where it was once lost",
+	"realisticdamage.detail.scarred.destroyed.head": "Scarred where the skull was once crushed",
+	"realisticdamage.detail.scarred.destroyed.torso": "Scarred where the chest once caved in"
 }

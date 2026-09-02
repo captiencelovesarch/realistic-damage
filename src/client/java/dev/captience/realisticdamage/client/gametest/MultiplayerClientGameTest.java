@@ -3,6 +3,7 @@ package dev.captience.realisticdamage.client.gametest;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.client.TriageHud;
 import dev.captience.realisticdamage.dummy.PracticeDummy;
@@ -65,7 +66,8 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 					BodySnapshot snapshot = client.player.getAttached(RDAttachments.SNAPSHOT);
 					return snapshot != null && snapshot.broken(BodyPart.LEFT_LEG)
 							&& snapshot.woundMask() != 0
-							&& snapshot.ceilingBand(BodyPart.LEFT_LEG) == 2;
+							&& snapshot.ceilingBand(BodyPart.LEFT_LEG) == 2
+							&& snapshot.scar(BodyPart.LEFT_LEG) == ScarLevel.BROKEN;
 				});
 				if (!injuryArrived) {
 					throw new AssertionError("injuries did not survive the trip to a remote client");
@@ -105,6 +107,30 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 							"a second player's body state never reached this client");
 				}
 				context.takeScreenshot("rd_mp_02_second_player");
+
+				// Two scarred bodies in one frame. This one cannot assert — there
+				// is no counter that can tell whose seam landed on whom — and it
+				// is here precisely because of that: the layer is a single
+				// instance shared by every player the renderer draws, and until
+				// 1.6 it posed its own meshes in place, so with two visible
+				// players each drew the other's limb angles. The pose now goes on
+				// the matrix stack, which is copied per submit. The fix and the
+				// picture that would show it failing ship together.
+				server.runOnServer(minecraftServer -> {
+					for (ServerPlayer player : minecraftServer.getPlayerList().getPlayers()) {
+						RealisticDamageData data = RDAttachments.get(player);
+						data.part(BodyPart.RIGHT_ARM).setScar(ScarLevel.DESTROYED);
+						data.part(BodyPart.LEFT_LEG).setScar(ScarLevel.BROKEN);
+						RDAttachments.pushSnapshot(player);
+					}
+				});
+				context.runOnClient(client ->
+						client.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK));
+				context.waitTicks(30);
+				context.takeScreenshot("rd_mp_02_two_scarred");
+				context.runOnClient(client ->
+						client.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON));
+				context.waitTicks(5);
 
 				// And the triage panel must draw once the server says who we are on.
 				int patientId = context.computeOnClient(client -> {

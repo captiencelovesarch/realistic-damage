@@ -1,11 +1,13 @@
 package dev.captience.realisticdamage.client;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
+import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.Vitals;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.net.BodySnapshot;
@@ -74,6 +76,24 @@ public final class BodyInspector {
 	@org.jspecify.annotations.Nullable
 	private static BodyPart lastHovered;
 	private static List<String> lastDetailKeys = List.of();
+	/**
+	 * Regions the scar seam was drawn on last frame, so a client gametest can
+	 * assert what the panel actually painted (1.6). There is deliberately no
+	 * companion hook for the hover line: {@link #lastDetailKeys()} already
+	 * records every key the box printed, and two hooks answering one question
+	 * is how the two drift apart.
+	 */
+	private static final EnumSet<BodyPart> lastScarMarks = EnumSet.noneOf(BodyPart.class);
+
+	/** Was the seam drawn on this region as of the last frame? */
+	public static boolean scarMarkDrawn(BodyPart part) {
+		return lastScarMarks.contains(part);
+	}
+
+	/** How many regions the seam was drawn on as of the last frame. */
+	public static int scarMarks() {
+		return lastScarMarks.size();
+	}
 
 	/** Screen position of a region as of the last frame, or null if not drawn. */
 	@org.jspecify.annotations.Nullable
@@ -110,6 +130,7 @@ public final class BodyInspector {
 		lastCenters.clear();
 		lastHovered = null;
 		lastDetailKeys = List.of();
+		lastScarMarks.clear();
 	}
 
 	public static void init() {
@@ -171,6 +192,7 @@ public final class BodyInspector {
 		}
 
 		List<Region> regions = layout(bodyX, panelY);
+		lastScarMarks.clear();
 		Region hovered = null;
 		for (Region region : regions) {
 			drawRegion(graphics, snapshot, region, region.contains(mouseX, mouseY));
@@ -225,10 +247,54 @@ public final class BodyInspector {
 			BodyHud.drawCeilingCap(graphics, region.x(), region.y(), region.w(), region.h(),
 					snapshot.ceilingBand(region.part()), 0xFF000000);
 		}
+		// History: a pale seam rising from the bottom-left corner, doubled and
+		// darker for a region that was once lost. Bottom-left because everything
+		// else has already claimed somewhere — the drain owns the top of the fill,
+		// the ceiling cap owns the top edge, the destroyed icon owns the centre.
+		// Not drawn on a destroyed region at all: the cross says everything a mark
+		// could say there, and the hover line still carries the "once lost".
+		ScarLevel scar = snapshot.scar(region.part());
+		if (ClientEffectsConfig.get().showScars && scar != ScarLevel.NONE
+				&& !snapshot.destroyed(region.part())) {
+			int n = Math.min(region.w(), region.h()) / 2;   // 6 on limbs, 7 on the head, 12 on the torso
+			drawSeam(graphics, region, 0, n, BodyHud.SCAR_LIGHT, BodyHud.SCAR_DARK, true);
+			if (scar == ScarLevel.DESTROYED) {
+				drawSeam(graphics, region, 4, n - 1, BodyHud.SCAR_DARK, BodyHud.SCAR_OUTLINE, false);
+			}
+			lastScarMarks.add(region.part());
+		}
 		if (snapshot.destroyed(region.part())) {
 			StatusIcons.draw(graphics, StatusIcons.DESTROYED,
 					region.x() + region.w() / 2 - StatusIcons.SIZE / 2,
 					region.y() + region.h() / 2 - StatusIcons.SIZE / 2, 0xFF000000);
+		}
+	}
+
+	/**
+	 * A one-pixel diagonal rising to the right from two pixels in from the
+	 * bottom-left corner, with a one-pixel shadow to its right and, on the
+	 * primary seam, cross-ticks every third pixel so it reads as a healed cut
+	 * rather than as a slash.
+	 *
+	 * <p>The second seam is inset four and drawn one pixel shorter: four is the
+	 * closest the two can sit and still read as two lines rather than as one
+	 * thick one, and one shorter is what keeps its shadow inside a twelve-pixel
+	 * limb. Every fill lands inside the region on all four sizes the layout
+	 * produces — head 18x15, arms 12x27, torso 24x27, legs 12x24.
+	 */
+	private static void drawSeam(GuiGraphicsExtractor graphics, Region region, int inset, int n,
+			int light, int shadow, boolean ticks) {
+		int baseX = region.x() + 2 + inset;
+		int baseY = region.y() + region.h() - 3;
+		for (int i = 0; i < n; i++) {
+			int px = baseX + i;
+			int py = baseY - i;
+			graphics.fill(px, py, px + 1, py + 1, light);
+			graphics.fill(px + 1, py, px + 2, py + 1, shadow);
+			if (ticks && i % 3 == 1) {
+				graphics.fill(px - 1, py + 1, px, py + 2, shadow);
+				graphics.fill(px + 1, py - 1, px + 2, py, shadow);
+			}
 		}
 	}
 
@@ -300,6 +366,25 @@ public final class BodyInspector {
 		}
 		if (snapshot.burned()) {
 			lines.add(Component.translatable("realisticdamage.detail.burned"));
+		}
+		// Last, after everything describing the region's condition, because this
+		// one is history rather than condition: the box then reads part, what it
+		// is now, what it can still come back to, the figures, what is wrong with
+		// it, and finally what happened to it. Shown even while the region is
+		// broken or destroyed — that is exactly the order in which the
+		// before-and-after of one event reads correctly.
+		//
+		// Gated on showScars like the seam is, and deliberately together: a
+		// toggle that hides the mark and keeps the sentence describing it is
+		// worse than either half of it.
+		ScarLevel scar = snapshot.scar(part);
+		if (ClientEffectsConfig.get().showScars && scar != ScarLevel.NONE) {
+			// Only the head and the torso get their own wording, and only once
+			// they have been lost: they are the two the death messages name, so
+			// they are the two a player already has a sentence in mind for.
+			lines.add(Component.translatable("realisticdamage.detail.scarred."
+					+ scar.name().toLowerCase(Locale.ROOT)
+					+ (scar == ScarLevel.DESTROYED && part.isCore() ? "." + part.id() : "")));
 		}
 
 		List<String> keys = new ArrayList<>(lines.size());
