@@ -41,12 +41,20 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 					throw new AssertionError("no body snapshot reached the client over a real connection");
 				}
 
-				// Injure the player server-side and watch it arrive.
+				// Injure the player server-side and watch it arrive. One mutation
+				// touching several fields at once on purpose: this is the only
+				// assertion in the suite that crosses a real PacketDecoder, and
+				// therefore the only place a mismatch between what the snapshot
+				// codec writes and what it reads shows up as anything other than a
+				// silently wrong number. The decoder's "bytes left over" check is
+				// what catches it, so the more of the record carries a distinctive
+				// value here the more of it that check is actually guarding.
 				server.runOnServer(minecraftServer -> {
 					for (ServerPlayer player : minecraftServer.getPlayerList().getPlayers()) {
 						RealisticDamageData data = RDAttachments.get(player);
 						data.part(BodyPart.LEFT_LEG).setCondition(4.0);
 						data.part(BodyPart.LEFT_LEG).setBroken(true);
+						data.part(BodyPart.LEFT_LEG).lowerCeilingTo(2);
 						data.addWound(BodyPart.TORSO, WoundSeverity.SEVERE);
 						data.setBlood(38.0);
 						RDAttachments.pushSnapshot(player);
@@ -56,7 +64,8 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 				boolean injuryArrived = context.computeOnClient(client -> {
 					BodySnapshot snapshot = client.player.getAttached(RDAttachments.SNAPSHOT);
 					return snapshot != null && snapshot.broken(BodyPart.LEFT_LEG)
-							&& snapshot.woundMask() != 0;
+							&& snapshot.woundMask() != 0
+							&& snapshot.ceilingBand(BodyPart.LEFT_LEG) == 2;
 				});
 				if (!injuryArrived) {
 					throw new AssertionError("injuries did not survive the trip to a remote client");

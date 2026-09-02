@@ -15,6 +15,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 
 /**
  * A larger, inspectable body panel beside the inventory. Hovering a region
@@ -72,6 +73,7 @@ public final class BodyInspector {
 			new java.util.EnumMap<>(BodyPart.class);
 	@org.jspecify.annotations.Nullable
 	private static BodyPart lastHovered;
+	private static List<String> lastDetailKeys = List.of();
 
 	/** Screen position of a region as of the last frame, or null if not drawn. */
 	@org.jspecify.annotations.Nullable
@@ -86,6 +88,20 @@ public final class BodyInspector {
 	}
 
 	/**
+	 * Every translation key the hover box put on screen last frame, in the order
+	 * it printed them; empty when no box was drawn (1.6).
+	 *
+	 * <p>The detail box is the only place the mod ever explains an injury in
+	 * words, and a screenshot cannot tell a client gametest which words those
+	 * were — nor, more importantly, which ones were absent. Keys rather than
+	 * rendered text because the assertion is about the branch the panel took, not
+	 * about the English somebody wrote for it.
+	 */
+	public static List<String> lastDetailKeys() {
+		return lastDetailKeys;
+	}
+
+	/**
 	 * Nothing was drawn this frame, so the recorded positions describe a panel
 	 * that is no longer on screen. Held stale, they would have a caller believe
 	 * a region is still under the cursor after the panel was hidden.
@@ -93,6 +109,7 @@ public final class BodyInspector {
 	private static void forget() {
 		lastCenters.clear();
 		lastHovered = null;
+		lastDetailKeys = List.of();
 	}
 
 	public static void init() {
@@ -163,7 +180,11 @@ public final class BodyInspector {
 			}
 		}
 		lastHovered = hovered == null ? null : hovered.part();
-		if (hovered != null) {
+		if (hovered == null) {
+			// No box on screen, so there are no lines to report. Left standing they
+			// would describe a region the cursor has already left.
+			lastDetailKeys = List.of();
+		} else {
 			drawDetail(graphics, snapshot, hovered.part(), mouseX, mouseY, screen.width);
 		}
 	}
@@ -195,6 +216,14 @@ public final class BodyInspector {
 		int empty = (int) ((1.0f - Math.clamp(fraction, 0.0f, 1.0f)) * region.h());
 		if (empty > 0) {
 			graphics.fill(region.x(), region.y(), region.x() + region.w(), region.y() + empty, 0x66000000);
+		}
+		// Over the drain, so the two edges can be compared at a glance: at a
+		// ceiling they land on the same row and the region reads "this is as far
+		// back as it comes" with no word for it. Nothing is capped on a region
+		// that is gone — a destroyed part sends no band at all.
+		if (!snapshot.destroyed(region.part())) {
+			BodyHud.drawCeilingCap(graphics, region.x(), region.y(), region.w(), region.h(),
+					snapshot.ceilingBand(region.part()), 0xFF000000);
 		}
 		if (snapshot.destroyed(region.part())) {
 			StatusIcons.draw(graphics, StatusIcons.DESTROYED,
@@ -237,6 +266,15 @@ public final class BodyInspector {
 		lines.add(Component.translatable("realisticdamage.part." + part.id()));
 		lines.add(Component.translatable("realisticdamage.state."
 				+ snapshot.state(part).name().toLowerCase(Locale.ROOT)));
+		// Directly under the state word, because it qualifies it: "Injured", and
+		// this is as far as it will ever come back. A band, never a figure — the
+		// ceiling is the one quantity the mod refuses to number even here, where
+		// condition itself is allowed one. /rdmg info remains the exact channel.
+		int band = snapshot.ceilingBand(part);
+		if (band > 0) {
+			lines.add(Component.translatable("realisticdamage.detail.ceiling."
+					+ snapshot.ceilingState(part).name().toLowerCase(Locale.ROOT)));
+		}
 		if (ClientEffectsConfig.get().showNumericStats && !snapshot.destroyed(part)) {
 			// Derived from a snapshot quantized to 1%, so one decimal is as much
 			// precision as actually exists. /rdmg info remains the exact source.
@@ -263,6 +301,14 @@ public final class BodyInspector {
 		if (snapshot.burned()) {
 			lines.add(Component.translatable("realisticdamage.detail.burned"));
 		}
+
+		List<String> keys = new ArrayList<>(lines.size());
+		for (Component line : lines) {
+			if (line.getContents() instanceof TranslatableContents translatable) {
+				keys.add(translatable.getKey());
+			}
+		}
+		lastDetailKeys = List.copyOf(keys);
 
 		int width = 0;
 		for (Component line : lines) {

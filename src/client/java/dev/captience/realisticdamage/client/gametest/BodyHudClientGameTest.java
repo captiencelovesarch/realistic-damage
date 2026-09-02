@@ -2,6 +2,7 @@ package dev.captience.realisticdamage.client.gametest;
 
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.client.BodyHud;
 import dev.captience.realisticdamage.client.BodyInspector;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
 import dev.captience.realisticdamage.body.RealisticDamageData;
@@ -205,6 +206,52 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.setScreen(() -> null);
 			context.waitTicks(3);
 
+			// A permanent ceiling (1.6): the leg can never come back past three
+			// quarters again, and right now it is sitting exactly on that line.
+			// That is this player's baseline, not an alarm — so the HUD has to be
+			// allowed to fade on it exactly as it does on an unhurt body. Only
+			// hurt() can be asked that: a screenshot of a HUD that faded out and a
+			// screenshot of one that never drew are the same picture.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.part(BodyPart.LEFT_LEG).lowerCeilingTo(1);
+			});
+			context.waitTicks(20);
+			int band = snapshot(context).ceilingBand(BodyPart.LEFT_LEG);
+			if (band != 1) {
+				throw new AssertionError("a ceiling lowered on the server arrived as band " + band);
+			}
+			if (BodyHud.hurt(snapshot(context))) {
+				throw new AssertionError("a body resting at its ceilings kept the HUD pinned open");
+			}
+
+			// And the panel says so in words, once — by band. The wrong band would
+			// be a quiet lie the screenshot could not catch, so both halves are
+			// asserted: the line that must be there and the one that must not.
+			context.setScreen(() -> new net.minecraft.client.gui.screens.inventory.InventoryScreen(
+					net.minecraft.client.Minecraft.getInstance().player));
+			context.waitTicks(5);
+			hover(context, BodyPart.LEFT_LEG);
+			java.util.List<String> keys = context.computeOnClient(client -> BodyInspector.lastDetailKeys());
+			if (!keys.contains("realisticdamage.detail.ceiling.hurt")
+					|| keys.contains("realisticdamage.detail.ceiling.injured")) {
+				throw new AssertionError("the hover box described a Hurt ceiling as " + keys);
+			}
+			context.takeScreenshot("rd_16_capped");
+
+			// Below the ceiling: 8 of 16 under a 12 ceiling. This is the state that
+			// still deserves the player's attention, and the fade must come back on
+			// for it — otherwise "capped bodies do not raise the HUD" would have
+			// quietly become "capped bodies never raise the HUD again".
+			mutate(singleplayer, data -> data.part(BodyPart.LEFT_LEG).damage(4.0));
+			context.waitTicks(20);
+			if (!BodyHud.hurt(snapshot(context))) {
+				throw new AssertionError("a capped leg hurt further left the HUD faded out");
+			}
+			context.takeScreenshot("rd_17_capped_and_hurt");
+			context.setScreen(() -> null);
+			context.waitTicks(3);
+
 			// The accessibility screen must open and draw.
 			context.setScreen(() -> new dev.captience.realisticdamage.client.AccessibilityScreen(null));
 			context.waitTicks(5);
@@ -274,6 +321,21 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 				RDAttachments.pushSnapshot(player);
 			}
 		});
+	}
+
+	/**
+	 * The snapshot the client is holding right now. Fetched rather than asserted
+	 * against because the interesting questions in 1.6 are about what the client
+	 * concluded from it — a band, and whether the HUD is entitled to fade — and
+	 * both of those are answered by client code that a screenshot cannot reach.
+	 */
+	private BodySnapshot snapshot(ClientGameTestContext context) {
+		BodySnapshot snapshot = context.computeOnClient(client ->
+				client.player == null ? null : client.player.getAttached(RDAttachments.SNAPSHOT));
+		if (snapshot == null) {
+			throw new AssertionError("the client is holding no body snapshot");
+		}
+		return snapshot;
 	}
 
 	/** The client must be seeing the server's state, not a stale default. */

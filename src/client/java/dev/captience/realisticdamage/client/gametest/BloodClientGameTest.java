@@ -35,6 +35,12 @@ import net.minecraft.server.level.ServerPlayer;
 public class BloodClientGameTest implements FabricClientGameTest {
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		// The config is a singleton shared by every test in this client session, and
+		// this one asserts on what the effects do. Reloading from disk first means a
+		// panic-buttoned config leaked by whichever class ran before us fails here as
+		// nothing rendering, rather than as a puzzle — the restore below is the same
+		// courtesy in the other direction, and neither can rely on run order.
+		context.runOnClient(client -> ClientEffectsConfig.load());
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			context.waitTicks(20);
 
