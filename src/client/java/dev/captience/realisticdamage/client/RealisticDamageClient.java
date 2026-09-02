@@ -16,6 +16,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		ClientEffectsConfig.load();
 		BodyInspector.init();
+		InjuryMessageFilter.register();
 
 		// The stain field and the client-side emitter draw from the same sprite
 		// definition as the drop itself, so binding happens inside the provider —

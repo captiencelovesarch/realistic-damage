@@ -44,6 +44,30 @@ public final class ClientEffectsConfig {
 	 * without ever having to learn that scars exist.
 	 */
 	public boolean showScars = true;
+	/**
+	 * The white line at the bottom of the screen — "Your right leg breaks!"
+	 * (1.6). Every other visible layer of this mod already had a control and
+	 * this one did not, which made the output that uses <em>words</em> the only
+	 * output a player could not refuse.
+	 *
+	 * <p>On by default: it is what everybody has today, and text switched off by
+	 * default would hide the mod from a new player entirely.
+	 *
+	 * <p>A plain boolean, not a boxed one. Absent from a 1.5 config file Gson
+	 * leaves the initialiser standing, which is already the right answer, so
+	 * {@link #migrate()} has nothing to say about it — the same argument
+	 * {@link #showScars} makes just above.
+	 *
+	 * <p>Kept out of the presets and out of {@link #disableAllEffects()} on the
+	 * {@link #showStatusIcons} and {@link #showScars} precedent — information,
+	 * not atmosphere — and for one reason of its own: cancelling the overlay
+	 * cancels the narrator with it, so for a screen-reader player this line is
+	 * the injury cue, and no preset should take it away unasked.
+	 *
+	 * <p>The rescue acknowledgements are outside this switch by construction
+	 * rather than by a second control; see {@code InjuryMessages}.
+	 */
+	public boolean showInjuryMessages = true;
 
 	public double vignetteIntensity = 1.0;
 	public double sensitivityReductionIntensity = 1.0;

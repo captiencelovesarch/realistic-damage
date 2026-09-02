@@ -61,11 +61,19 @@ public class AccessibilityScreen extends OptionsSubScreen {
 		// player model: what this switch turns off is a piece of information
 		// about your body, and the place a player will look for it is beside the
 		// other two switches that decide what the body diagram says.
+		//
+		// The injury text shares the row for the same reason. It is not a sound
+		// and not a screen effect — it is the fourth thing that decides what the
+		// mod tells you about your body, so it belongs with the other three
+		// rather than in a section of its own.
 		this.list.addSmall(
 				CycleButton.onOffBuilder(config.showScars)
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.scars"),
 								(button, value) -> config.showScars = value),
-				null);
+				CycleButton.onOffBuilder(config.showInjuryMessages)
+						.create(0, 0, 150, 20,
+								Component.translatable("realisticdamage.config.injury_messages"),
+								(button, value) -> config.showInjuryMessages = value));
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.vision"));
 		this.list.addSmall(

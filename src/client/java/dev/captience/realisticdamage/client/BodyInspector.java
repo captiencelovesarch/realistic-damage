@@ -10,12 +10,15 @@ import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.Vitals;
 import dev.captience.realisticdamage.body.WoundSeverity;
+import dev.captience.realisticdamage.client.mixin.ContainerLayoutAccessor;
+import dev.captience.realisticdamage.client.mixin.InventoryLayoutAccessor;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
@@ -36,9 +39,30 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 public final class BodyInspector {
 	private BodyInspector() {}
 
-	// Vanilla survival inventory is a fixed 176x166, centred.
-	private static final int GUI_WIDTH = 176;
+	// Vanilla survival inventory is a fixed 176x166. Only the height is used to
+	// find the panel's top edge now — where the window is horizontally is asked
+	// of the screen rather than derived from its width, because the recipe book
+	// moves it and the width does not change when it does.
 	private static final int GUI_HEIGHT = 166;
+
+	// The recipe book opens into the space LEFT of the inventory — the same
+	// strip this panel lives in — and vanilla slides the window 77px right to
+	// make room for it. These three numbers describe where that cluster starts:
+	// the book page is IMAGE_WIDTH wide and centred, shifted left by its
+	// xOffset, and the category tabs hang a further BOOK_TABS off its left edge.
+	//
+	// MAINTENANCE HAZARD, and it is the next Minecraft bump that will spring it:
+	// only the first of these is vanilla API we can name. The other two are
+	// copies — BOOK_OFFSET of the private OFFSET_X_POSITION, BOOK_TABS of a bare
+	// literal inside RecipeBookComponent.updateTabs — so neither can be read at
+	// runtime and neither will announce itself if Mojang moves it. The panel
+	// would simply start overlapping again, silently, exactly as it did before
+	// this fix. The recipe-book block in BodyHudClientGameTest is what catches
+	// that, and it is why that block asserts a clearance rather than taking a
+	// screenshot and calling it verified.
+	private static final int BOOK_WIDTH = RecipeBookComponent.IMAGE_WIDTH;
+	private static final int BOOK_OFFSET = 86;
+	private static final int BOOK_TABS = 30;
 
 	private static final int SCALE = 3;
 	private static final int SEG = 4 * SCALE;
@@ -84,6 +108,25 @@ public final class BodyInspector {
 	 * is how the two drift apart.
 	 */
 	private static final EnumSet<BodyPart> lastScarMarks = EnumSet.noneOf(BodyPart.class);
+	@org.jspecify.annotations.Nullable
+	private static int[] lastPanelBounds;
+
+	/**
+	 * The panel's own rectangle as of the last frame — {left, top, right,
+	 * bottom} — or null when nothing was drawn (1.6).
+	 *
+	 * <p>Distinct from {@link #regionCenter}, which answers where a region is so
+	 * a hover can be aimed at it. This answers how far the panel reaches, which
+	 * is the only thing a test asserting that it clears vanilla's own furniture
+	 * can usefully ask. The alternative was reconstructing the right edge as
+	 * {@code regionCenter(LEFT_ARM)[0] + 12}, which works and re-encodes the
+	 * layout arithmetic inside the assertion, so that the two drift apart on the
+	 * day the layout changes.
+	 */
+	@org.jspecify.annotations.Nullable
+	public static int[] panelBounds() {
+		return lastPanelBounds;
+	}
 
 	/** Was the seam drawn on this region as of the last frame? */
 	public static boolean scarMarkDrawn(BodyPart part) {
@@ -131,6 +174,7 @@ public final class BodyInspector {
 		lastHovered = null;
 		lastDetailKeys = List.of();
 		lastScarMarks.clear();
+		lastPanelBounds = null;
 	}
 
 	public static void init() {
@@ -170,16 +214,53 @@ public final class BodyInspector {
 		// inventory window at narrower GUI widths.
 		int overhang = Math.max(0, textW - bodyW);
 		int panelH = bodyH + (vitals.isEmpty() ? 0 : 6 + vitals.size() * 10);
-		int guiLeft = (screen.width - GUI_WIDTH) / 2;
-		// Sit just left of the inventory, or hug the screen edge if it will not
-		// fit. Overlapping the inventory is the one outcome worth avoiding at any
-		// width, so that bound wins over keeping the whole text on screen; below
-		// about 356 scaled pixels the panel is simply clipped at the left edge.
-		int bodyX = Math.min(guiLeft - bodyW - 8,
-				Math.max(10 + overhang, guiLeft - bodyW - 26));
+
+		// Where the leftmost thing vanilla drew begins. Not (screen.width - 176)
+		// / 2: that is where the inventory sits only while the recipe book is
+		// shut. Open and beside the window, vanilla moves the window right and
+		// fills the vacated strip with the book and its tab column, so the
+		// window's left edge stops being the cluster's left edge — and merely
+		// following the window would be worse than the old bug rather than
+		// better, planting the panel wholly inside the open book instead of
+		// half on it.
+		InventoryLayoutAccessor book = (InventoryLayoutAccessor) screen;
+		boolean bookBeside = book.realisticdamage$recipeBook().isVisible()
+				&& !book.realisticdamage$widthTooNarrow();
+		int anchorLeft = bookBeside
+				? (screen.width - BOOK_WIDTH) / 2 - BOOK_OFFSET - BOOK_TABS
+				: ((ContainerLayoutAccessor) screen).realisticdamage$leftPos();
+
+		// Book open on a small screen: vanilla has taken the whole width and the
+		// strip left of the tab column is narrower than the body diagram itself.
+		// anchorLeft = (W - 147)/2 - 116 and the body needs bodyW + 8 = 62, so
+		// this fires below W = 503. Worth being plain about how wide that band
+		// is: vanilla's automatic GUI scale picks the largest scale that still
+		// fits 320x240, which pins the scaled width under about 480 on every
+		// monitor — 1920x1080 lands on 480, 1280x720 on 427 — so on auto the
+		// panel steps aside whenever the book is open, at any window size. Only
+		// a player who has turned the scale down by hand ever sees both.
+		//
+		// There is no correct placement in that band: the free strips are 24px
+		// on the left and 49px on the right, against a 54px body, and the right
+		// one already belongs to the status-effects readout. So stand aside.
+		// Vanilla's own UI wins the argument it did not know it was in, and
+		// shutting the book brings the panel straight back.
+		if (anchorLeft - bodyW - 8 < 0) {
+			forget();
+			return;
+		}
+
+		// Sit just left of the cluster, or hug the screen edge if it will not
+		// fit. Overlapping what vanilla drew is the one outcome worth avoiding at
+		// any width, so that bound wins over keeping the whole text on screen;
+		// below about 356 scaled pixels the vitals text is simply clipped at the
+		// left edge.
+		int bodyX = Math.min(anchorLeft - bodyW - 8,
+				Math.max(10 + overhang, anchorLeft - bodyW - 26));
 		int panelY = (screen.height - GUI_HEIGHT) / 2 + 6;
 		int panelLeft = Math.max(0, bodyX - overhang - 6);
 		int panelRight = bodyX + bodyW + 6;
+		lastPanelBounds = new int[] {panelLeft, panelY - 6, panelRight, panelY + panelH + 6};
 
 		graphics.fill(panelLeft, panelY - 6, panelRight, panelY + panelH + 6, PANEL_BG);
 		graphics.fill(panelLeft, panelY - 6, panelRight, panelY - 5, PANEL_EDGE);

@@ -5,7 +5,11 @@ import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.client.BodyHud;
 import dev.captience.realisticdamage.client.BodyInspector;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
+import dev.captience.realisticdamage.client.ClientState;
+import dev.captience.realisticdamage.client.ConsciousnessEffects;
+import dev.captience.realisticdamage.client.InjuryMessageFilter;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -73,6 +77,77 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.waitTicks(60);
 			context.takeScreenshot("rd_04_recovered");
 			assertSynced(context, "after recovery");
+
+			// The middle of the ladder, on a clear head (1.6 playtest fix). The beta
+			// report was that afterimages and exposure shift "don't have much
+			// effect", and it was right: both curves reached full strength at zero
+			// consciousness, underneath the blackout, so the band a conscious player
+			// actually occupies got their weakest few percent. A screenshot cannot
+			// tell 8/255 from 50/255, so this asserts the magnitudes the renderer
+			// really asked for.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.drainConsciousness(72.0);   // 100 - 72 = 28, mid-band and no concussion
+			});
+			// Six ticks, not thirty: consciousness recovers at 2.5 a second, so a
+			// long settle drifts off the rung being measured. The first version of
+			// this waited 30 and sampled at 33 instead of 28. The window below is
+			// wide enough to hold whatever it drifts to in three tenths of a second.
+			context.waitTicks(6);
+			double[] midband = context.computeOnClient(client -> new double[] {
+					ClientState.effectiveConsciousness(),
+					ConsciousnessEffects.lastExposureAlpha(),
+					ConsciousnessEffects.lastGhostStrength()});
+			if (midband[0] <= Balance.SYMPTOM_MICROSLEEP || midband[0] >= 33.0) {
+				throw new AssertionError("meant to sample mid-band, sampled " + midband[0]);
+			}
+			// Worst case inside that window is consciousness 33, where
+			// exposureStrength = sqrt(2/25) = 0.283 and the breath can take a fifth
+			// off it: 0.283 * 0.80 * 120 = 27. The linear ramp this replaces could
+			// not reach 4 there, and never got past 25 anywhere a player can see.
+			if (midband[1] < 24.0) {
+				throw new AssertionError("the washout at consciousness " + midband[0]
+						+ " was only " + (int) midband[1] + "/255");
+			}
+			// And at 33, afterimageStrength = sqrt(12/27) = 0.667 against a pulse
+			// floor of 0.55, so 0.37. The curve this replaces was at 0.07 before
+			// its pulse even touched it.
+			if (midband[2] < 0.30) {
+				throw new AssertionError("the ghost at consciousness " + midband[0]
+						+ " was only " + midband[2]);
+			}
+			// And the gaussian is still a deep-end backstop: it must not have eaten
+			// the middle of the ladder on its way to being made perceptible.
+			if (context.computeOnClient(client -> ConsciousnessEffects.blurRequestedLastFrame())) {
+				throw new AssertionError("the blur fired in mid-band, at consciousness " + midband[0]);
+			}
+			context.takeScreenshot("rd_18_midladder");
+
+			// Every sensory effect keeps its own switch. Turning these two off has
+			// to actually stop them, not merely quieten them.
+			context.runOnClient(client -> {
+				ClientEffectsConfig.get().exposureIntensity = 0.0;
+				ClientEffectsConfig.get().afterimageIntensity = 0.0;
+			});
+			context.waitTicks(5);
+			int mutedAlpha = context.computeOnClient(client -> ConsciousnessEffects.lastExposureAlpha());
+			double mutedGhost = context.computeOnClient(client -> ConsciousnessEffects.lastGhostStrength());
+			if (mutedAlpha != 0 || mutedGhost != 0.0) {
+				throw new AssertionError("sliders at zero still drew " + mutedAlpha + "/255 and "
+						+ mutedGhost);
+			}
+			// The config is a singleton shared with every other client gametest.
+			context.runOnClient(client -> ClientEffectsConfig.load());
+			context.waitTicks(5);
+
+			// Below the blur backstop the gaussian does come on, and the ghost has
+			// ramped all the way up to hand over to it.
+			mutate(singleplayer, data -> data.drainConsciousness(18.0));   // to about 12, under the 18 backstop
+			context.waitTicks(10);
+			if (!context.computeOnClient(client -> ConsciousnessEffects.blurRequestedLastFrame())) {
+				throw new AssertionError("the blur never fired below its threshold");
+			}
+			context.takeScreenshot("rd_19_deep");
 
 			// A concussion alone, everything else pristine: it must survive (it used
 			// to clear itself one tick later) and it must be visible.
@@ -203,8 +278,12 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("rd_15_numeric_cramped");
 			context.runOnClient(client -> ClientEffectsConfig.get().showNumericStats = false);
 
+			assertThePanelFollowsTheWindow(context);
+
 			context.setScreen(() -> null);
 			context.waitTicks(3);
+
+			assertInjuryTextCanBeSilenced(context, singleplayer);
 
 			// A permanent ceiling (1.6): the leg can never come back past three
 			// quarters again, and right now it is sitting exactly on that line.
@@ -286,6 +365,238 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 		if (fresh != 1.0) {
 			throw new AssertionError("a fresh config should default to full drift, got " + fresh);
 		}
+	}
+
+	/**
+	 * The panel has to move when the <em>window</em> does, which is the half of
+	 * this that 1.1 never asserted (1.6 playtest fix).
+	 *
+	 * <p>1.1 pinned that the body does not move when the numbers are switched on,
+	 * and that assertion is right and still above. But the panel derived the
+	 * inventory's position from the screen width, and the recipe book moves the
+	 * inventory 77px right without the screen width changing a pixel — so the
+	 * panel heard about none of it and sat opaquely on the book's search box and
+	 * category tabs, passing clicks through to recipes the player could not see.
+	 * The right assertion had been written on the wrong axis.
+	 *
+	 * <p>Both ends of the range, because the answer is different at each: wide
+	 * enough and the panel steps left of the whole cluster, too narrow and it
+	 * stands aside altogether. The narrow case is the default 854x480 window at
+	 * GUI scale 2, which is why it is not an edge case worth skipping.
+	 */
+	private void assertThePanelFollowsTheWindow(ClientGameTestContext context) {
+		int restoreScale = context.computeOnClient(client -> client.options.guiScale().get());
+		// GUI scale is pinned rather than left on auto, and the wide case cannot
+		// be reached without pinning it. Vanilla's auto scale is the largest that
+		// keeps 320x240 on screen, so it holds the scaled width under about 480
+		// however large the monitor — 1920x1080 lands on 480, and 503 is where
+		// the body and the open recipe book both fit. So the only player who ever
+		// sees both is one who turned the scale down by hand. 1280x720 at scale 2
+		// is 640 scaled pixels, which is that player.
+		setGuiScale(context, 2);
+		context.getInput().resizeWindow(1280, 720);
+		context.waitTicks(3);
+		setRecipeBookOpen(context, false);
+		int wide = guiWidth(context);
+		// anchorLeft = (W - 147)/2 - 86 - 30 and the body needs 54 + 8 beside it,
+		// so both fit from (W - 147)/2 >= 178, i.e. W >= 503.
+		if (wide < 503) {
+			throw new AssertionError("meant to test a window with room for both, got W = " + wide);
+		}
+		int[] shut = context.computeOnClient(client -> BodyInspector.panelBounds());
+		if (shut == null) {
+			throw new AssertionError("the panel drew nothing with the recipe book shut at W = " + wide);
+		}
+
+		setRecipeBookOpen(context, true);
+		int[] open = context.computeOnClient(client -> BodyInspector.panelBounds());
+		if (open == null) {
+			throw new AssertionError("the panel vanished at W = " + wide + ", which has room for it");
+		}
+		if (open[0] == shut[0]) {
+			throw new AssertionError("the panel did not move when the recipe book opened: still at "
+					+ open[0]);
+		}
+		// Vanilla's own arithmetic, spelled out here rather than asked of
+		// BodyInspector: RecipeBookComponent.getXOrigin is (width - IMAGE_WIDTH)
+		// / 2 - xOffset, and updateTabs hangs the category column 30 further
+		// left. If the panel and this ever disagree it is because Mojang moved
+		// one of them, which is exactly the day this test is for.
+		int tabLeft = context.computeOnClient(client ->
+				(client.getWindow().getGuiScaledWidth() - 147) / 2 - 86 - 30);
+		if (open[2] > tabLeft) {
+			throw new AssertionError("the panel reaches " + open[2]
+					+ ", over the recipe book tabs that start at " + tabLeft);
+		}
+		for (BodyPart part : BodyPart.values()) {
+			hover(context, part);
+			if (context.computeOnClient(client -> BodyInspector.hoveredPart()) != part) {
+				throw new AssertionError("the recipe book layout broke the hover on " + part);
+			}
+		}
+		context.takeScreenshot("rd_20_recipe_book_open");
+
+		// Squeezed, with the book still open, there is no strip wide enough for
+		// the body: 24px left of the tabs and 49px right of the window, against a
+		// 54px diagram, and the right strip already belongs to the status
+		// effects. Standing aside beats painting over the recipes.
+		context.getInput().resizeWindow(854, 480);
+		context.waitTicks(3);
+		int narrow = guiWidth(context);
+		if (narrow < 379 || narrow >= 503) {
+			throw new AssertionError("meant to test the band where the book shifts but nothing fits, got W = "
+					+ narrow);
+		}
+		if (context.computeOnClient(client -> BodyInspector.panelBounds()) != null
+				|| context.computeOnClient(client -> BodyInspector.regionCenter(BodyPart.HEAD)) != null) {
+			throw new AssertionError("the panel drew at W = " + narrow
+					+ " with no room beside the open recipe book");
+		}
+		context.takeScreenshot("rd_21_recipe_book_cramped");
+
+		// And it comes straight back — suppression is a response to the book, not
+		// a state the panel gets stuck in.
+		setRecipeBookOpen(context, false);
+		int[] backAgain = context.computeOnClient(client -> BodyInspector.panelBounds());
+		if (backAgain == null) {
+			throw new AssertionError("the panel never returned once the recipe book was shut");
+		}
+		// The other half of "follows the window": same book state, different
+		// window, different place. This is what the old code could not do.
+		if (backAgain[0] == shut[0]) {
+			throw new AssertionError("the panel sat at " + shut[0] + " at both W = " + wide
+					+ " and W = " + narrow);
+		}
+
+		// Back to whatever the harness had, so the blocks after this one see the
+		// window they were written against.
+		setGuiScale(context, restoreScale);
+		context.getInput().resizeWindow(854, 480);
+		context.waitTicks(3);
+	}
+
+	/** 0 is vanilla's "auto". resizeGui is what actually applies the new scale. */
+	private void setGuiScale(ClientGameTestContext context, int scale) {
+		context.runOnClient(client -> {
+			client.options.guiScale().set(scale);
+			client.resizeGui();
+		});
+		context.waitTicks(3);
+	}
+
+	/**
+	 * Puts vanilla's recipe book into a known state by clicking its toggle the
+	 * way a player does, because {@code leftPos} is only recomputed inside that
+	 * button's own handler — calling {@code toggleVisibility} would flip the book
+	 * and leave the window where it was, which is a layout that never happens.
+	 *
+	 * <p>Driven to a state rather than toggled blindly: the book remembers
+	 * whether it was open in the player's saved book data, so nothing here may
+	 * assume it starts shut.
+	 */
+	private void setRecipeBookOpen(ClientGameTestContext context, boolean open) {
+		boolean already = context.computeOnClient(client ->
+				((dev.captience.realisticdamage.client.mixin.InventoryLayoutAccessor) client.gui.screen())
+						.realisticdamage$recipeBook().isVisible());
+		if (already != open) {
+			// The toggle is 20x18 at leftPos+104, height/2-22 (InventoryScreen
+			// .getRecipeBookButtonPosition), so its centre is +114, +9 from there.
+			int[] at = context.computeOnClient(client -> new int[] {
+					((dev.captience.realisticdamage.client.mixin.ContainerLayoutAccessor) client.gui.screen())
+							.realisticdamage$leftPos() + 114,
+					client.getWindow().getGuiScaledHeight() / 2 - 13});
+			setCursor(context, at[0], at[1]);
+			context.waitTicks(2);
+			context.getInput().pressMouse(0);
+			context.waitTicks(3);
+			boolean now = context.computeOnClient(client ->
+					((dev.captience.realisticdamage.client.mixin.InventoryLayoutAccessor) client.gui.screen())
+							.realisticdamage$recipeBook().isVisible());
+			if (now != open) {
+				throw new AssertionError("clicking the recipe book toggle did not make it "
+						+ (open ? "open" : "shut"));
+			}
+		}
+		context.waitTicks(3);
+	}
+
+	private int guiWidth(ClientGameTestContext context) {
+		return context.computeOnClient(client -> client.getWindow().getGuiScaledWidth());
+	}
+
+	/**
+	 * "I wish the white text at the bottom of the screen could be disabled"
+	 * (1.6 playtest fix). It is the mod's only visible output that used words and
+	 * the only one with no switch, in a mod that promises in two documents that
+	 * every sensory layer has one.
+	 *
+	 * <p>Asserted through the filter's own hook rather than by reading the HUD's
+	 * overlay string: a screenshot cannot tell a line that was never sent from
+	 * one that was sent and refused, and those are precisely the two states this
+	 * fix creates. The server is unchanged either way — it still sends ordinary
+	 * system chat, so a vanilla client on a modded server keeps the text.
+	 */
+	private void assertInjuryTextCanBeSilenced(ClientGameTestContext context,
+			TestSingleplayerContext singleplayer) {
+		context.runOnClient(client -> InjuryMessageFilter.clearLastSuppressedKey());
+		announce(singleplayer, "realisticdamage.msg.break.left_leg");
+		context.waitTicks(5);
+		String leaked = context.computeOnClient(client -> InjuryMessageFilter.lastSuppressedKey());
+		if (leaked != null) {
+			throw new AssertionError("the switch is on by default and it still ate " + leaked);
+		}
+		context.takeScreenshot("rd_22_injury_text");
+
+		// Let that line expire before switching the option off. Hud.setOverlayMessage
+		// gives it 60 ticks, and without the wait the "off" screenshot shows the
+		// previous message still fading — which looks exactly like the switch
+		// having failed, in the one picture whose whole job is to show that it
+		// worked.
+		context.waitTicks(65);
+		context.runOnClient(client -> {
+			ClientEffectsConfig.get().showInjuryMessages = false;
+			InjuryMessageFilter.clearLastSuppressedKey();
+		});
+		announce(singleplayer, "realisticdamage.msg.break.right_leg");
+		context.waitTicks(5);
+		String silenced = context.computeOnClient(client -> InjuryMessageFilter.lastSuppressedKey());
+		if (!"realisticdamage.msg.break.right_leg".equals(silenced)) {
+			throw new AssertionError("the switch is off and the leg break came through as " + silenced);
+		}
+		context.takeScreenshot("rd_23_injury_text_off");
+
+		// Still off, and a rescue acknowledgement must arrive anyway. These
+		// answer a keypress instead of reporting a body, and nothing else on
+		// screen says them — silencing them would break a feature rather than
+		// quiet an effect.
+		context.runOnClient(client -> InjuryMessageFilter.clearLastSuppressedKey());
+		announce(singleplayer, "realisticdamage.msg.pressure.self");
+		context.waitTicks(5);
+		String rescue = context.computeOnClient(client -> InjuryMessageFilter.lastSuppressedKey());
+		if (rescue != null) {
+			throw new AssertionError("a rescue acknowledgement was swallowed: " + rescue);
+		}
+
+		// Back on. The config is a singleton shared with every other client
+		// gametest, and this one is a plain field on it rather than a reloadable
+		// file value, so it is restored by hand as well as by load().
+		context.runOnClient(client -> {
+			ClientEffectsConfig.get().showInjuryMessages = true;
+			ClientEffectsConfig.load();
+		});
+		context.waitTicks(3);
+		if (!context.computeOnClient(client -> ClientEffectsConfig.get().showInjuryMessages)) {
+			throw new AssertionError("the injury text stayed off for the tests that follow");
+		}
+	}
+
+	/** Sends one action-bar line down the real wire, exactly as an injury would. */
+	private void announce(TestSingleplayerContext singleplayer, String key) {
+		singleplayer.getServer().runOnServer(server -> {
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				dev.captience.realisticdamage.util.Notifier.message(player, key);
+			}
+		});
 	}
 
 	/** Puts the real cursor over the centre of a body region and lets it render. */

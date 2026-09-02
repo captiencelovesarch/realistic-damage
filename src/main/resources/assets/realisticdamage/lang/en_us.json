@@ -42,6 +42,7 @@
 	"realisticdamage.config.sensitivity": "Look Slowdown",
 	"realisticdamage.config.inertia": "Look Drift",
 	"realisticdamage.config.numeric_stats": "Exact Numbers",
+	"realisticdamage.config.injury_messages": "Injury Text",
 	"realisticdamage.config.injury_sounds": "Injury Volume",
 	"realisticdamage.config.sound_style": "Injury Sound",
 	"realisticdamage.config.sound_style.visceral": "Visceral",
