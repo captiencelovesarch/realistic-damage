@@ -41,16 +41,22 @@ public final class RDCodecs {
 			},
 			severity -> severity.name().toLowerCase(Locale.ROOT));
 
-	private record PartState(double condition, boolean broken, int strain, boolean destroyed) {
+	private record PartState(double condition, boolean broken, int strain, boolean destroyed, int ceiling) {
 		static final Codec<PartState> CODEC = RecordCodecBuilder.create(i -> i.group(
 				Codec.DOUBLE.fieldOf("condition").forGetter(PartState::condition),
 				Codec.BOOL.optionalFieldOf("broken", false).forGetter(PartState::broken),
 				Codec.INT.optionalFieldOf("strain", 0).forGetter(PartState::strain),
-				Codec.BOOL.optionalFieldOf("destroyed", false).forGetter(PartState::destroyed)
+				Codec.BOOL.optionalFieldOf("destroyed", false).forGetter(PartState::destroyed),
+				// optionalFieldOf with a fixed default, never fieldOf and never Optional:
+				// a 1.5 save has no such key and must decode silently, a pristine 1.6
+				// body must write no key at all, and a malformed one must WARN and
+				// default rather than drop the whole body back to pristine.
+				Codec.INT.optionalFieldOf("ceiling", 0).forGetter(PartState::ceiling)
 		).apply(i, PartState::new));
 
 		static PartState of(BodyPartData data) {
-			return new PartState(data.condition(), data.broken(), data.strainPauseTicks(), data.destroyed());
+			return new PartState(data.condition(), data.broken(), data.strainPauseTicks(), data.destroyed(),
+					data.ceilingBand());
 		}
 	}
 
@@ -104,7 +110,11 @@ public final class RDCodecs {
 			PartState saved = state.body().get(part);
 			if (saved != null) {
 				BodyPartData target = data.part(part);
-				// Condition first: setDestroyed pins the part at zero afterwards.
+				// Ceiling first: setCondition clamps to it, so a save whose condition
+				// sits above its ceiling decodes to the ceiling rather than throwing.
+				// lowerCeilingTo sanitises, so a hand-edited band cannot get in here.
+				target.lowerCeilingTo(saved.ceiling());
+				// Condition next: setDestroyed pins the part at zero afterwards.
 				target.setCondition(saved.condition());
 				target.setBroken(saved.broken());
 				target.strain(saved.strain());

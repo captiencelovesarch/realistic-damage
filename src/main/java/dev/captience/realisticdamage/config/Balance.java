@@ -70,6 +70,31 @@ public final class Balance {
 	 */
 	public static final double ONE_HANDED_PENALTY = 0.80;
 
+	// --- Long-term injuries (1.6, hardcore) ---
+	/**
+	 * A ceiling is a band, never a figure: 1 pins the part at Hurt, 2 at Injured,
+	 * 3 at Critical. The rungs are the state boundaries themselves
+	 * ({@link #HEALTHY_ABOVE}, {@link #HURT_ABOVE}, {@link #INJURED_ABOVE}), so a
+	 * part healed to its ceiling sits exactly on a band line and its colour is
+	 * the ceiling made visible. No new doubles here for that reason.
+	 */
+	public static final int CEILING_BANDS = 3;
+	/** Arms and legs bottom out at Critical: still a limb, permanently a poor one (leg penalty 0.18, falls x1.75). */
+	public static final int CEILING_FLOOR_BAND_LIMB = 3;
+	/**
+	 * Head and chest stop at Hurt, one rung. Hurt caps consciousness at 95, and
+	 * 95 - CONCUSSION_CAP_DROP - CONCUSSION_SYMPTOM_SHIFT = 67 still clears
+	 * SYMPTOM_SENSITIVITY (65) and SYMPTOM_ATTACK_RECOVERY (55). An Injured
+	 * ceiling gives 54 and installs a permanent action penalty; Critical (55) is
+	 * the symptom ladder itself. A ceiling may cost the buffer above the ladder,
+	 * never a rung of it. The torso follows the head because nothing reads torso
+	 * condition: a permanently red chest would be a screen saying "dying" over a
+	 * body that is fine.
+	 */
+	public static final int CEILING_FLOOR_BAND_CORE = 1;
+	/** "At the ceiling" and "nothing left to heal" must agree to the same epsilon or they disagree for a tick. */
+	public static final double CONDITION_EPSILON = 1.0e-9;
+
 	// --- Bleeding (spec §16-17) ---
 	public static final double BLOOD_MAX = 100.0;
 	/** Blood points per second per wound severity. */
@@ -341,6 +366,17 @@ public final class Balance {
 	public static final double HEAD_CAP_INJURED = 82.0;
 	public static final double HEAD_CAP_CRITICAL = 55.0;
 	public static final double HEAD_CAP_DISABLED = 25.0;
+	/**
+	 * A concussion lowers whichever head cap applies by this much — the fog on
+	 * top of the injury, not a separate injury of its own.
+	 */
+	public static final double CONCUSSION_CAP_DROP = 10.0;
+	/**
+	 * ...but never below {@link #WAKE_THRESHOLD} plus this, which is exactly
+	 * {@link #HEAD_CAP_DISABLED}: a concussion may keep you groggy, it may not on
+	 * its own hold you under the waking line.
+	 */
+	public static final double CONCUSSION_CAP_FLOOR_MARGIN = 5.0;
 
 	/** Collapse at 0; wake only once consciousness reaches this (hysteresis, spec §25). */
 	public static final double WAKE_THRESHOLD = 20.0;

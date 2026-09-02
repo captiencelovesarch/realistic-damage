@@ -151,7 +151,8 @@ public final class RealisticDamageData {
 			case DISABLED, DESTROYED -> Balance.HEAD_CAP_DISABLED;
 		};
 		if (concussion) {
-			cap = Math.max(Balance.WAKE_THRESHOLD + 5.0, cap - 10.0);
+			cap = Math.max(Balance.WAKE_THRESHOLD + Balance.CONCUSSION_CAP_FLOOR_MARGIN,
+					cap - Balance.CONCUSSION_CAP_DROP);
 		}
 		return cap;
 	}
@@ -553,11 +554,17 @@ public final class RealisticDamageData {
 
 	// --- Whole-state operations ---
 
-	/** Full reset to a freshly-spawned body (death/respawn, spec §46; debug heal §54). */
+	/**
+	 * Full reset to a freshly-spawned body (spec §46; debug heal §54). Ceilings go
+	 * too: this is the pristine-body primitive behind {@code /rdmg heal} and the
+	 * practice dummy, not the death path — that is {@code RespawnCarryover}.
+	 */
 	public void reset() {
 		for (BodyPart part : BodyPart.values()) {
 			BodyPartData data = parts.get(part);
 			data.setDestroyed(false);
+			// Before setCondition, which clamps to whatever the ceiling still is.
+			data.restoreCeiling();
 			data.setCondition(part.maxCondition());
 			data.setBroken(false);
 			data.strain(0);
@@ -575,7 +582,33 @@ public final class RealisticDamageData {
 		clearPendingFall();
 	}
 
-	/** Totem stabilization (spec §41): floors, not a full reset. Injury statuses persist. */
+	/**
+	 * The body a player is reborn into (1.6). Everything is forgotten — condition,
+	 * fractures, wounds, blood, statuses, pending state — except the marks.
+	 *
+	 * <p>Ceilings only under the hardcore toggle, and each carried part starts AT
+	 * its ceiling — full, for the body it now is.
+	 *
+	 * <p>Forget by default, carry what is listed. Pure, so a unit test can prove
+	 * nothing else leaks across a death.
+	 */
+	public static RealisticDamageData freshCarrying(RealisticDamageData old, boolean keepCeilings) {
+		RealisticDamageData fresh = new RealisticDamageData();
+		for (BodyPart part : BodyPart.values()) {
+			if (keepCeilings) {
+				fresh.part(part).lowerCeilingTo(old.part(part).ceilingBand());
+			}
+		}
+		return fresh;
+	}
+
+	/**
+	 * Totem stabilization (spec §41): floors, not a full reset. Injury statuses
+	 * persist, and so do ceilings — a totem is a rescue, not a cure. The floor is
+	 * written through setCondition, which since 1.6 clamps to the ceiling, but the
+	 * clamp never binds: the deepest legal ceiling is 0.25 of max and the totem
+	 * floor is {@link Balance#TOTEM_CONDITION_FLOOR_FRACTION} 0.15.
+	 */
 	public void totemStabilize() {
 		clearWounds();
 		if (blood < Balance.TOTEM_BLOOD_FLOOR) {
