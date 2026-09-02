@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage;
 
+import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.systems.WoundMath;
 import org.junit.jupiter.api.Test;
@@ -41,5 +42,52 @@ class WoundMathTest {
 		double base = WoundMath.effectiveBleedRate(new double[]{1.2, 0.6});
 		double more = WoundMath.effectiveBleedRate(new double[]{1.2, 0.6, 0.25});
 		assertTrue(more >= base);
+	}
+
+	/** Critical for a blow, severe for a grind — the whole rule, in both directions. */
+	@Test
+	void aLimbStillStandingWhenTheBlowLandsBleedsWorse() {
+		// The killing blow found condition to take: the limb was on the body.
+		assertEquals(WoundSeverity.CRITICAL, WoundMath.stumpSeverity(4.0));
+		assertEquals(WoundSeverity.CRITICAL, WoundMath.stumpSeverity(0.5));
+		// It found nothing: the fight had already emptied the limb, and this hit
+		// only detached it. BodyPartData.damage() clamps at zero, so this is the
+		// exact figure the finish-off path reports for every ground-down limb.
+		assertEquals(WoundSeverity.SEVERE, WoundMath.stumpSeverity(0.0));
+	}
+
+	/**
+	 * The classification is a yes/no about the blow, never a measurement of it.
+	 * Deriving severity from the size of the residual would make the same lost
+	 * leg bleed differently depending on the armour worn and the weapon used.
+	 */
+	@Test
+	void howMuchWasLeftToLoseChangesNothing() {
+		WoundSeverity first = WoundMath.stumpSeverity(0.01);
+		for (double lost : new double[]{0.01, 1.0, 6.0, 16.0, 1000.0}) {
+			assertEquals(first, WoundMath.stumpSeverity(lost),
+					lost + " must classify the same as any other blow that took something");
+		}
+	}
+
+	/**
+	 * Floating-point dust is not a standing limb. The finish-off path subtracts
+	 * doubles, so "nothing left" has to mean the same thing here as it does to
+	 * every other condition comparison in the mod.
+	 */
+	@Test
+	void aResidualTooSmallToSeeIsStillNothing() {
+		assertEquals(WoundSeverity.SEVERE, WoundMath.stumpSeverity(Balance.CONDITION_EPSILON));
+		assertEquals(WoundSeverity.SEVERE, WoundMath.stumpSeverity(-0.0));
+	}
+
+	/** A stump always bleeds hard: never a scratch, whichever way the limb went. */
+	@Test
+	void neitherStumpIsEverMinorOrModerate() {
+		for (double lost : new double[]{0.0, 0.001, 3.0}) {
+			WoundSeverity severity = WoundMath.stumpSeverity(lost);
+			assertTrue(severity.ordinal() >= WoundSeverity.SEVERE.ordinal(),
+					"a lost limb is never a scratch, got " + severity);
+		}
 	}
 }

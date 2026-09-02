@@ -22,8 +22,34 @@ public final class Notifier {
 		injurySound(player, InjurySound.FRACTURE);
 	}
 
-	public static void destroyed(ServerPlayer player, BodyPart part) {
-		message(player, "realisticdamage.msg.destroyed." + part.id());
+	/**
+	 * A part is gone. Two wordings, one moment: a limb that opened a stump says
+	 * so, because the bleeding is the news the player has to act on, and the old
+	 * line would leave them looking for a wound the HUD is already showing. The
+	 * head and torso lines are untouched — nothing bleeds on a corpse — and the
+	 * stump wording is never used when {@code enableBleeding} is off, or the
+	 * sentence would describe a wound that was never opened.
+	 *
+	 * <p>Still one sound. {@code DESTRUCTION} is the loudest cue in the mod and
+	 * it already owns this frame; a second cue in the same tick only muddies it.
+	 */
+	public static void destroyed(ServerPlayer player, BodyPart part, boolean stump) {
+		message(player, (stump ? "realisticdamage.msg.stump." : "realisticdamage.msg.destroyed.") + part.id());
+		injurySound(player, InjurySound.DESTRUCTION);
+	}
+
+	/**
+	 * A blast took the limb (1.6). A different sentence from
+	 * {@link #destroyed}, because "is destroyed" names the state and the player
+	 * needs the cause: this is a rule with real counterplay — distance, cover,
+	 * Blast Protection — and counterplay you cannot see is decoration.
+	 *
+	 * <p>Same cue, deliberately. {@code DESTRUCTION} is already the loudest sound
+	 * in the mod, the victim's client is inside the BLAST whiteout with its ears
+	 * ringing, and a bespoke amputation sound would play into deafness.
+	 */
+	public static void dismembered(ServerPlayer player, BodyPart part) {
+		message(player, "realisticdamage.msg.dismembered." + part.id());
 		injurySound(player, InjurySound.DESTRUCTION);
 	}
 

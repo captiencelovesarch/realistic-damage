@@ -51,7 +51,7 @@ class InjuryMessageKeysTest {
 	 * commit as the key, which is the whole mechanism: the number moving is what
 	 * forces somebody to look at this file and decide.
 	 */
-	private static final int SHIPPED_MESSAGE_KEYS = 54;
+	private static final int SHIPPED_MESSAGE_KEYS = 62;
 
 	@Test
 	void everyShippedMessageKeyIsClassifiedDeliberately() throws IOException {

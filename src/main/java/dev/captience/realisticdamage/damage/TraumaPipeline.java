@@ -6,6 +6,7 @@ import java.util.Map;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyPartData;
+import dev.captience.realisticdamage.body.PendingExplosion;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
@@ -75,6 +76,36 @@ public final class TraumaPipeline {
 			}
 		}
 
+		// A blast is judged on the blast (1.6), the way a fall is judged on its
+		// height: what the hearts, absorption or armour let through is vanilla's
+		// verdict on whether you lived, not a description of what the overpressure
+		// did to a limb. Consumed here, once, whatever happens below; the mixin's
+		// finally is the safety net, not the cleanup.
+		PendingExplosion blast = classified.category() == DamageCategory.EXPLOSION
+				? data.consumePendingExplosion()
+				: null;
+		// One explosionShares call per blast, shared by the rule and the routing,
+		// so the region that takes the biggest share is the region that can go.
+		Map<BodyPart, Double> blastShares = blast == null
+				? null
+				: BodyHitResolver.explosionShares(player, new Vec3(blast.x(), blast.y(), blast.z()));
+
+		// Explosive dismemberment runs before the health-derived trauma and before
+		// its early returns, because the cases it exists for are exactly the ones
+		// where the health bar says nothing happened: a totem that set you to one
+		// heart, an enchanted apple whose absorption ate the whole blast. Running
+		// first also makes "already Disabled" mean before this blast rather than
+		// after it. A raised shield is the one thing that does stand between you
+		// and it — vanilla sets blocked for any block, including a partial one,
+		// and "I raised my shield and still lost the leg" is the least readable
+		// outcome available here.
+		List<BodyPart> taken = List.of();
+		if (blast != null && !blocked
+				&& config.enableLimbDestruction && config.enableExplosiveDismemberment) {
+			taken = ExplosiveDismemberment.evaluate(
+					player, data, config, classified, source, blast, blastShares, result);
+		}
+
 		// A fall is scored on how far you dropped, not on what your boots let
 		// through (1.4). Everything downstream — shares, breaks, concussion — then
 		// reads the same units it always did.
@@ -84,7 +115,14 @@ public final class TraumaPipeline {
 				? FallMath.traumaEquivalent(fallHeight, data.pendingFallSurface())
 				: appliedDamage;
 
-		if (traumaSource <= 0.0) {
+		// Falling through with nothing on the health bar is safe and was checked
+		// stage by stage: baseTrauma is 0, so applyShares computes 0 for every
+		// region and its own guard adds nothing; BreakLogic and createWounds see
+		// only the blast entries, whose conditionDamage is 0; ConsciousnessSystem
+		// sums 0 and returns; sendImpact finds the blast's own magnitude and sends
+		// the full cue. The blast is the only thing that happened, and it is the
+		// only thing that gets reported.
+		if (traumaSource <= 0.0 && taken.isEmpty()) {
 			return result;
 		}
 		double baseTrauma = traumaSource * profile.traumaMultiplier()
@@ -95,7 +133,7 @@ public final class TraumaPipeline {
 		if (fall) {
 			baseTrauma *= config.fallTraumaMultiplier;
 		}
-		if (baseTrauma <= 0.0) {
+		if (baseTrauma <= 0.0 && taken.isEmpty()) {
 			return result;
 		}
 
@@ -122,10 +160,20 @@ public final class TraumaPipeline {
 				}
 			}
 			case EXPLOSION_DIRECTIONAL -> {
-				Vec3 center = source.getSourcePosition();
-				Map<BodyPart, Double> shares = center != null
-						? BodyHitResolver.explosionShares(player, center)
-						: EnvironmentalRouter.shares(Routing.HEAD_TORSO);
+				// The captured centre is the point vanilla measured exposure and
+				// distance from. source.getSourcePosition() is only the direct
+				// entity's feet, and is null for a positionless source — which used
+				// to route an ownerless blast to the head and torso whatever side
+				// it actually came from. Applied whenever a blast was captured,
+				// independent of the dismemberment toggle: this is geometry, not an
+				// injury rule, and one geometry for both rules is the point.
+				Map<BodyPart, Double> shares = blastShares;
+				if (shares == null) {
+					Vec3 center = source.getSourcePosition();
+					shares = center != null
+							? BodyHitResolver.explosionShares(player, center)
+							: EnvironmentalRouter.shares(Routing.HEAD_TORSO);
+				}
 				applyShares(player, data, classified, baseTrauma, shares, result);
 			}
 			case FALL_LEGS -> applyShares(player, data, classified, baseTrauma,
@@ -146,21 +194,32 @@ public final class TraumaPipeline {
 		if (config.enableBrokenLimbs) {
 			BreakLogic.evaluate(player, data, profile, result);
 		}
-		if (config.enableLimbDestruction) {
-			DestructionLogic.evaluate(player, data, result);
+		// One direction for the whole event: the stump's spray and the wounds'
+		// sprays are thrown by the same blow, so they are read off it once.
+		Vec3 blow = blowDirection(player, source);
+		// A blast that already took a limb counts: the dismemberment sentence must
+		// keep the frame too.
+		boolean limbLost = !taken.isEmpty();
+		if (config.enableLimbDestruction && DestructionLogic.evaluate(player, data, result, blow)) {
+			limbLost = true;
 		}
 		if (config.enableLongTermInjuries) {
 			CeilingLogic.evaluate(player, data, result, brokenBefore, destroyedBefore);
 		}
 		if (config.enableBleeding) {
-			createWounds(player, data, classified, profile, result, source);
+			createWounds(player, data, classified, profile, result, blow, limbLost);
 		}
 		// The impact term reads the same height-derived figure as the trauma, for
 		// the same reason: whether a landing rattles your brain is a question
 		// about the deceleration, not about how much padding was between you and
 		// it.
+		// ...and this system runs last of all, so it is the real threat to the
+		// limb-loss sentence: any blast worth a limb clears the 6.0 concussion
+		// bar several times over, and the concussion line would otherwise be the
+		// last thing written on every dismemberment frame there has ever been.
+		// The concussion still happens — only the sentence yields.
 		dev.captience.realisticdamage.systems.ConsciousnessSystem.onTrauma(
-				player, data, classified, profile, result, traumaSource);
+				player, data, classified, profile, result, traumaSource, limbLost);
 		if (fall && fallHeight > 0.0) {
 			landed(player, data, fallHeight, config);
 		} else {
@@ -254,9 +313,20 @@ public final class TraumaPipeline {
 		}
 	}
 
-	/** Deterministic wound creation from localized trauma thresholds (spec §16). */
+	/**
+	 * Deterministic wound creation from localized trauma thresholds (spec §16).
+	 *
+	 * @param limbLost a limb came off earlier in this same event — ground down and
+	 *                 finished off, or torn off by a blast — so that sentence keeps
+	 *                 the frame: {@code sendOverlayMessage} means the last line
+	 *                 written is the only one read, and losing a limb is never the
+	 *                 smaller piece of news. The stump is already in
+	 *                 {@code worstBefore} — it was opened before this runs — so
+	 *                 this only bites when some other region is cut worse in the
+	 *                 same blow, which today no single event can manage.
+	 */
 	private static void createWounds(ServerPlayer player, RealisticDamageData data, ClassifiedDamage classified,
-			DamageProfile profile, List<AppliedTrauma> traumas, DamageSource source) {
+			DamageProfile profile, List<AppliedTrauma> traumas, Vec3 blow, boolean limbLost) {
 		DamageProfile woundProfile = classified.woundAs() != null
 				? DamageProfiles.of(classified.woundAs())
 				: profile;
@@ -280,11 +350,12 @@ public final class TraumaPipeline {
 				// Thrown along the blow so it reads as having been knocked out of
 				// you rather than as having welled up on a timer.
 				dev.captience.realisticdamage.systems.BleedingSystem.spray(
-						player, trauma.part(), severity, blowDirection(player, source));
+						player, trauma.part(), severity, blow);
 			}
 		}
 		var worstAfter = data.worstWound();
-		if (worstAfter != null && (worstBefore == null || worstAfter.ordinal() > worstBefore.ordinal())) {
+		if (!limbLost && worstAfter != null
+				&& (worstBefore == null || worstAfter.ordinal() > worstBefore.ordinal())) {
 			Notifier.message(player, "realisticdamage.msg.bleeding."
 					+ worstAfter.name().toLowerCase(java.util.Locale.ROOT));
 		}

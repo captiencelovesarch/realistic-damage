@@ -244,9 +244,28 @@ public final class ConsciousnessSystem {
 		}
 	}
 
-	/** Event-driven consciousness consequences of one damage event (called by the pipeline). */
+	/**
+	 * Event-driven consciousness consequences of one damage event (called by the
+	 * pipeline).
+	 *
+	 * @param limbLost a limb came off earlier in this same event, so the sentence
+	 *                 announcing that keeps the frame and the concussion line is
+	 *                 held back. Only the line: the concussion itself is set, the
+	 *                 status icon and the body panel say so, and every
+	 *                 consciousness effect runs exactly as it would have. This is
+	 *                 the same rule the bleeding escalation line already follows
+	 *                 in {@code createWounds}, for the same reason — {@code
+	 *                 sendOverlayMessage} means the last line written is the only
+	 *                 one read, and losing a limb is never the smaller piece of
+	 *                 news. It matters far more here: this system runs last in
+	 *                 the event, and any blast worth a limb is worth well over
+	 *                 the 6.0 concussion bar, so without this the line that makes
+	 *                 distance, cover and Blast Protection learnable reaches the
+	 *                 player essentially never.
+	 */
 	public static void onTrauma(ServerPlayer player, RealisticDamageData data, ClassifiedDamage classified,
-			DamageProfile profile, List<TraumaPipeline.AppliedTrauma> traumas, double appliedDamage) {
+			DamageProfile profile, List<TraumaPipeline.AppliedTrauma> traumas, double appliedDamage,
+			boolean limbLost) {
 		ServerConfig config = ServerConfig.get();
 		if (!config.enableConsciousness) {
 			return;
@@ -265,7 +284,7 @@ public final class ConsciousnessSystem {
 					hit *= Balance.CONCUSSION_EXTRA_HEAD_DRAIN;
 				}
 				drain += hit;
-				maybeConcuss(player, data, profile, trauma.conditionDamage());
+				maybeConcuss(player, data, profile, trauma.conditionDamage(), limbLost);
 			} else {
 				drain += trauma.conditionDamage() * profile.consciousnessFactor()
 						* Balance.CONSCIOUSNESS_BODY_HIT_SCALE * (trauma.primary() ? 1.0 : 0.5);
@@ -275,7 +294,7 @@ public final class ConsciousnessSystem {
 		// Hard impacts jolt the whole body, not just whichever region took the hit.
 		if (profile.concussionCapable()) {
 			drain += appliedDamage * profile.consciousnessFactor() * Balance.CONSCIOUSNESS_IMPACT_SCALE;
-			maybeConcuss(player, data, profile, appliedDamage * profile.consciousnessFactor());
+			maybeConcuss(player, data, profile, appliedDamage * profile.consciousnessFactor(), limbLost);
 		}
 		if (classified.routing() == ClassifiedDamage.Routing.NONE) {
 			// Sonic boom, drowning ticks: pure consciousness pressure, no limb trauma.
@@ -289,9 +308,19 @@ public final class ConsciousnessSystem {
 		}
 	}
 
-	/** Deterministic concussion (spec §21): big single head trauma, or meaningful trauma on an already-battered head. */
+	/**
+	 * Deterministic concussion (spec §21): big single head trauma, or meaningful
+	 * trauma on an already-battered head.
+	 *
+	 * @param limbLost suppresses the announcement and nothing else. The flag is
+	 *                 read only around {@code Notifier.message}: the state is set
+	 *                 first and unconditionally, so a player who loses a leg to a
+	 *                 blast that also rattles their skull is concussed in every
+	 *                 way the mod can express except the one sentence the frame
+	 *                 has room for.
+	 */
 	private static void maybeConcuss(ServerPlayer player, RealisticDamageData data, DamageProfile profile,
-			double headTrauma) {
+			double headTrauma, boolean limbLost) {
 		if (data.concussion() || !profile.concussionCapable()) {
 			return;
 		}
@@ -300,7 +329,9 @@ public final class ConsciousnessSystem {
 				&& data.part(BodyPart.HEAD).state().isAtLeastAsBadAs(BodyState.INJURED);
 		if (massive || compounded) {
 			data.setConcussion(true);
-			Notifier.message(player, "realisticdamage.msg.concussion");
+			if (!limbLost) {
+				Notifier.message(player, "realisticdamage.msg.concussion");
+			}
 		}
 	}
 

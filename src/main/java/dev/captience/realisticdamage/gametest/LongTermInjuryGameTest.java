@@ -238,7 +238,10 @@ public class LongTermInjuryGameTest {
 			helper.assertTrue(data.part(otherLeg(leg)).ceilingBand() == 0, "the untouched leg keeps its full range");
 			helper.assertTrue(BodySnapshot.of(data).ceilingBand(leg) == 0,
 					"a crossed-out region sends no band; the band underneath is not the client's business");
-			helper.assertTrue(("realisticdamage.msg.destroyed." + leg.id()).equals(Notifier.lastMessageKey()),
+			// The destruction line still owns the moment; since 1.6 it is the stump
+			// wording, because this leg was already at zero and the blow that took
+			// it opened a wound. A ceiling line here would overwrite it.
+			helper.assertTrue(("realisticdamage.msg.stump." + leg.id()).equals(Notifier.lastMessageKey()),
 					"the destruction line owns that moment, got " + Notifier.lastMessageKey());
 		} finally {
 			ServerConfig.get().enableLongTermInjuries = previousMode;
