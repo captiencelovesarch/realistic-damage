@@ -60,9 +60,13 @@ public final class ImpairmentSystem {
 				? Balance.ONE_HANDED_PENALTY
 				: ImpairmentMath.armPenalty(mainArm.fraction(), mainArm.broken());
 		// Low consciousness makes actions sluggish (spec §23).
-		double sluggish = sluggishPenalty(data.consciousness());
+		double sluggish = sluggishPenalty(ConsciousnessSystem.effective(data));
+		// The injury caps bound what a wrecked *limb* costs you. Fading out is not
+		// a limb injury and must not be filed under one: capping the sum at the arm
+		// cap was what let a player at one point of consciousness still mine at
+		// nearly two-thirds speed. The cap still applies to the arm's own share.
 		double cap = oneHanded ? Balance.ONE_HANDED_PENALTY : Balance.ARM_PENALTY_TOTAL_CAP;
-		double actionPenalty = Math.min(cap, armPenalty + sluggish);
+		double actionPenalty = Math.max(sluggish, Math.min(cap, armPenalty + sluggish));
 
 		if (data.legless()) {
 			// Dragging yourself along: slow, and you certainly cannot jump.
@@ -76,6 +80,17 @@ public final class ImpairmentSystem {
 		}
 		if (RescueSystem.rooted(data)) {
 			// Kneeling with a hand on a wound. You can press or you can move.
+			movement = 1.0;
+			jump = 1.0;
+		}
+		if (data.knockdownRecoveryTicks() > 0) {
+			// Back on your feet but not yet steady (1.4).
+			movement = Math.max(movement, Balance.KNOCKDOWN_RECOVERY_MOVEMENT_PENALTY);
+			jump = 1.0;
+		}
+		if (data.knockedDown() || data.microsleeping()) {
+			// Face-down after a landing, or gone for a moment: physics still owns
+			// you, you just are not steering (1.4).
 			movement = 1.0;
 			jump = 1.0;
 		}
@@ -99,7 +114,15 @@ public final class ImpairmentSystem {
 		}
 	}
 
-	/** Smooth action penalty from low consciousness: 0 above 55, ramping below. */
+	/**
+	 * Smooth action penalty from low consciousness: 0 above 55, ramping below,
+	 * and caving in over the last twenty points so that the approach to collapse
+	 * is felt in the hands and not only on the screen. Takes <em>effective</em>
+	 * consciousness, so a concussion brings the whole curve forward.
+	 *
+	 * <p>Below {@link Balance#SYMPTOM_FEEBLE} the curve stops being the whole
+	 * story: ConsciousnessSystem refuses the swing outright.
+	 */
 	public static double sluggishPenalty(double consciousness) {
 		if (consciousness >= Balance.SYMPTOM_ATTACK_RECOVERY) {
 			return 0.0;
@@ -125,8 +148,10 @@ public final class ImpairmentSystem {
 
 	public static boolean sprintBlocked(RealisticDamageData data) {
 		return data.unconscious()
+				|| data.knockedDown()
+				|| data.microsleeping()
 				|| data.legless()
-				|| data.consciousness() < Balance.SYMPTOM_SPRINT_LOSS
+				|| ConsciousnessSystem.effective(data) < Balance.SYMPTOM_SPRINT_LOSS
 				|| data.part(BodyPart.LEFT_LEG).state() == BodyState.DISABLED
 				|| data.part(BodyPart.RIGHT_LEG).state() == BodyState.DISABLED;
 	}

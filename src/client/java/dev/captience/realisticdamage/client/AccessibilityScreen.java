@@ -75,6 +75,40 @@ public class AccessibilityScreen extends OptionsSubScreen {
 				CycleButton.onOffBuilder(config.fullBlackUnconscious)
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.full_black"),
 								(button, value) -> config.fullBlackUnconscious = value));
+		this.list.addSmall(
+				slider("realisticdamage.config.death",
+						config::deathIntensity, value -> config.deathIntensityValue = value),
+				CycleButton.booleanBuilder(
+								Component.translatable("realisticdamage.config.death_style.realistic"),
+								Component.translatable("realisticdamage.config.death_style.cinematic"),
+								config.realisticDeath)
+						.create(0, 0, 150, 20,
+								Component.translatable("realisticdamage.config.death_style"),
+								(button, value) -> config.realisticDeath = value));
+
+		this.list.addHeader(Component.translatable("realisticdamage.config.section.blood"));
+		// The master first and on its own row: everything under it is a share of
+		// this one, so a player who wants no blood at all has a single control to
+		// find rather than four to hunt down.
+		this.list.addSmall(
+				slider("realisticdamage.config.blood",
+						config::bloodIntensity, value -> config.bloodIntensityValue = value),
+				CycleButton.booleanBuilder(
+								Component.translatable("realisticdamage.config.blood_style.visceral"),
+								Component.translatable("realisticdamage.config.blood_style.muted"),
+								config.visceralBlood)
+						.create(0, 0, 150, 20,
+								Component.translatable("realisticdamage.config.blood_style"),
+								(button, value) -> config.visceralBlood = value));
+		this.list.addSmall(
+				slider("realisticdamage.config.blood_stains",
+						() -> config.bloodStainIntensity, value -> config.bloodStainIntensity = value),
+				slider("realisticdamage.config.blood_lens",
+						() -> config.bloodLensIntensity, value -> config.bloodLensIntensity = value));
+		this.list.addSmall(
+				slider("realisticdamage.config.blood_body",
+						() -> config.bloodBodyIntensity, value -> config.bloodBodyIntensity = value),
+				null);
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.aim"));
 		this.list.addSmall(
@@ -88,6 +122,12 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						() -> config.cameraDriftIntensity, value -> config.cameraDriftIntensity = value),
 				slider("realisticdamage.config.impact",
 						() -> config.impactIntensity, value -> config.impactIntensity = value));
+		// Its own row: this is the only slider here that changes where the player
+		// physically ends up, so it should not read as one more screen effect.
+		this.list.addSmall(
+				slider("realisticdamage.config.stumble",
+						config::stumbleIntensity, value -> config.stumbleIntensityValue = value),
+				null);
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.sound"));
 		this.list.addSmall(

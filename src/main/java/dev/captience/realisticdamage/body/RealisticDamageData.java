@@ -55,6 +55,29 @@ public final class RealisticDamageData {
 	/** Transient: last "who you are treating" id sent, so it is only sent on change. */
 	private transient int lastTreatingSent = -1;
 
+	/**
+	 * Transient landing state (1.4). Set by the fall mixin on the tick the ground
+	 * arrives and consumed by the trauma pipeline in the same tick, so that falls
+	 * can be scored on how far you dropped rather than on what your boots let
+	 * through. None of it is persisted: you are not still mid-fall after a
+	 * restart.
+	 */
+	private transient double pendingFallHeight;
+	private transient double pendingFallSurface = 1.0;
+	private transient boolean pendingFallLeadingLeft;
+	/** Counts down while you are on the ground after a hard landing. */
+	private transient int knockdownTicks;
+	/** ...and then while you are back up but not yet steady. */
+	private transient int knockdownRecoveryTicks;
+	/**
+	 * Free-running phase toward the next microsleep, in [0,1). Advanced by a rate
+	 * derived from consciousness, so the cadence is a pure function of how far
+	 * gone the player is — no die rolls anywhere in losing consciousness.
+	 */
+	private transient double microsleepPhase;
+	/** Ticks left in the current blackout; 0 when awake enough to be present. */
+	private transient int microsleepTicks;
+
 	public RealisticDamageData() {
 		for (BodyPart part : BodyPart.values()) {
 			parts.put(part, new BodyPartData(part));
@@ -253,6 +276,126 @@ public final class RealisticDamageData {
 		unconsciousTicks = Math.max(0, ticks);
 	}
 
+	// --- Landing, knockdown and microsleeps (1.4) ---
+
+	/** Records the landing the pipeline is about to be asked about. */
+	public void setPendingFall(double height, double surfaceFactor, boolean leadingLeft) {
+		pendingFallHeight = Math.max(0.0, height);
+		pendingFallSurface = surfaceFactor;
+		pendingFallLeadingLeft = leadingLeft;
+	}
+
+	public double pendingFallHeight() {
+		return pendingFallHeight;
+	}
+
+	public double pendingFallSurface() {
+		return pendingFallSurface;
+	}
+
+	public boolean pendingFallLeadingLeft() {
+		return pendingFallLeadingLeft;
+	}
+
+	/**
+	 * Single-use, like the pre-hurt capture: a fall scores exactly one damage
+	 * event, and a stale height left lying around would quietly re-score the next
+	 * unrelated hit as though the player had dropped off a cliff.
+	 */
+	public void clearPendingFall() {
+		pendingFallHeight = 0.0;
+		pendingFallSurface = 1.0;
+	}
+
+	/**
+	 * How violent the blow that is about to kill this player was, held for the
+	 * one tick between the trauma pipeline seeing a lethal hit and AFTER_DEATH
+	 * confirming it. Tick-stamped rather than merely single-use because the gap
+	 * between "lethal-looking" and "dead" is where a totem fires: a stash with
+	 * no expiry would sit through the save and then colour some unrelated
+	 * bleed-out death minutes later with the mace hit's violence.
+	 */
+	private transient double deathViolence;
+	private transient int deathViolenceTick = Integer.MIN_VALUE;
+
+	public void stashDeathViolence(double violence, int tick) {
+		deathViolence = Math.clamp(violence, 0.0, 1.0);
+		deathViolenceTick = tick;
+	}
+
+	/** The stashed violence if it was scored this same tick, else 0. Clears either way. */
+	public double consumeDeathViolence(int tick) {
+		double value = tick == deathViolenceTick ? deathViolence : 0.0;
+		deathViolence = 0.0;
+		deathViolenceTick = Integer.MIN_VALUE;
+		return value;
+	}
+
+	public boolean knockedDown() {
+		return knockdownTicks > 0;
+	}
+
+	public int knockdownTicks() {
+		return knockdownTicks;
+	}
+
+	/** Never shortens an existing knockdown: the worse of two landings wins. */
+	public void knockDown(int ticks) {
+		knockdownTicks = Math.max(knockdownTicks, ticks);
+	}
+
+	public int knockdownRecoveryTicks() {
+		return knockdownRecoveryTicks;
+	}
+
+	/** Ticks the knockdown down, rolling into the unsteady tail as it ends. */
+	public void tickKnockdown(int recoveryTicks) {
+		if (knockdownTicks > 0) {
+			knockdownTicks--;
+			if (knockdownTicks == 0) {
+				knockdownRecoveryTicks = recoveryTicks;
+			}
+		} else if (knockdownRecoveryTicks > 0) {
+			knockdownRecoveryTicks--;
+		}
+	}
+
+	public void clearKnockdown() {
+		knockdownTicks = 0;
+		knockdownRecoveryTicks = 0;
+	}
+
+	public boolean microsleeping() {
+		return microsleepTicks > 0;
+	}
+
+	public int microsleepTicks() {
+		return microsleepTicks;
+	}
+
+	public double microsleepPhase() {
+		return microsleepPhase;
+	}
+
+	public void setMicrosleepPhase(double phase) {
+		microsleepPhase = phase;
+	}
+
+	public void beginMicrosleep(int ticks) {
+		microsleepTicks = Math.max(microsleepTicks, ticks);
+	}
+
+	public void tickMicrosleep() {
+		if (microsleepTicks > 0) {
+			microsleepTicks--;
+		}
+	}
+
+	public void clearMicrosleep() {
+		microsleepTicks = 0;
+		microsleepPhase = 0.0;
+	}
+
 	// --- Injuries ---
 
 	public boolean concussion() {
@@ -377,17 +520,20 @@ public final class RealisticDamageData {
 	}
 
 	/**
-	 * Advances the deterministic item-use stall accumulator by {@code penalty}
-	 * (0..1); returns true when one use tick should be stalled. A penalty of 0.3
-	 * makes bow draws take ~1/0.7x longer, smoothly and reproducibly.
+	 * Advances the deterministic item-use stall accumulator by {@code penalty} and
+	 * returns how many use ticks to stall this tick. A penalty of 0.3 makes bow
+	 * draws take ~1/0.7x longer, smoothly and reproducibly.
+	 *
+	 * <p>Returns a count rather than a flag (1.4) because eating needed to get
+	 * genuinely slow, and one stalled tick per tick caps the slowdown at exactly
+	 * two-fold — enough for an injured arm on a bowstring, nowhere near enough
+	 * for a man trying to get bread into himself while greying out.
 	 */
-	public boolean advanceUseStall(double penalty) {
+	public int advanceUseStall(double penalty) {
 		useStallProgress += penalty;
-		if (useStallProgress >= 1.0) {
-			useStallProgress -= 1.0;
-			return true;
-		}
-		return false;
+		int whole = (int) useStallProgress;
+		useStallProgress -= whole;
+		return whole;
 	}
 
 	/** Puts an unspent bleed point back when the hurt was refused (i-frames, etc.). */
@@ -424,6 +570,9 @@ public final class RealisticDamageData {
 		concussion = false;
 		concussionStableTicks = 0;
 		burned = false;
+		clearKnockdown();
+		clearMicrosleep();
+		clearPendingFall();
 	}
 
 	/** Totem stabilization (spec §41): floors, not a full reset. Injury statuses persist. */
@@ -446,5 +595,8 @@ public final class RealisticDamageData {
 			unconscious = false;
 			unconsciousTicks = 0;
 		}
+		// A totem that leaves you face-down and blacking out has not saved you.
+		clearKnockdown();
+		clearMicrosleep();
 	}
 }

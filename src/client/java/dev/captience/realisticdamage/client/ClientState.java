@@ -19,10 +19,35 @@ public final class ClientState {
 	private static double smoothedBlood = Balance.BLOOD_MAX;
 	/** Rises while unconscious, falls after waking — drives the blackout fade. */
 	private static double unconsciousFade;
-	/** Free-running heartbeat clock, in beats. Whole numbers are the "lub". */
-	private static double beatPhase;
-	private static long lastBeat = -1;
-	private static boolean beatFired;
+	/**
+	 * The same idea for a microsleep (1.4), but far snappier at both ends. A
+	 * blackout that eased in like unconsciousness would be over before it
+	 * finished arriving; this one drops like a dropped thread and comes back
+	 * almost as fast, which is what makes it read as losing a moment rather than
+	 * as a slow fade.
+	 */
+	private static double microsleepFade;
+	/**
+	 * The player's own heart (1.5). Owned here rather than by whatever needs it,
+	 * because the sound, the vignette thump and the arterial spurts from an open
+	 * wound all have to be the same beat — three clocks would drift apart within
+	 * seconds and the effect only works while they agree.
+	 */
+	private static final dev.captience.realisticdamage.systems.Cardio HEART =
+			new dev.captience.realisticdamage.systems.Cardio();
+	/**
+	 * Rises from 0 to 1 over the seconds after death (1.5). Everything the death
+	 * screen does — the heart running down, the colour finishing its drain, the
+	 * quiet — is a function of this one clock, so the pieces cannot drift apart.
+	 */
+	private static double deathFade;
+	/**
+	 * How violent the death was, 0 to 1, from the server's one-shot payload.
+	 * Compresses the fade and pre-ages the heart: a bleed-out keeps the whole
+	 * sequence, a 50-block landing is a cut with no beats in it. Defaults to 0,
+	 * so deaths the server says nothing about get the slow ending.
+	 */
+	private static double deathViolence;
 
 	/** Eases toward a target, quickly when it worsens and slowly when it recovers. */
 	private static double approach(double current, double target, double worseRate, double betterRate) {
@@ -37,11 +62,45 @@ public final class ClientState {
 
 	/** Called each client tick: eases the smoothed values toward the synced ones. */
 	public static void tick() {
+		// Dying comes first, because the checks below all treat a dead player as
+		// "nothing to do" — which is exactly the snap-to-nothing this replaces.
+		// The vitals freeze where death left them; only the fade and the failing
+		// heart advance.
+		if (dying()) {
+			boolean realistic = ClientEffectsConfig.get().realisticDeath;
+			// Violence compresses the fade toward a cut...
+			double seconds = dev.captience.realisticdamage.damage.DeathMath.fadeSeconds(
+					realistic ? Balance.DEATH_FADE_SECONDS_REALISTIC : Balance.DEATH_FADE_SECONDS,
+					deathViolence);
+			deathFade = Math.min(1.0, deathFade + 1.0 / (seconds * 20.0));
+			// ...and pre-ages the heart: an overwhelming death starts the run-down
+			// at or past the silent point, so there are no beats at all —
+			// consciousness ended before the heart did. The realistic ending keeps
+			// what beats remain going past the blackout, because hearing is the
+			// last sense to go; the cinematic one stops them while the screen
+			// still shows something.
+			HEART.setMoribund(Math.max(deathFade, deathViolence), realistic
+					? Balance.DEATH_HEART_SILENT_REALISTIC : Balance.DEATH_HEART_SILENT);
+			// Pure agonal character: whatever was wrong before, this is the head
+			// going now — slow and heavy, not racing.
+			HEART.tick(0.0, 0.0, 1.0, breath());
+			return;
+		}
+		if (deathFade > 0.0) {
+			// Respawned: a fresh body gets a fresh heart, immediately — the last
+			// one's fade must not play out over the new life, and neither may its
+			// violence.
+			deathFade = 0.0;
+			deathViolence = 0.0;
+			HEART.reset();
+		}
 		BodySnapshot snapshot = snapshot();
 		if (snapshot == null) {
 			smoothedConsciousness = Balance.CONSCIOUSNESS_MAX;
 			smoothedBlood = Balance.BLOOD_MAX;
 			unconsciousFade = 0.0;
+			microsleepFade = 0.0;
+			HEART.reset();
 			return;
 		}
 		// Asymmetric on purpose. Getting hurt is an event and must land at once —
@@ -52,46 +111,107 @@ public final class ClientState {
 		smoothedBlood = approach(smoothedBlood, snapshot.blood(), 0.85, 0.15);
 		double target = snapshot.unconscious() ? 1.0 : 0.0;
 		unconsciousFade += (target - unconsciousFade) * (target > unconsciousFade ? 0.45 : 0.12);
+		double microTarget = snapshot.microsleeping() ? 1.0 : 0.0;
+		microsleepFade += (microTarget - microsleepFade) * (microTarget > microsleepFade ? 0.70 : 0.30);
 
-		// The heart races as things get worse: a resting 55 bpm up to a hammering
-		// 165 when you are nearly gone.
-		double bpm = 55.0 + 110.0 * distress();
-		beatPhase += bpm / 60.0 / 20.0;
-		long beat = (long) beatPhase;
-		beatFired = beat != lastBeat;
-		lastBeat = beat;
+		HEART.tick(distressFromHealth(), distressFromBlood(), distressFromMind(), breath());
 	}
 
 	/**
-	 * How much trouble the player is in, 0 to 1 — the worst of near-death health,
-	 * blood loss and fading consciousness. Drives both the heartbeat and the
-	 * near-death vignette so every dangerous state pulses.
+	 * The breathing cycle, 0 to 1 — one slow inhale and exhale every 90 ticks.
+	 *
+	 * <p>Shared rather than recomputed per effect so that the washout overlay, the
+	 * heart's sinus arrhythmia and anything added later all breathe together. Two
+	 * effects on independent breathing clocks drift against each other and the
+	 * whole thing stops reading as one body.
+	 */
+	public static double breath() {
+		Minecraft client = Minecraft.getInstance();
+		if (client.level == null) {
+			return 0.5;
+		}
+		double period = 90.0;
+		double time = client.level.getGameTime() % (long) period;
+		return 0.5 - 0.5 * Math.cos(time / period * Math.PI * 2.0);
+	}
+
+	/** The player's cardiac clock, for anything that has to land on the beat. */
+	public static dev.captience.realisticdamage.systems.Cardio heart() {
+		return HEART;
+	}
+
+	/** True from the moment of death until the respawn, while the body winds down. */
+	public static boolean dying() {
+		LocalPlayer player = Minecraft.getInstance().player;
+		return player != null && player.isDeadOrDying();
+	}
+
+	/**
+	 * How far through dying the player is, 0 (just happened, or alive) to 1
+	 * (over). Raw state — consumers scale it by their own intensity settings.
+	 */
+	public static double deathFade() {
+		return deathFade;
+	}
+
+	/** The server's one word about the death in progress: how hard it happened. */
+	public static void setDeathViolence(double violence) {
+		deathViolence = Math.clamp(violence, 0.0, 1.0);
+	}
+
+	public static double deathViolence() {
+		return deathViolence;
+	}
+
+	/**
+	 * How much trouble the player is in, 0 to 1 — the worst of the three causes.
+	 * Still the right number for anything that only cares how bad things are; use
+	 * the three components below for anything that cares <em>why</em>.
 	 */
 	public static double distress() {
-		if (!active()) {
-			return 0.0;
-		}
-		double fromBlood = smoothedBlood >= Balance.BLOOD_SERIOUS ? 0.0
-				: Math.clamp((Balance.BLOOD_SERIOUS - smoothedBlood) / Balance.BLOOD_SERIOUS, 0.0, 1.0);
-		double fromMind = ramp(Balance.SYMPTOM_HEARTBEAT, 0.0);
-		return Math.max(lowHealth(), Math.max(fromBlood, fromMind));
+		return Math.max(distressFromHealth(), Math.max(distressFromBlood(), distressFromMind()));
+	}
+
+	/** Distress from the ordinary health bar. */
+	public static double distressFromHealth() {
+		return active() ? lowHealth() : 0.0;
+	}
+
+	/** Distress from blood loss — the cause behind the greyout and the thready pulse. */
+	public static double distressFromBlood() {
+		return active() ? dev.captience.realisticdamage.body.Vitals.distressFromBlood(smoothedBlood) : 0.0;
+	}
+
+	/** Distress from a fading mind — the cause behind the warping and the slow, heavy beat. */
+	public static double distressFromMind() {
+		return active()
+				? dev.captience.realisticdamage.body.Vitals.distressFromMind(effectiveConsciousness())
+				: 0.0;
 	}
 
 	/**
-	 * The cardiac envelope for the current instant: a sharp "lub", a softer "dub"
-	 * a fifth of a beat later, then quiet. Sharp transients are what make it read
-	 * as a heartbeat instead of gentle breathing.
+	 * The cardiac envelope for the current instant: a sharp first sound, a softer
+	 * second a fifth of a second later, then quiet.
+	 *
+	 * <p>Both the shape and the timing now come from {@link
+	 * dev.captience.realisticdamage.systems.Cardio}, which fixed two things. The
+	 * decays used to be measured in fractions of a beat, so the thump got shorter
+	 * in real time the faster the heart went and a racing pulse turned into a
+	 * click track. And the rate was one smooth function of one number, so the beat
+	 * could get faster but could never falter.
 	 */
 	public static double heartbeatEnvelope() {
-		double f = beatPhase - Math.floor(beatPhase);
-		double lub = Math.exp(-f / 0.055);
-		double dub = f >= 0.20 ? 0.72 * Math.exp(-(f - 0.20) / 0.065) : 0.0;
-		return Math.clamp(Math.max(lub, dub), 0.0, 1.0);
+		return HEART.envelope();
 	}
 
 	/** True on the single tick a new beat begins — fire the thump sound here. */
 	public static boolean beatJustFired() {
-		return beatFired;
+		return HEART.beatJustFired();
+	}
+
+	/** How hard the beat in progress landed: weak if ectopic, heavy after a pause. */
+	public static double beatAmplitude() {
+		return HEART.beatAmplitude();
 	}
 
 	public static double consciousness() {
@@ -106,9 +226,25 @@ public final class ClientState {
 		return unconsciousFade;
 	}
 
+	public static double microsleepFade() {
+		return microsleepFade;
+	}
+
 	public static boolean unconscious() {
 		BodySnapshot snapshot = snapshot();
 		return snapshot != null && snapshot.unconscious();
+	}
+
+	/** Blacked out for a moment (1.4) — the stutter before the stop. */
+	public static boolean microsleeping() {
+		BodySnapshot snapshot = snapshot();
+		return snapshot != null && snapshot.microsleeping();
+	}
+
+	/** Face-down after a hard landing (1.4). */
+	public static boolean knockedDown() {
+		BodySnapshot snapshot = snapshot();
+		return snapshot != null && snapshot.knockedDown();
 	}
 
 	/**
@@ -134,10 +270,8 @@ public final class ClientState {
 	 */
 	public static double effectiveConsciousness() {
 		BodySnapshot snapshot = snapshot();
-		if (snapshot != null && snapshot.concussion()) {
-			return smoothedConsciousness - Balance.CONCUSSION_SYMPTOM_SHIFT;
-		}
-		return smoothedConsciousness;
+		return dev.captience.realisticdamage.body.Vitals.effectiveConsciousness(
+				smoothedConsciousness, snapshot != null && snapshot.concussion());
 	}
 
 	/** True when the synced state says the player is concussed. */

@@ -26,6 +26,17 @@ public record BodySnapshot(
 	public static final int FLAG_UNCONSCIOUS = 1;
 	public static final int FLAG_CONCUSSION = 2;
 	public static final int FLAG_BURNED = 4;
+	/** Face-down after a hard landing (1.4). */
+	public static final int FLAG_KNOCKED_DOWN = 8;
+	/** Lights out for a moment (1.4). */
+	public static final int FLAG_MICROSLEEP = 16;
+	/**
+	 * A hand is being held over the wound (1.5). Synced because blood is now drawn
+	 * client-side from this snapshot: without it, a wound being compressed would
+	 * carry on visibly pumping while the number behind it had already slowed, and
+	 * the one piece of first aid in the mod would look like it did nothing.
+	 */
+	public static final int FLAG_PRESSURE = 32;
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, BodySnapshot> STREAM_CODEC = StreamCodec.composite(
 			ByteBufCodecs.FLOAT, BodySnapshot::head,
@@ -65,7 +76,10 @@ public record BodySnapshot(
 		}
 		int flags = (data.unconscious() ? FLAG_UNCONSCIOUS : 0)
 				| (data.concussion() ? FLAG_CONCUSSION : 0)
-				| (data.burned() ? FLAG_BURNED : 0);
+				| (data.burned() ? FLAG_BURNED : 0)
+				| (data.knockedDown() ? FLAG_KNOCKED_DOWN : 0)
+				| (data.microsleeping() ? FLAG_MICROSLEEP : 0)
+				| (data.underPressure() ? FLAG_PRESSURE : 0);
 		return new BodySnapshot(
 				quantizeFraction(data.part(BodyPart.HEAD).fraction()),
 				quantizeFraction(data.part(BodyPart.TORSO).fraction()),
@@ -125,6 +139,18 @@ public record BodySnapshot(
 
 	public boolean burned() {
 		return (statusFlags & FLAG_BURNED) != 0;
+	}
+
+	public boolean knockedDown() {
+		return (statusFlags & FLAG_KNOCKED_DOWN) != 0;
+	}
+
+	public boolean microsleeping() {
+		return (statusFlags & FLAG_MICROSLEEP) != 0;
+	}
+
+	public boolean underPressure() {
+		return (statusFlags & FLAG_PRESSURE) != 0;
 	}
 
 	public static BodySnapshot healthy() {

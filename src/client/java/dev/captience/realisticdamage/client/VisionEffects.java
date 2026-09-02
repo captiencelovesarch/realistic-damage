@@ -32,16 +32,31 @@ public final class VisionEffects {
 	/** Which chain is currently applied, or -1 for none. */
 	private static int applied = -1;
 
-	/** 0 to 1: how far gone the player's vision is. Blood loss greys you out too. */
-	private static double severity() {
+	/**
+	 * How far the colour has drained, 0 to 1 — and this one is <em>blood loss</em>
+	 * (1.5).
+	 *
+	 * <p>Until 1.5 there was a single severity taking the worst of blood loss and
+	 * fading consciousness, which both the colour drain and the world warping
+	 * read. The consequence was that the screen could say how bad things were but
+	 * never what was wrong: bleeding out and being concussed looked identical, so
+	 * neither told you whether to stop the bleeding or stop taking hits to the
+	 * head. Split, greyout means blood — which is also the medically right
+	 * pairing, since losing colour from the edges inward is what actually precedes
+	 * a blackout from hypovolemia.
+	 */
+	private static double greyoutSeverity() {
 		if (!ClientState.active()) {
 			return 0.0;
 		}
-		double fromMind = ClientState.ramp(Balance.SYMPTOM_VIGNETTE, 0.0);
 		double blood = ClientState.blood();
-		double fromBlood = blood >= Balance.BLOOD_MILD ? 0.0
+		return blood >= Balance.BLOOD_MILD ? 0.0
 				: Math.clamp((Balance.BLOOD_MILD - blood) / Balance.BLOOD_MILD, 0.0, 1.0);
-		return Math.max(fromMind, fromBlood);
+	}
+
+	/** ...and this one is the head: the warping, the swimming, the doubled world. */
+	private static double warpSeverity() {
+		return ClientState.active() ? ClientState.ramp(Balance.SYMPTOM_VIGNETTE, 0.0) : 0.0;
 	}
 
 	/** Extra nausea-equivalent warp, consumed by the distortion mixin. */
@@ -49,7 +64,10 @@ public final class VisionEffects {
 		if (ClientEffectsConfig.get().distortionIntensity <= 0.0) {
 			return 0.0;
 		}
-		double severity = severity();
+		// A little blood loss still swims — enough that a heavy bleed is not
+		// completely stable underfoot — but the warp belongs to the head, and it
+		// is the head that can drive it all the way.
+		double severity = Math.max(warpSeverity(), greyoutSeverity() * 0.45);
 		// Held back until things are genuinely bad; the world should not swim
 		// while you are merely scratched.
 		if (severity < 0.45) {
@@ -84,7 +102,31 @@ public final class VisionEffects {
 		if (current != null && applied < 0) {
 			return -1;
 		}
-		double severity = severity() * ClientEffectsConfig.get().desaturationIntensity;
+		// Dying finishes the drain (1.5): whatever colour was left leaves over
+		// the death fade, so the world behind the death screen ends grey rather
+		// than snapping back to vivid on the frame you die. The realistic style
+		// front-loads it — the colour has to be gone before the blackout closes
+		// over it at 55%, or the drain happens where nobody can see it.
+		if (ClientState.dying()) {
+			double pace = ClientEffectsConfig.get().realisticDeath ? 2.0 : 1.0;
+			double gone = ClientState.deathFade() * pace
+					* ClientEffectsConfig.get().deathIntensity()
+					* ClientEffectsConfig.get().desaturationIntensity;
+			if (gone < 0.15) {
+				return applied;   // hold whatever dying interrupted; no brightening
+			}
+			if (gone < 0.35) {
+				return Math.max(applied, 0);
+			}
+			if (gone < 0.6) {
+				return Math.max(applied, 1);
+			}
+			return gone < 0.85 ? Math.max(applied, 2) : 3;
+		}
+		// Blood drives this outright; a fading mind contributes, but only enough
+		// that going under still dims the world rather than leaving it vivid.
+		double severity = Math.max(greyoutSeverity(), warpSeverity() * 0.6)
+				* ClientEffectsConfig.get().desaturationIntensity;
 		if (severity < 0.45) {
 			return -1;
 		}

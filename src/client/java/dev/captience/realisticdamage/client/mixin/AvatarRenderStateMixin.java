@@ -1,15 +1,18 @@
 package dev.captience.realisticdamage.client.mixin;
 
+import dev.captience.realisticdamage.client.BloodStainHolder;
 import dev.captience.realisticdamage.client.DestroyedLimbHolder;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-/** Storage slot for the destroyed-limb mask on the player's render state. */
+/** Storage slots for the destroyed-limb mask and blood staining on the player's render state. */
 @Mixin(AvatarRenderState.class)
-public abstract class AvatarRenderStateMixin implements DestroyedLimbHolder {
+public abstract class AvatarRenderStateMixin implements DestroyedLimbHolder, BloodStainHolder {
 	@Unique
 	private int realisticdamage$destroyedMask;
+	@Unique
+	private float[] realisticdamage$bloodStains;
 
 	@Override
 	public int realisticdamage$destroyedMask() {
@@ -19,5 +22,15 @@ public abstract class AvatarRenderStateMixin implements DestroyedLimbHolder {
 	@Override
 	public void realisticdamage$setDestroyedMask(int mask) {
 		this.realisticdamage$destroyedMask = mask;
+	}
+
+	@Override
+	public float[] realisticdamage$bloodStains() {
+		return this.realisticdamage$bloodStains;
+	}
+
+	@Override
+	public void realisticdamage$setBloodStains(float[] stains) {
+		this.realisticdamage$bloodStains = stains;
 	}
 }

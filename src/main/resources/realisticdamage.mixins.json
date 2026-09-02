@@ -5,6 +5,7 @@
 	"mixins": [
 		"ClientLoadTimeoutAccessor",
 		"FoodPropertiesMixin",
+		"LivingEntityFallMixin",
 		"LivingEntityHealMixin",
 		"LivingEntityUseItemMixin",
 		"MobTargetMixin",

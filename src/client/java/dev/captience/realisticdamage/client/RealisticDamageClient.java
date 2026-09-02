@@ -17,15 +17,40 @@ public class RealisticDamageClient implements ClientModInitializer {
 		ClientEffectsConfig.load();
 		BodyInspector.init();
 
+		// The stain field and the client-side emitter draw from the same sprite
+		// definition as the drop itself, so binding happens inside the provider —
+		// this is the only point at which a SpriteSet for it is handed out.
+		net.fabricmc.fabric.api.client.particle.v1.ParticleProviderRegistry.getInstance().register(
+				dev.captience.realisticdamage.RDParticles.BLOOD, BloodDrop.Provider::new);
+
+		// Blood on the body, for every player renderer including the skin variants.
+		net.fabricmc.fabric.api.client.rendering.v1.LivingEntityRenderLayerRegistrationCallback.EVENT
+				.register((entityType, renderer, helper, context) -> {
+					if (renderer instanceof net.minecraft.client.renderer.entity.player.AvatarRenderer<?> avatar) {
+						@SuppressWarnings("unchecked")
+						var parent = (net.minecraft.client.renderer.entity.RenderLayerParent<
+								net.minecraft.client.renderer.entity.state.AvatarRenderState,
+								net.minecraft.client.model.player.PlayerModel>) avatar;
+						helper.register(new BloodBodyLayer(parent));
+					}
+				});
+
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.ImpactPayload.TYPE,
-				(payload, context) -> ImpactEffect.trigger(payload.magnitude(), payload.yaw()));
+				(payload, context) -> ImpactEffect.trigger(payload.magnitude(), payload.yaw(),
+						ImpactFamily.of(payload.resolved())));
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.LandingPayload.TYPE,
+				(payload, context) -> LandingEffect.trigger(payload.severity(), payload.hardness()));
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.InjurySoundPayload.TYPE,
 				(payload, context) -> InjuryAudio.play(payload));
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.TreatingPayload.TYPE,
 				(payload, context) -> TriageHud.setTarget(payload.targetId()));
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.DeathPayload.TYPE,
+				(payload, context) -> ClientState.setDeathViolence(payload.violence()));
 
 		// Reachable without Mod Menu, per the "no config-file editing" rule.
 		KeyMapping.Category category = KeyMapping.Category.register(RealisticDamage.id("main"));
@@ -47,6 +72,12 @@ public class RealisticDamageClient implements ClientModInitializer {
 			MouseInertia.tickFallback();
 			VisionEffects.tick();
 			RescueInput.tick(client);
+			// Blood last, and in this order: the emitter reads the heart that
+			// ClientState.tick just advanced, and the lens is fed by the emitter.
+			BloodEmitter.tick();
+			BloodBody.tick();
+			BloodStains.tick();
+			BloodLens.tick();
 			while (openSettings.consumeClick()) {
 				client.gui.setScreen(new AccessibilityScreen(client.gui.screen()));
 			}
@@ -56,7 +87,13 @@ public class RealisticDamageClient implements ClientModInitializer {
 			VisionEffects.reset();
 			MouseInertia.reset();
 			ImpactEffect.reset();
+			LandingEffect.reset();
+			StumbleInput.reset();
 			TriageHud.reset();
+			BloodEmitter.reset();
+			BloodBody.reset();
+			BloodStains.reset();
+			BloodLens.reset();
 		});
 	}
 }

@@ -6,6 +6,7 @@
 		"AvatarRenderStateMixin",
 		"AvatarRendererMixin",
 		"ChannelAccessor",
+		"ClientInputMixin",
 		"GameRendererAccessor",
 		"ItemInHandRendererMixin",
 		"MouseHandlerMixin",

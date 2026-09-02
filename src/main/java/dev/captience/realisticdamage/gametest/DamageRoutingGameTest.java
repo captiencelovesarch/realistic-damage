@@ -97,13 +97,26 @@ public class DamageRoutingGameTest {
 		helper.succeed();
 	}
 
+	/**
+	 * Falls are described by height since 1.4, not by the health they cost, so
+	 * these record a landing the way the fall mixin does. {@code height} is blocks
+	 * beyond the safe fall distance; the HP figure is only what vanilla happened
+	 * to take, and no longer drives the trauma.
+	 */
+	private void land(GameTestHelper helper, ServerPlayer player, RealisticDamageData data,
+			double height, double appliedHp) {
+		data.setPendingFall(height, 1.0, true);
+		TraumaPipeline.handle(player, data, helper.getLevel().damageSources().fall(),
+				appliedHp, appliedHp, appliedHp, false);
+		data.clearPendingFall();
+	}
+
 	@GameTest
 	public void bigFallAddsSecondaryCoreTrauma(GameTestHelper helper) {
 		ServerPlayer player = mockPlayer(helper);
 		RealisticDamageData data = RDAttachments.get(player);
 		data.reset();
-		DamageSource fall = helper.getLevel().damageSources().fall();
-		TraumaPipeline.handle(player, data, fall, 16, 16, 16, false);
+		land(helper, player, data, 20.0, 16);
 		helper.assertTrue(data.part(BodyPart.TORSO).condition() < 20.0, "big fall must shock the torso");
 		helper.assertTrue(data.part(BodyPart.HEAD).condition() < 20.0, "extreme fall must shock the head");
 		helper.assertTrue(data.part(BodyPart.LEFT_LEG).condition() < 11.0, "legs still take the bulk");
@@ -114,18 +127,17 @@ public class DamageRoutingGameTest {
 	public void hugeFallKnocksYouOutNotJustYourLegs(GameTestHelper helper) {
 		ServerPlayer player = mockPlayer(helper);
 		RealisticDamageData data = RDAttachments.get(player);
-		DamageSource fall = helper.getLevel().damageSources().fall();
 
 		// A survivable-but-brutal drop: legs wrecked AND the lights go out.
 		data.reset();
-		TraumaPipeline.handle(player, data, fall, 34, 34, 34, false);
+		land(helper, player, data, 45.0, 24);
 		helper.assertTrue(data.consciousness() <= 0.0,
 				"an extreme fall must knock you out, consciousness = " + data.consciousness());
 		helper.assertTrue(data.concussion(), "an extreme fall must concuss");
 
 		// A moderate fall should rattle but never black you out.
 		data.reset();
-		TraumaPipeline.handle(player, data, fall, 7, 7, 7, false);
+		land(helper, player, data, 8.0, 7);
 		helper.assertTrue(data.consciousness() > 0.0 && data.consciousness() < 100.0,
 				"a moderate fall should dent consciousness without a blackout, got "
 						+ data.consciousness());

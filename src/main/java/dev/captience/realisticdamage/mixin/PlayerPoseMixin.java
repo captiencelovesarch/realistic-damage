@@ -13,9 +13,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Players lie prone using the vanilla swimming/crawling pose when unconscious,
- * or when both legs are destroyed and crawling is all that is left (spec §26). Server-authoritative state; clients (own and remote) read the
- * synced snapshot attachment so every side computes the same desired pose.
- * Movement/interaction locks live elsewhere — this is presentation + hitbox.
+ * when knocked off their feet by a hard landing (1.4), or when both legs are
+ * destroyed and crawling is all that is left (spec §26). Server-authoritative
+ * state; clients (own and remote) read the synced snapshot attachment so every
+ * side computes the same desired pose. Movement/interaction locks live
+ * elsewhere — this is presentation + hitbox.
  */
 @Mixin(Player.class)
 public abstract class PlayerPoseMixin {
@@ -25,10 +27,10 @@ public abstract class PlayerPoseMixin {
 		boolean prone;
 		if (self instanceof ServerPlayer serverPlayer) {
 			var data = RDAttachments.get(serverPlayer);
-			prone = data.unconscious() || data.legless();
+			prone = data.unconscious() || data.legless() || data.knockedDown();
 		} else {
 			BodySnapshot snapshot = self.getAttached(RDAttachments.SNAPSHOT);
-			prone = snapshot != null && (snapshot.unconscious()
+			prone = snapshot != null && (snapshot.unconscious() || snapshot.knockedDown()
 					|| (snapshot.destroyed(BodyPart.LEFT_LEG) && snapshot.destroyed(BodyPart.RIGHT_LEG)));
 		}
 		if (prone) {

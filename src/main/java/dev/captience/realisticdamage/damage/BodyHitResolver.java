@@ -165,8 +165,16 @@ public final class BodyHitResolver {
 		return shares;
 	}
 
-	/** Approximate world-space center of a body region (particles, effects). */
-	public static Vec3 regionCenter(ServerPlayer target, BodyPart part) {
+	/**
+	 * Approximate world-space center of a body region (particles, effects).
+	 *
+	 * <p>Takes a {@link LivingEntity} rather than a {@code ServerPlayer} because
+	 * the client draws blood for every player it can see, not only for the one it
+	 * is authoritative over. Everything it reads — the bounding box and the body
+	 * rotation — exists on both sides, and the box shrinking when a player crawls
+	 * is what makes a prone bleeder leave a trail at floor level for free.
+	 */
+	public static Vec3 regionCenter(LivingEntity target, BodyPart part) {
 		AABB box = target.getBoundingBox();
 		Vec3 forward = Vec3.directionFromRotation(0.0F, target.yBodyRot);
 		Vec3 right = forward.yRot((float) (-Math.PI / 2.0));

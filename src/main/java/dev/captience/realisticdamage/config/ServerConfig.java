@@ -28,6 +28,20 @@ public final class ServerConfig {
 	public boolean enableBurns = true;
 	public boolean enableHitLocation = true;
 	/**
+	 * A hard landing puts you on the ground for a moment (1.4). Separable from
+	 * the rest of the fall rework because losing control of your character, even
+	 * briefly, is the one part of this that some players will simply not want.
+	 */
+	public boolean enableKnockdown = true;
+	/** Consciousness cuts out in episodes on the way down (1.4). */
+	public boolean enableMicrosleeps = true;
+	/**
+	 * Compress vanilla's lethal fall tail so long drops maim rather than delete
+	 * (1.4). Off, falls kill exactly as vanilla says they do and the body trauma
+	 * simply rides along on top.
+	 */
+	public boolean softenFallLethality = true;
+	/**
 	 * Arcade preset: further trauma to an already-Disabled part destroys it
 	 * permanently. A destroyed arm can no longer use its hand, a destroyed leg
 	 * is a permanent limp, and a destroyed head or torso kills.

@@ -20,5 +20,8 @@ public abstract class AvatarRendererMixin {
 		BodySnapshot snapshot = entity.getAttached(RDAttachments.SNAPSHOT);
 		((DestroyedLimbHolder) state).realisticdamage$setDestroyedMask(
 				snapshot == null ? 0 : snapshot.destroyedMask());
+		((dev.captience.realisticdamage.client.BloodStainHolder) state)
+				.realisticdamage$setBloodStains(
+						dev.captience.realisticdamage.client.BloodBody.stains(entity.getId()));
 	}
 }

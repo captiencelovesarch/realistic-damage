@@ -58,8 +58,86 @@ public final class ClientEffectsConfig {
 	public boolean tinnitusTone = true;
 	/** True low-pass muffling of world audio (falls back to ducking if EFX is absent). */
 	public double mufflingIntensity = 1.0;
-	/** Flash, camera kick and thud when a heavy blow lands. */
+	/** Flash, camera kick and thud when a heavy blow lands — and the slam of a landing. */
 	public double impactIntensity = 1.0;
+	/**
+	 * How far your feet wander off your input as consciousness fades (1.4).
+	 *
+	 * <p>Its own control rather than part of the look sliders, and boxed for the
+	 * same reason {@link #lookInertiaIntensity} is: this is the only effect in the
+	 * mod that changes where the player physically ends up, so someone who is fine
+	 * with a swimming screen may still want their footing left alone — and a
+	 * config written before 1.4 must not have it switched on underneath them at
+	 * full strength. {@link #migrate()} seeds it from the inertia control, which
+	 * is the closest existing statement of "I am happy for my controls to lie to
+	 * me".
+	 */
+	public Double stumbleIntensityValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double stumbleIntensity() {
+		return stumbleIntensityValue == null ? lookInertia() : stumbleIntensityValue;
+	}
+	/**
+	 * The master control for everything blood (1.5): drops, the marks they leave,
+	 * blood on your own body and blood on the camera.
+	 *
+	 * <p>Boxed and migrated like the controls above, but for a subtler reason.
+	 * Blood is not a new effect layered onto something that already worked — it is
+	 * the fix for bleeding having been effectively invisible, so a 1.4 config
+	 * ought to receive it. What it must not do is switch itself on for someone who
+	 * had deliberately turned the sensory layer off, and "turned everything off"
+	 * is exactly the state {@link #disableAllEffects()} leaves behind.
+	 * {@link #migrate()} therefore seeds this from the existing controls rather
+	 * than defaulting it, so a silent config comes back on and a silenced one
+	 * stays silent.
+	 */
+	public Double bloodIntensityValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double bloodIntensity() {
+		return bloodIntensityValue == null ? 1.0 : bloodIntensityValue;
+	}
+
+	/** Marks left on the world: the trail behind you and the pool under you. */
+	public double bloodStainIntensity = 1.0;
+	/** Droplets that land on the camera, run down it and dry. */
+	public double bloodLensIntensity = 1.0;
+	/** Blood on the player model, per injured region — yours and everyone else's. */
+	public double bloodBodyIntensity = 1.0;
+	/**
+	 * Brighter, wetter, and more of it. The same split as
+	 * {@link #visceralInjurySounds}, and for the same reason: two players on one
+	 * server are allowed to disagree about how visceral their game is, because
+	 * none of it is a gameplay signal the other can be denied.
+	 */
+	public boolean visceralBlood = false;
+
+	/**
+	 * The dying fade (1.5): the heart running down, the colour finishing its
+	 * drain, the world going quiet under the death screen. Boxed and migrated
+	 * like the other post-1.0 controls, seeded from the vignette because that is
+	 * the closest existing statement of how much screen-covering drama the player
+	 * wants — and it is zero for anyone who pressed the panic button.
+	 */
+	public Double deathIntensityValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double deathIntensity() {
+		return deathIntensityValue == null ? 1.0 : deathIntensityValue;
+	}
+
+	/**
+	 * Which death the fade plays (1.5). False is the cinematic one: five seconds,
+	 * a red pulse, and a screen that dims but stays legible. True is the
+	 * realistic one: vision tunnels out to true black just past the middle of a
+	 * longer fade, the heart keeps beating in the dark after it — hearing is the
+	 * last sense to go — and the end is genuinely black and silent. Selected by
+	 * the Arcade and Grounded presets respectively, overridable on its own,
+	 * exactly like the muted/visceral sound split.
+	 */
+	public boolean realisticDeath = false;
+
 	/** Fracture, destruction and collapse audio. */
 	public double injurySoundVolume = 1.0;
 	/** Real colour drain through vanilla's post-processing. */
@@ -83,6 +161,7 @@ public final class ClientEffectsConfig {
 		vignetteIntensity = 0.85;
 		sensitivityReductionIntensity = 0.5;
 		lookInertiaIntensity = 0.4;
+		stumbleIntensityValue = 0.35;
 		afterimageIntensity = 0.6;
 		exposureIntensity = 0.6;
 		ringingVolume = 0.8;
@@ -92,6 +171,16 @@ public final class ClientEffectsConfig {
 		desaturationIntensity = 0.7;
 		distortionIntensity = 0.5;
 		visceralInjurySounds = false;
+		// Blood is information here, not atmosphere: kept legible but tidied up,
+		// with the lens droplets pulled back hardest because they are the layer
+		// that actually sits between you and the game.
+		bloodIntensityValue = 0.85;
+		bloodStainIntensity = 0.7;
+		bloodLensIntensity = 0.45;
+		bloodBodyIntensity = 0.8;
+		visceralBlood = false;
+		deathIntensityValue = 0.75;
+		realisticDeath = false;
 	}
 
 	/** Heavier immersion: full blackout, camera drift, everything at full strength. */
@@ -99,6 +188,7 @@ public final class ClientEffectsConfig {
 		vignetteIntensity = 1.0;
 		sensitivityReductionIntensity = 1.0;
 		lookInertiaIntensity = 1.0;
+		stumbleIntensityValue = 1.0;
 		afterimageIntensity = 1.0;
 		exposureIntensity = 1.0;
 		ringingVolume = 1.0;
@@ -108,6 +198,13 @@ public final class ClientEffectsConfig {
 		desaturationIntensity = 1.0;
 		distortionIntensity = 1.0;
 		visceralInjurySounds = true;
+		bloodIntensityValue = 1.0;
+		bloodStainIntensity = 1.0;
+		bloodLensIntensity = 1.0;
+		bloodBodyIntensity = 1.0;
+		visceralBlood = true;
+		deathIntensityValue = 1.0;
+		realisticDeath = true;
 	}
 
 	/**
@@ -119,6 +216,7 @@ public final class ClientEffectsConfig {
 		vignetteIntensity = 0.0;
 		sensitivityReductionIntensity = 0.0;
 		lookInertiaIntensity = 0.0;
+		stumbleIntensityValue = 0.0;
 		afterimageIntensity = 0.0;
 		exposureIntensity = 0.0;
 		ringingVolume = 0.0;
@@ -129,6 +227,8 @@ public final class ClientEffectsConfig {
 		mufflingIntensity = 0.0;
 		impactIntensity = 0.0;
 		injurySoundVolume = 0.0;
+		bloodIntensityValue = 0.0;
+		deathIntensityValue = 0.0;
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -168,6 +268,19 @@ public final class ClientEffectsConfig {
 	public void migrate() {
 		if (lookInertiaIntensity == null) {
 			lookInertiaIntensity = sensitivityReductionIntensity;
+		}
+		if (stumbleIntensityValue == null) {
+			stumbleIntensityValue = lookInertia();
+		}
+		if (bloodIntensityValue == null) {
+			// The strongest surviving statement of "show me that I am hurt". A
+			// config with the whole sensory layer at zero seeds blood at zero and
+			// the panic button keeps its promise across the upgrade; anything else
+			// gets the effect it was missing.
+			bloodIntensityValue = Math.max(vignetteIntensity, impactIntensity);
+		}
+		if (deathIntensityValue == null) {
+			deathIntensityValue = vignetteIntensity;
 		}
 	}
 

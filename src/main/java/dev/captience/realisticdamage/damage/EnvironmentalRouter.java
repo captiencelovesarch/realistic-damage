@@ -4,35 +4,31 @@ import java.util.EnumMap;
 import java.util.Map;
 
 import dev.captience.realisticdamage.body.BodyPart;
-import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.damage.ClassifiedDamage.Routing;
 
 /** Deterministic predefined routing for indirect/environmental damage (spec §7). */
 public final class EnvironmentalRouter {
 	private EnvironmentalRouter() {}
 
-	/** Shares sum to 1.0. {@code appliedDamage} drives fall-severity secondary shares. */
-	public static Map<BodyPart, Double> shares(Routing routing, double appliedDamage) {
+	/**
+	 * Shares sum to 1.0.
+	 *
+	 * <p>Falls are no longer routed here: their distribution depends on drop
+	 * height and on which foot was leading, which is more than a static table can
+	 * say, and it lives in {@link FallMath}. {@code FALL_LEGS} keeps an even
+	 * two-legged split as a fallback for any fall-tagged damage that arrives
+	 * without a recorded landing — another mod's custom source, say.
+	 */
+	public static Map<BodyPart, Double> shares(Routing routing) {
 		Map<BodyPart, Double> shares = new EnumMap<>(BodyPart.class);
 		switch (routing) {
-			case FALL_LEGS -> {
+			case FALL_LEGS, LEGS -> {
 				shares.put(BodyPart.LEFT_LEG, 0.5);
 				shares.put(BodyPart.RIGHT_LEG, 0.5);
-				if (appliedDamage >= Balance.FALL_SECONDARY_TORSO_DAMAGE) {
-					shares.put(BodyPart.TORSO, 0.3);
-				}
-				if (appliedDamage >= Balance.FALL_SECONDARY_HEAD_DAMAGE) {
-					shares.put(BodyPart.HEAD, 0.2);
-				}
-				normalize(shares);
 			}
 			case HEAD_HEAVY -> {
 				shares.put(BodyPart.HEAD, 0.6);
 				shares.put(BodyPart.TORSO, 0.4);
-			}
-			case LEGS -> {
-				shares.put(BodyPart.LEFT_LEG, 0.5);
-				shares.put(BodyPart.RIGHT_LEG, 0.5);
 			}
 			case TORSO -> shares.put(BodyPart.TORSO, 1.0);
 			case HEAD_TORSO -> {
@@ -56,12 +52,5 @@ public final class EnvironmentalRouter {
 			default -> {}
 		}
 		return shares;
-	}
-
-	private static void normalize(Map<BodyPart, Double> shares) {
-		double sum = shares.values().stream().mapToDouble(Double::doubleValue).sum();
-		if (sum > 0) {
-			shares.replaceAll((part, value) -> value / sum);
-		}
 	}
 }

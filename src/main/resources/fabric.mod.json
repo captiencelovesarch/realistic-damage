@@ -23,7 +23,9 @@
 		],
 		"fabric-client-gametest": [
 			"dev.captience.realisticdamage.client.gametest.BodyHudClientGameTest",
-			"dev.captience.realisticdamage.client.gametest.MultiplayerClientGameTest"
+			"dev.captience.realisticdamage.client.gametest.MultiplayerClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.BloodClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.DeathClientGameTest"
 		],
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
@@ -35,7 +37,11 @@
 			"dev.captience.realisticdamage.gametest.UnconsciousAggroGameTest",
 			"dev.captience.realisticdamage.gametest.RescueGameTest",
 			"dev.captience.realisticdamage.gametest.PracticeDummyGameTest",
-			"dev.captience.realisticdamage.gametest.InteropGameTest"
+			"dev.captience.realisticdamage.gametest.InteropGameTest",
+			"dev.captience.realisticdamage.gametest.LandingGameTest",
+			"dev.captience.realisticdamage.gametest.MicrosleepGameTest",
+			"dev.captience.realisticdamage.gametest.BloodGameTest",
+			"dev.captience.realisticdamage.gametest.DeathGameTest"
 		]
 	},
 	"mixins": [

@@ -6,6 +6,7 @@ import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.body.Vitals;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.damage.ClassifiedDamage;
@@ -39,16 +40,62 @@ public final class ConsciousnessSystem {
 		// one-handed, very slowly (see ImpairmentSystem). Only item *use* is
 		// genuinely impossible without that hand.
 		AttackEntityCallback.EVENT.register((player, level, hand, entity, hitResult) ->
-				locked(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+				locked(player) || tooFeeble(player) ? InteractionResult.FAIL : InteractionResult.PASS);
 		AttackBlockCallback.EVENT.register((player, level, hand, pos, direction) ->
-				locked(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+				locked(player) || tooFeeble(player) ? InteractionResult.FAIL : InteractionResult.PASS);
 		UseItemCallback.EVENT.register((player, level, hand) ->
-				locked(player) || handGone(player, hand) ? InteractionResult.FAIL : InteractionResult.PASS);
+				locked(player) || handGone(player, hand) || absent(player)
+						? InteractionResult.FAIL : InteractionResult.PASS);
 		UseBlockCallback.EVENT.register((player, level, hand, hitResult) ->
-				locked(player) || handGone(player, hand) ? InteractionResult.FAIL : InteractionResult.PASS);
+				locked(player) || handGone(player, hand) || absent(player)
+						? InteractionResult.FAIL : InteractionResult.PASS);
 		UseEntityCallback.EVENT.register((player, level, hand, entity, hitResult) ->
-				locked(player) || handGone(player, hand) ? InteractionResult.FAIL : InteractionResult.PASS);
-		PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) -> !locked(player));
+				locked(player) || handGone(player, hand) || absent(player)
+						? InteractionResult.FAIL : InteractionResult.PASS);
+		PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) ->
+				!locked(player) && !tooFeeble(player));
+	}
+
+	/**
+	 * Blacked out for the moment, or face-down after a landing: the body is
+	 * present but the player is not driving it. Distinct from {@link #locked}
+	 * because this is measured in fractions of a second and recovers on its own —
+	 * the point is that collapse arrives as a stutter you can feel coming rather
+	 * than a switch that flips once.
+	 */
+	private static boolean absent(Player player) {
+		if (!(player instanceof ServerPlayer serverPlayer)
+				|| serverPlayer.isCreative() || serverPlayer.isSpectator()) {
+			return false;
+		}
+		RealisticDamageData data = RDAttachments.get(serverPlayer);
+		return data.microsleeping() || data.knockedDown();
+	}
+
+	/**
+	 * Past the bottom of the ladder your arms will not answer at all. Everything
+	 * above {@link Balance#SYMPTOM_FEEBLE} is merely slow (see {@link
+	 * ImpairmentSystem#sluggishPenalty}); this is the floor under the slowness,
+	 * so that "about to lose consciousness" stops meaning "mining at 70%".
+	 */
+	private static boolean tooFeeble(Player player) {
+		if (!(player instanceof ServerPlayer serverPlayer)
+				|| serverPlayer.isCreative() || serverPlayer.isSpectator()) {
+			return false;
+		}
+		if (!ServerConfig.get().enableConsciousness) {
+			return false;
+		}
+		RealisticDamageData data = RDAttachments.get(serverPlayer);
+		if (data.microsleeping() || data.knockedDown()) {
+			return true;
+		}
+		return effective(data) < Balance.SYMPTOM_FEEBLE;
+	}
+
+	/** Consciousness as the body experiences it, concussion shift included. */
+	public static double effective(RealisticDamageData data) {
+		return Vitals.effectiveConsciousness(data.consciousness(), data.concussion());
 	}
 
 	/** A destroyed arm's hand simply does not work any more (Arcade preset). */
@@ -70,6 +117,7 @@ public final class ConsciousnessSystem {
 			if (data.unconscious()) {
 				wake(player, data);
 			}
+			data.clearMicrosleep();
 			return;
 		}
 
@@ -102,10 +150,53 @@ public final class ConsciousnessSystem {
 			keepMobsInterested(player);
 		}
 
+		tickMicrosleep(player, data);
+
 		if (data.unconscious()
 				&& data.unconsciousTicks() >= Balance.MIN_UNCONSCIOUS_TICKS
 				&& data.consciousness() >= Balance.WAKE_THRESHOLD) {
 			wake(player, data);
+		}
+	}
+
+	/**
+	 * The stutter before the stop (1.4). Consciousness does not dim smoothly to
+	 * nothing; it drops out in episodes that get longer and closer together, and
+	 * those episodes are the warning that the meter itself cannot give you
+	 * without being displayed.
+	 *
+	 * <p>The cadence is a phase accumulator, not a die roll: advance by one
+	 * period's worth each tick and black out when it wraps. Two identical
+	 * descents therefore produce identical blackouts, which is the same promise
+	 * the mod makes about which leg breaks.
+	 */
+	private static void tickMicrosleep(ServerPlayer player, RealisticDamageData data) {
+		if (!ServerConfig.get().enableMicrosleeps) {
+			data.clearMicrosleep();
+			return;
+		}
+		if (data.microsleeping()) {
+			data.tickMicrosleep();
+			return;
+		}
+		// Being fully out supersedes blinking out; so does simply being well
+		// enough. In both cases the phase unwinds so that dipping back under the
+		// threshold does not instantly black you out on the strength of credit
+		// accumulated on the way down.
+		double effective = effective(data);
+		if (data.unconscious() || effective >= Balance.SYMPTOM_MICROSLEEP) {
+			data.setMicrosleepPhase(Math.max(0.0, data.microsleepPhase() - 0.02));
+			return;
+		}
+		double phase = data.microsleepPhase() + 1.0 / Vitals.microsleepPeriod(effective);
+		if (phase < 1.0) {
+			data.setMicrosleepPhase(phase);
+			return;
+		}
+		data.setMicrosleepPhase(phase - 1.0);
+		data.beginMicrosleep(Vitals.microsleepDuration(effective));
+		if (player.isSprinting()) {
+			player.setSprinting(false);
 		}
 	}
 
@@ -235,12 +326,19 @@ public final class ConsciousnessSystem {
 			player.setSprinting(false);
 		}
 		player.stopUsingItem();
+		// Going all the way out supersedes blinking out: leaving the flag set
+		// would have the client fading a blackout in underneath a blackout.
+		data.clearMicrosleep();
 		Notifier.message(player, "realisticdamage.msg.unconscious");
 		Notifier.injurySound(player, dev.captience.realisticdamage.net.InjurySound.COLLAPSE);
 	}
 
 	private static void wake(ServerPlayer player, RealisticDamageData data) {
 		data.setUnconscious(false);
+		// You come round at WAKE_THRESHOLD, which is below the microsleep line —
+		// so without clearing the phase you would blink straight back out on the
+		// strength of time spent unconscious.
+		data.clearMicrosleep();
 		Notifier.message(player, "realisticdamage.msg.wake");
 	}
 }

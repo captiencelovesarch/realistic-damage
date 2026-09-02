@@ -32,6 +32,20 @@ punctures bleed, blunt trauma doesn't. Identical hits always produce identical o
 costing hearts and pulls you toward blacking out. Head trauma can knock you unconscious
 with most of your hearts intact. You wake up when you stabilize.
 
+**Going under is a slide, not a switch.** Near the bottom your hands stop obeying: swinging
+and mining fall off a cliff and eventually refuse outright, your feet start wandering off
+the direction you pointed them, and you black out in brief episodes that come more often
+and last longer the further down you are. Eating still always works — food is the cure —
+but at the bottom a loaf takes eight seconds you may not have. A concussion brings all of
+it forward.
+
+**Falls land like falls.** Severity comes from how far you dropped, not from what your
+armour let through, so a long drop in good gear still shatters the leg you landed on and
+still rattles your skull. Hard landings put you on the ground for a moment. The leading
+foot takes the worse of it. Hay, leaves and snow genuinely cushion; stone and iron don't.
+And the lethal tail is compressed — you survive drops that used to kill you, concussed and
+limping, which is usually worse.
+
 **Limb destruction** (Arcade preset, on by default). Keep hitting a limb that is already
 Disabled and it is gone for good: no healing, no golden apple, only death restores it. A
 destroyed arm cannot use that hand and works one-handed at a heavy penalty, destroyed legs
@@ -63,7 +77,21 @@ numbered. Being surprised by your own blood level is the point of hiding it.
 As consciousness fails the world genuinely changes rather than being overlaid: colour
 drains out of it, the view warps and blurs, your aim goes slippery and slow, your head
 sags, and the world's audio is low-passed into a dull murmur behind a ringing tone and a
-rising heartbeat. Heavy blows flash and kick the camera on impact.
+heartbeat. What the screen does tells you *which* thing is wrong — the colour drains for
+blood loss and the world warps for head trauma — and how a blow looked tells you what
+landed: a cut throws blood across the camera, a puncture pinches the view shut, a club
+leaves it ringing and doubled, a blast whites everything out and takes your hearing with
+it for several seconds.
+
+Your heart is not a metronome. It races when you're bleeding and slows to something heavy
+and enormous when your head is going, and once you're in real trouble it starts to skip —
+an early weak beat, a pause too long, then a thump that lands harder than any of them.
+
+Bleeding is something you can see. Drops fall, land, and mark whatever they hit, so you
+leave a trail behind you and a pool under you when you stop; a bad wound spurts in time
+with your pulse; blood soaks into the limb it came out of and dries there; and it gets on
+the camera, which is the part you can't miss. Every layer of it has its own slider, and
+none of it is on the HUD.
 
 Breaking, losing a limb and going down each have their own synthesised audio, in a muted
 set that sits inside Minecraft's palette and a visceral set that doesn't. Your own
@@ -104,6 +132,9 @@ mod is concerned, so it bleeds, breaks, concusses and goes down exactly as you w
 | `fallTraumaMultiplier` | 1.0 | Scales fall trauma specifically |
 | `pvpTraumaMultiplier` | 1.0 | Scales trauma from other players |
 | `enableLimbDestruction` | true | Arcade preset: limbs can be destroyed permanently |
+| `enableKnockdown` | true | Hard landings put you on the ground for a moment |
+| `enableMicrosleeps` | true | Consciousness cuts out in episodes on the way down |
+| `softenFallLethality` | true | Compresses vanilla's lethal fall tail so long drops maim rather than delete |
 | `unconsciousAggro` | `NEARBY` | Who notices a body on the floor. `ATTACKERS` keeps whatever was already fighting you, `NEARBY` adds anything within 6 blocks that can see you, `ALL` pulls in every hostile with line of sight, `NONE` takes you off the menu entirely |
 | `enableBleeding` / `enableBrokenLimbs` / `enableConsciousness` / `enableBurns` / `enableHitLocation` | true | Turn whole systems off |
 
@@ -157,8 +188,8 @@ Death resets everything. Creative and Spectator are ignored entirely.
 
 ## What's next
 
-`ROADMAP.md` covers 1.3 through 1.5: deeper consequences, mob anatomy, and a public API for other
-mods. Medical items are explicitly not on it.
+`ROADMAP.md` covers 1.5 and 1.6: deeper consequences and mob anatomy. Medical items are
+explicitly not on it.
 
 ## Design
 

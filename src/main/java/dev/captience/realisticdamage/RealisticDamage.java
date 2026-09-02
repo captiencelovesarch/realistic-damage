@@ -19,11 +19,17 @@ public class RealisticDamage implements ModInitializer {
 				.register(dev.captience.realisticdamage.net.ImpactPayload.TYPE,
 						dev.captience.realisticdamage.net.ImpactPayload.CODEC);
 		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()
+				.register(dev.captience.realisticdamage.net.LandingPayload.TYPE,
+						dev.captience.realisticdamage.net.LandingPayload.CODEC);
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()
 				.register(dev.captience.realisticdamage.net.InjurySoundPayload.TYPE,
 						dev.captience.realisticdamage.net.InjurySoundPayload.CODEC);
 		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()
 				.register(dev.captience.realisticdamage.net.TreatingPayload.TYPE,
 						dev.captience.realisticdamage.net.TreatingPayload.CODEC);
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()
+				.register(dev.captience.realisticdamage.net.DeathPayload.TYPE,
+						dev.captience.realisticdamage.net.DeathPayload.CODEC);
 		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.serverboundPlay()
 				.register(dev.captience.realisticdamage.net.PressurePayload.TYPE,
 						dev.captience.realisticdamage.net.PressurePayload.CODEC);
@@ -32,6 +38,7 @@ public class RealisticDamage implements ModInitializer {
 				(payload, context) -> dev.captience.realisticdamage.systems.RescueSystem
 						.onPressureRequest(context.player(), payload.targetId()));
 		RDAttachments.init();
+		RDParticles.init();
 		dev.captience.realisticdamage.systems.TickDispatcher.init();
 		dev.captience.realisticdamage.systems.ImpairmentSystem.init();
 		dev.captience.realisticdamage.systems.ConsciousnessSystem.init();

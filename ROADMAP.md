@@ -1,4 +1,4 @@
-# Realistic Damage: roadmap to 1.5
+# Realistic Damage: roadmap to 1.7
 
 Where 1.0 landed and what comes next. Each release has one theme, because
 shipping a coherent idea beats shipping a pile of options.
@@ -160,7 +160,98 @@ Still open:
 - **Compatibility passes** against the big combat and armour mods, which have
   the same availability problem for now.
 
-## 1.4: Consequence
+## 1.4: Weight
+
+Two things the mod had been describing rather than delivering. Unplanned —
+this displaced Consequence, which moves to 1.5 — but both were holes in what
+was already shipped rather than new territory, and they were the two places
+where the screen and the gameplay were telling different stories.
+
+**Losing consciousness now costs you something before it costs you everything.**
+The symptom ladder was almost entirely sensory: at one point of consciousness a
+player could still look around cleanly, swing, place blocks and eat at full
+speed, and then collapse between one tick and the next. The approach to
+collapse is now a slide rather than a cliff.
+
+- **Microsleeps**: below 22 the player blacks out in episodes, deterministically
+  — a phase accumulator, not a die roll — arriving more often and lasting longer
+  the further down they are. Controls are actually taken away, not merely
+  dimmed. Capped so you are always present more than you are absent.
+- **Feebleness**: the action penalty caved in over the last twenty points (0.22
+  at 20, 0.85 at 0, where it used to be 0.10 and 0.30), and below 8 you cannot
+  swing or mine at all. Fading is no longer filed under the arm-injury cap,
+  which is what let it be capped away.
+- **Unsteady footing**: the movement vector wanders off the input as
+  consciousness falls, up to 42°. Client-side, because a server-side nudge
+  arrives as a rubber-band and a control that fights you reads as a broken game
+  rather than a failing body.
+- **Eating slows** to five times its length at the bottom. It is never refused
+  for weakness — food is the only cure and that promise is kept — but it stops
+  being free.
+- **Concussion now decides these**, not just the visuals: the symptom shift
+  moved into shared code, so a concussed player blacks out and stumbles at a
+  consciousness a clear-headed one walks off.
+
+**Falls are scored on height, not on the health bar.** Post-armour damage was
+the wrong input: it is what vanilla decided your boots were worth, so diamond
+and Feather Falling IV did not merely protect you, they deleted the event.
+
+- **Height-keyed severity**: trauma, secondary torso and head shares, and
+  knockdown all derive from how far you dropped. Armour still helps, through the
+  same localized reduction every other category goes through.
+- **Knockdown**: hard landings put you on the ground, prone and not steering,
+  for up to 2.5 seconds, then a brief unsteady tail. There was previously no
+  landing event of any kind.
+- **Asymmetric legs**: the leading foot — read off the walk cycle, so it is
+  reproducible — takes about twice the trailing one's share on a committed
+  landing.
+- **Surfaces matter**: hay, leaves, snow and wool genuinely cushion the body and
+  can leave you standing where stone would floor you; stone, metal and obsidian
+  make it worse.
+- **Less fatal, worse aftermath**: vanilla's linear damage makes lethality a
+  cliff edge at 23 blocks. The tail is compressed above 10 points, so a
+  35-block drop is survivable from full health — at about two hearts, concussed,
+  with a shattered leg — while fifty blocks still kills.
+
+## 1.5: Blood
+
+Also unplanned, and displacing Consequence a second time — but like Weight
+before it, this was a hole in what had already shipped rather than new
+territory. Bleeding was a first-class mechanic with a hidden meter, a
+stacking rate model and its own death path, presented as four redstone
+particles every 25 ticks that hung in the air and, in first person, spawned
+behind the camera where they could not be seen at all. The mod could kill you
+by a means it never actually showed you.
+
+**Blood you can read.** Drops with gravity, drag and block collision that land
+and leave marks; a bounded stain field that merges nearby marks into pools, so
+standing still grows a pool while walking lays a trail; per-region staining on
+the body, so a cut left arm is a bloody left arm; and droplets on the camera
+driven by bleed *rate* rather than blood *level* — the one signal that says you
+are losing blood right now. Emission moved to the client off the already-synced
+snapshot, which costs less on the wire than the packets it replaced and lets an
+arterial wound throw its blood on the beat the player is hearing.
+
+**A heart that can falter.** The old beat raced but never stumbled, and its
+envelope was measured in fractions of a beat, so the thump got shorter as the
+rate rose and dying sounded like a metronome. Now: decays in seconds, ectopic
+beats with a compensatory pause and a hard beat after it, and three characters
+crossfaded by cause — blood loss fast and faint, head trauma slow and enormous,
+ordinary injury the pounding one.
+
+**A screen that says what happened.** Colour drain means blood loss and warping
+means the head, instead of both reading one collapsed severity; and impacts
+carry their damage category, folded into four physical events — cut, pierce,
+blow, blast — so a slash and a blast no longer produce the same white flash.
+
+**An ending instead of a cut.** Death used to snap every effect off between one
+frame and the next. Now the heart runs down — a handful of beats with widening
+gaps, each softer, silent past the middle — while the colour finishes draining,
+the vignette closes and loses its red, and the world's audio sinks toward quiet
+under the death screen. The respawn button stays readable the whole way, and a
+fresh life starts with a clean frame.
+
+## 1.6: Consequence
 
 Deepen what injuries mean rather than adding more of them.
 
@@ -173,7 +264,7 @@ Deepen what injuries mean rather than adding more of them.
 - **Injury-aware mob AI**: hostiles preferring targets that are visibly limping
   or bleeding. Predators pick off the wounded.
 
-## 1.5: Anatomy for everyone
+## 1.7: Anatomy for everyone
 
 Mobs get bodies. Deliberately last, because it doubles the surface area of
 every system and needs everything before it to be stable first.

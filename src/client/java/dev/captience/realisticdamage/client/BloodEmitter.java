@@ -1,0 +1,198 @@
+package dev.captience.realisticdamage.client;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import dev.captience.realisticdamage.RDAttachments;
+import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.body.Vitals;
+import dev.captience.realisticdamage.body.WoundSeverity;
+import dev.captience.realisticdamage.config.Balance;
+import dev.captience.realisticdamage.damage.BodyHitResolver;
+import dev.captience.realisticdamage.net.BodySnapshot;
+import dev.captience.realisticdamage.systems.BloodFlow;
+import dev.captience.realisticdamage.systems.Cardio;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Where the blood actually comes from (1.5).
+ *
+ * <p>Runs entirely on the client, for every player it can see, driven by the
+ * body snapshot that was already being synced. That is a straight improvement
+ * on the old arrangement in three ways: it costs nothing on the wire where the
+ * server used to send particle packets, the rate can follow the wound's real
+ * Blood/sec instead of a fixed 25-tick timer, and — because the client owns the
+ * cardiac clock — an arterial wound can throw its blood on the same beat the
+ * player is hearing and feeling in the vignette.
+ *
+ * <p>The only blood the server still sends is the one-shot spray when a blow
+ * opens a wound, because that is an event with a direction and the snapshot
+ * carries neither.
+ */
+public final class BloodEmitter {
+	private BloodEmitter() {}
+
+	/** Sprites 0-3 of {@code blood.json} are drops; 4-7 are the splats stains use. */
+	public static final int DROP_SPRITE_COUNT = 4;
+	public static final int SPRITE_COUNT = 8;
+	/** Beyond this, someone else's bleeding is not worth the particles. */
+	private static final double EMIT_RANGE = 28.0;
+	/** However bad an artery is, one beat may not throw more than this. */
+	private static final int SPURT_DROPS_MAX = 7;
+
+	private static @Nullable SpriteSet sprites;
+	private static final Map<Integer, Bleeder> bleeders = new HashMap<>();
+
+	/** Per-player emission state: a fractional-drop carry per region, and a heart. */
+	private static final class Bleeder {
+		private final Cardio heart = new Cardio();
+		private final double[] carry = new double[BodyPart.values().length];
+		private long emitted;
+	}
+
+	static void bindSprites(SpriteSet spriteSet) {
+		sprites = spriteSet;
+	}
+
+	public static void tick() {
+		Minecraft client = Minecraft.getInstance();
+		ClientLevel level = client.level;
+		if (level == null || sprites == null) {
+			bleeders.clear();
+			return;
+		}
+		if (ClientEffectsConfig.get().bloodIntensity() <= 0.0) {
+			bleeders.clear();
+			return;
+		}
+		Vec3 here = client.player == null ? Vec3.ZERO : client.player.position();
+		for (Player player : level.players()) {
+			BodySnapshot snapshot = player.getAttached(RDAttachments.SNAPSHOT);
+			if (snapshot == null || !player.isAlive() || player.isSpectator()) {
+				continue;
+			}
+			boolean local = player == client.player;
+			if (!local && player.position().distanceToSqr(here) > EMIT_RANGE * EMIT_RANGE) {
+				continue;
+			}
+			emitFor(player, snapshot, local);
+		}
+		bleeders.keySet().removeIf(id -> level.getEntity(id) == null);
+	}
+
+	private static void emitFor(Player player, BodySnapshot snapshot, boolean local) {
+		Bleeder bleeder = bleeders.computeIfAbsent(player.getId(), id -> new Bleeder());
+
+		// The local player's spurts have to land on the heart the player is
+		// actually hearing, so they borrow ClientState's clock rather than
+		// running a second one that would drift out of step with the sound.
+		Cardio heart = local ? ClientState.heart() : advanceRemoteHeart(player, snapshot, bleeder);
+		boolean beat = heart.beatJustFired();
+
+		double lensWeighted = 0.0;
+		for (BodyPart part : BodyPart.values()) {
+			WoundSeverity wound = snapshot.wound(part);
+			if (wound == null) {
+				bleeder.carry[part.ordinal()] = 0.0;
+				continue;
+			}
+			double rate = wound.bloodPerSecond();
+			lensWeighted += rate * BloodFlow.lensWeight(part);
+			if (snapshot.underPressure()) {
+				// A hand over the wound slows what is coming out; it does not close
+				// it. Choking the visible flow to nothing would overstate the one
+				// piece of first aid in the mod, so a seep still gets through.
+				rate *= 0.15;
+			}
+
+			boolean arterial = BloodFlow.arterial(wound.bloodPerSecond()) && !snapshot.underPressure();
+			double share = arterial ? BloodFlow.spurtShare(wound.bloodPerSecond()) : 0.0;
+			double trickle = BloodFlow.dropsPerSecond(rate * (1.0 - share));
+
+			int drops = BloodFlow.dropsThisTick(bleeder.carry[part.ordinal()], trickle);
+			bleeder.carry[part.ordinal()] = BloodFlow.carryAfter(bleeder.carry[part.ordinal()], trickle);
+			for (int i = 0; i < drops; i++) {
+				spawn(player, part, wound.bloodPerSecond(), false, bleeder.emitted++);
+			}
+
+			if (arterial && beat) {
+				double perBeat = BloodFlow.dropsPerSecond(wound.bloodPerSecond()) * share
+						* 60.0 / heart.bpm();
+				int burst = (int) Math.clamp(Math.round(perBeat), 1L, SPURT_DROPS_MAX);
+				for (int i = 0; i < burst; i++) {
+					spawn(player, part, wound.bloodPerSecond(), true, bleeder.emitted++);
+				}
+			}
+		}
+
+		if (local && lensWeighted > 0.0 && !snapshot.underPressure()) {
+			BloodLens.feed(lensWeighted);
+		}
+	}
+
+	/**
+	 * Someone else's heart, so their arterial wounds spurt in their own rhythm
+	 * rather than in yours. Computed from their synced vitals, which every client
+	 * has, so two people watching the same casualty see the same thing.
+	 */
+	private static Cardio advanceRemoteHeart(Player player, BodySnapshot snapshot, Bleeder bleeder) {
+		double effective = Vitals.effectiveConsciousness(snapshot.consciousness(), snapshot.concussion());
+		double maxHealth = player.getMaxHealth();
+		double healthFraction = maxHealth <= 0.0 ? 1.0 : player.getHealth() / maxHealth;
+		bleeder.heart.tick(
+				Vitals.distressFromHealth(healthFraction),
+				Vitals.distressFromBlood(snapshot.blood()),
+				Vitals.distressFromMind(effective),
+				ClientState.breath());
+		return bleeder.heart;
+	}
+
+	private static void spawn(Player player, BodyPart part, double bloodPerSecond, boolean onBeat, long index) {
+		Minecraft client = Minecraft.getInstance();
+		ClientLevel level = client.level;
+		if (level == null || sprites == null) {
+			return;
+		}
+		Vec3 at = BodyHitResolver.regionCenter(player, part);
+		// Scatter the origin across the region rather than emitting from a single
+		// point: a wound is somewhere on a limb, not at its exact centre.
+		double spreadX = BloodFlow.jitterSigned(index, 1) * 0.11;
+		double spreadY = BloodFlow.jitterSigned(index, 2) * 0.11;
+		double spreadZ = BloodFlow.jitterSigned(index, 3) * 0.11;
+
+		double speed = BloodFlow.dropSpeed(bloodPerSecond, onBeat) / 20.0;
+		Vec3 direction = onBeat
+				? spurtDirection(player, index)
+				: new Vec3(BloodFlow.jitterSigned(index, 4) * 0.35, -1.0,
+						BloodFlow.jitterSigned(index, 5) * 0.35).normalize();
+
+		BloodDrop drop = new BloodDrop(level,
+				at.x + spreadX, at.y + spreadY, at.z + spreadZ,
+				direction.x * speed, direction.y * speed, direction.z * speed,
+				player.getId(),
+				sprites.get((int) (BloodFlow.jitter(index, 6) * DROP_SPRITE_COUNT), SPRITE_COUNT - 1));
+		client.particleEngine.add(drop);
+	}
+
+	/**
+	 * Where a spurt goes: broadly the way the body is facing, in a narrow cone
+	 * tilted slightly up so it arcs. Narrow because this is pressure escaping a
+	 * hole, not an aerosol — a wide cone reads as a spray can.
+	 */
+	private static Vec3 spurtDirection(Player player, long index) {
+		double yaw = Math.toRadians(player.yBodyRot)
+				+ Math.toRadians(BloodFlow.jitterSigned(index, 8) * Balance.ARTERIAL_SPURT_SPREAD);
+		double pitch = Math.toRadians(-18.0 + BloodFlow.jitterSigned(index, 9) * Balance.ARTERIAL_SPURT_SPREAD);
+		double horizontal = Math.cos(pitch);
+		return new Vec3(-Math.sin(yaw) * horizontal, -Math.sin(pitch), Math.cos(yaw) * horizontal);
+	}
+
+	public static void reset() {
+		bleeders.clear();
+	}
+}

@@ -84,6 +84,34 @@ public final class ImpairmentMath {
 	}
 
 	/**
+	 * How much longer a meal takes as consciousness fades (1.4), expressed as
+	 * stalled use-ticks per tick: 0 is normal speed, 1.0 is twice as long, 4.0 is
+	 * five times.
+	 *
+	 * <p>Food is the only cure in this mod, so eating is the one action that is
+	 * never refused for weakness — but it should not stay a free instant either.
+	 * Slowing it turns the last of your consciousness into something you have to
+	 * spend deliberately: getting bread down while greying out means finding
+	 * eight seconds where nothing is hitting you, which is a decision, where
+	 * tapping a key and being fine was not.
+	 */
+	public static double eatingStallPenalty(double effectiveConsciousness) {
+		if (effectiveConsciousness >= Balance.SYMPTOM_ATTACK_RECOVERY) {
+			return 0.0;
+		}
+		if (effectiveConsciousness <= 0.0) {
+			return Balance.EAT_STALL_AT_0;
+		}
+		if (effectiveConsciousness >= Balance.SYMPTOM_SPRINT_LOSS) {
+			double t = (Balance.SYMPTOM_ATTACK_RECOVERY - effectiveConsciousness)
+					/ (Balance.SYMPTOM_ATTACK_RECOVERY - Balance.SYMPTOM_SPRINT_LOSS);
+			return t * Balance.EAT_STALL_AT_20;
+		}
+		double t = (Balance.SYMPTOM_SPRINT_LOSS - effectiveConsciousness) / Balance.SYMPTOM_SPRINT_LOSS;
+		return Balance.EAT_STALL_AT_20 + t * (Balance.EAT_STALL_AT_0 - Balance.EAT_STALL_AT_20);
+	}
+
+	/**
 	 * Fall-trauma amplification from already-injured legs (spec §13): 1.0 for
 	 * healthy legs, up to FALL_TRAUMA_INJURED_LEG_MAX_AMP as the worse leg
 	 * approaches zero condition.

@@ -48,6 +48,7 @@
 	"realisticdamage.config.sound_style.muted": "Muted",
 	"realisticdamage.config.section.display": "Display",
 	"realisticdamage.config.section.vision": "Vision",
+	"realisticdamage.config.section.blood": "Blood",
 	"realisticdamage.config.section.aim": "Aim and Impact",
 	"realisticdamage.config.section.sound": "Sound",
 	"realisticdamage.config.section.everything": "All Effects",
@@ -121,5 +122,19 @@
 	"realisticdamage.msg.feed.full": "They cannot take any more.",
 	"realisticdamage.triage.unconscious": "Unconscious",
 	"death.attack.realisticdamage.testBallistic": "%1$s was shot",
-	"death.attack.realisticdamage.testBallistic.player": "%1$s was shot by %2$s"
+	"death.attack.realisticdamage.testBallistic.player": "%1$s was shot by %2$s",
+	"realisticdamage.msg.knocked_down": "The landing takes your legs out from under you.",
+	"realisticdamage.config.stumble": "Unsteady Footing",
+	"realisticdamage.triage.knocked_down": "Down",
+	"realisticdamage.config.blood": "Blood",
+	"realisticdamage.config.blood_stains": "Marks on the World",
+	"realisticdamage.config.blood_lens": "Blood on Screen",
+	"realisticdamage.config.blood_body": "Blood on Bodies",
+	"realisticdamage.config.blood_style": "Blood Style",
+	"realisticdamage.config.blood_style.visceral": "Visceral",
+	"realisticdamage.config.blood_style.muted": "Muted",
+	"realisticdamage.config.death": "Dying Fade",
+	"realisticdamage.config.death_style": "Death Style",
+	"realisticdamage.config.death_style.cinematic": "Cinematic",
+	"realisticdamage.config.death_style.realistic": "Realistic"
 }

@@ -3,6 +3,7 @@ package dev.captience.realisticdamage.systems;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPartData;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.config.Balance;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -26,6 +27,10 @@ public final class TickDispatcher {
 		// Creative/Spectator ignore Realistic Damage (spec §46).
 		if (player.isCreative() || player.isSpectator()) {
 			ImpairmentSystem.clear(player);
+			// Otherwise a mode switch mid-landing leaves you face-down on the
+			// floor the moment you switch back.
+			RDAttachments.get(player).clearKnockdown();
+			RDAttachments.get(player).clearMicrosleep();
 			return;
 		}
 		RealisticDamageData data = RDAttachments.get(player);
@@ -33,6 +38,7 @@ public final class TickDispatcher {
 			part.tickStrain();
 		}
 		data.tickUnconscious();
+		data.tickKnockdown(Balance.KNOCKDOWN_RECOVERY_TICKS);
 		// Ahead of bleeding, so a pressure hold claimed this tick counts this tick.
 		RescueSystem.tick(player, data);
 		BleedingSystem.tick(player, data);
