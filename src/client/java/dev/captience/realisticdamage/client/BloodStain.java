@@ -152,9 +152,14 @@ public class BloodStain extends SingleQuadParticle {
 		return (float) radius;
 	}
 
+	/**
+	 * Translucent particles without the depth write — see {@link BloodStainLayer}.
+	 * A pool is a stack of exactly coplanar quads by construction, and the vanilla
+	 * translucent layer makes them fight each other for it.
+	 */
 	@Override
 	public SingleQuadParticle.Layer getLayer() {
-		return SingleQuadParticle.Layer.TRANSLUCENT;
+		return BloodStainLayer.LAYER;
 	}
 
 	/**
