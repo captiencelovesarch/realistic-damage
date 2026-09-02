@@ -40,6 +40,75 @@ public class ImpairmentGameTest {
 		helper.succeed();
 	}
 
+	/**
+	 * A leg injury may make climbing heavier; it may never make it impossible.
+	 *
+	 * <p>Vanilla flight is {@code y += v; v = (v - 0.08) * 0.98}, so a one-block
+	 * step-up needs JUMP_STRENGTH 0.36813 and anything below that turns the world
+	 * into a set of disconnected floors. The second half of this test is the more
+	 * important half: the six hard vetoes assign a penalty of 1.0 after the injury
+	 * cap is applied, and a cap moved downstream of them would quietly give an
+	 * unconscious player nine tenths of their jump back.
+	 */
+	@GameTest
+	public void wreckedLegsStillClearOneBlockButVetoesStillStop(GameTestHelper helper) {
+		ServerPlayer player = mockPlayer(helper);
+		RealisticDamageData data = RDAttachments.get(player);
+		double climbsOneBlock = 0.36813;
+
+		data.reset();
+		ImpairmentSystem.tick(player, data);
+		double healthyJump = player.getAttributeValue(Attributes.JUMP_STRENGTH);
+		helper.assertTrue(healthyJump > climbsOneBlock, "an unhurt player jumps normally");
+
+		// The worst state the curves can reach: both legs at zero and both broken.
+		data.reset();
+		for (BodyPart leg : new BodyPart[] {BodyPart.LEFT_LEG, BodyPart.RIGHT_LEG}) {
+			data.part(leg).setCondition(0.0);
+			data.part(leg).setBroken(true);
+		}
+		ImpairmentSystem.tick(player, data);
+		double wreckedJump = player.getAttributeValue(Attributes.JUMP_STRENGTH);
+		helper.assertTrue(wreckedJump >= climbsOneBlock,
+				"two wrecked legs must still clear a one-block step-up");
+		helper.assertTrue(wreckedJump < healthyJump, "but visibly lower than an unhurt jump");
+
+		// One leg gone is permanent, so it gets the same floor rather than a wall.
+		data.reset();
+		data.part(BodyPart.LEFT_LEG).setDestroyed(true);
+		data.part(BodyPart.RIGHT_LEG).setCondition(0.0);
+		ImpairmentSystem.tick(player, data);
+		helper.assertTrue(player.getAttributeValue(Attributes.JUMP_STRENGTH) >= climbsOneBlock,
+				"a lost leg must not be a permanent wall");
+
+		// And now the regression the cap could break. Each of these is a full stop.
+		data.reset();
+		data.part(BodyPart.LEFT_LEG).setDestroyed(true);
+		data.part(BodyPart.RIGHT_LEG).setDestroyed(true);
+		ImpairmentSystem.tick(player, data);
+		helper.assertValueEqual(player.getAttributeValue(Attributes.JUMP_STRENGTH), 0.0,
+				"crawling on two lost legs must not jump");
+
+		data.reset();
+		data.setUnconscious(true);
+		ImpairmentSystem.tick(player, data);
+		helper.assertValueEqual(player.getAttributeValue(Attributes.JUMP_STRENGTH), 0.0,
+				"an unconscious player must not jump");
+
+		data.reset();
+		data.knockDown(20);
+		ImpairmentSystem.tick(player, data);
+		helper.assertValueEqual(player.getAttributeValue(Attributes.JUMP_STRENGTH), 0.0,
+				"a knocked-down player must not jump");
+
+		// reset() clears the statuses as well as the limbs, so this is a full recovery.
+		data.reset();
+		ImpairmentSystem.tick(player, data);
+		helper.assertValueEqual(player.getAttributeValue(Attributes.JUMP_STRENGTH), healthyJump,
+				"recovery must fully remove the modifier");
+		helper.succeed();
+	}
+
 	@GameTest
 	public void brokenArmSlowsAttackAndMining(GameTestHelper helper) {
 		ServerPlayer player = mockPlayer(helper);

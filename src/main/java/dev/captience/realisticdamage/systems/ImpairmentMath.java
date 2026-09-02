@@ -67,9 +67,23 @@ public final class ImpairmentMath {
 		return Math.min(combined, Balance.LEG_PENALTY_TOTAL_CAP);
 	}
 
-	/** Jump-strength penalty derived from the combined movement penalty. */
+	/**
+	 * Jump-strength penalty derived from the combined movement penalty, bounded so
+	 * a wrecked or lost leg can still climb one block.
+	 *
+	 * <p>The cap belongs here and not at the call site. ImpairmentSystem assigns a
+	 * penalty of 1.0 outright for crawling, dragging, pressing a wound, knockdown,
+	 * microsleep and unconsciousness, and it does so <em>after</em> this call — a cap
+	 * applied downstream of those would hand an unconscious player their jump back.
+	 * What is bounded here is what an injury costs; a state that forbids jumping is
+	 * still allowed to forbid it absolutely.
+	 *
+	 * <p>See {@link Balance#JUMP_PENALTY_INJURY_CAP} for the vanilla arithmetic the
+	 * bound is derived from.
+	 */
 	public static double jumpPenalty(double combinedLegPenalty) {
-		return combinedLegPenalty * Balance.JUMP_PENALTY_FACTOR;
+		return Math.min(combinedLegPenalty * Balance.JUMP_PENALTY_FACTOR,
+				Balance.JUMP_PENALTY_INJURY_CAP);
 	}
 
 	/**

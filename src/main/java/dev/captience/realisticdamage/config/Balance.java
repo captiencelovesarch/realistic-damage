@@ -188,16 +188,82 @@ public final class Balance {
 	public static final double STAIN_WET_FRACTION = 0.18;
 	/** ...and the fraction at the end spent fading out, having already gone brown. */
 	public static final double STAIN_FADE_FRACTION = 0.30;
-	public static final double STAIN_SIZE_MIN = 0.10;
-	public static final double STAIN_SIZE_MAX = 0.34;
+	/** The smallest mark a single drop leaves: a bead of seep landing on stone. */
+	public static final double STAIN_DROP_SIZE_MIN = 0.10;
+	/**
+	 * ...and the largest, which is a full arterial gout arriving all at once.
+	 *
+	 * <p>Was {@code STAIN_SIZE_MAX}, one constant doing two incompatible jobs: it
+	 * bounded what a single drop could mark <em>and</em> what a mark fed by many
+	 * drops could grow to. Being the same number meant a fully-fed pool was exactly
+	 * the size of one splat, so pooling had no size it could express — see
+	 * {@link #STAIN_POOL_SIZE_MAX}.
+	 */
+	public static final double STAIN_DROP_SIZE_MAX = 0.34;
+	/**
+	 * The largest a single mark may grow to once drops keep feeding it.
+	 *
+	 * <p>Deliberately larger than {@link #STAIN_DROP_SIZE_MAX}: the difference is
+	 * the entire vocabulary pooling has. Kept under 0.5 because a stain is drawn as
+	 * a flat quad of half-extent {@code radius}, so a mark this size laid against a
+	 * wall pokes {@code radius} blocks through it — 0.46 keeps the poke-through
+	 * inside the block the mark sits on. Width beyond one quad is not bought by
+	 * enlarging the quad; it is bought by accretion, see {@link #STAIN_POOL_MARKS_MAX}.
+	 */
+	public static final double STAIN_POOL_SIZE_MAX = 0.46;
+	/**
+	 * How many marks one pool may consist of, which is what actually sets its width.
+	 *
+	 * <p>Ten marks of up to 0.92 blocks across, laid inside a stationary player's
+	 * 0.30-block landing footprint, reads as roughly 1.2 blocks of contiguous
+	 * ground — which is "a pool you would walk around" rather than "a splat".
+	 * Beyond this the pool stops widening and further drops only keep it wet, so a
+	 * player who stands still forever does not consume the whole field. The global
+	 * {@link #STAIN_CAPACITY} still bounds everything above this.
+	 */
+	public static final int STAIN_POOL_MARKS_MAX = 10;
+	/** Marks this close together on the same face are counted as one pool. */
+	public static final double STAIN_POOL_RADIUS = 0.55;
+	/**
+	 * Past this radius a mark stops using a splat sprite and takes a pool one.
+	 *
+	 * <p>A magnified splat sprite keeps its flung satellite droplets and its
+	 * off-centre mass, so scaling one up gives a magnified splatter — word for word
+	 * what the author reported. Past this size the sprite is swapped for a round,
+	 * dense one instead.
+	 *
+	 * <p>The threshold is below {@link #STAIN_DROP_SIZE_MAX}, which sounds like it
+	 * would let a big spurt land already drawn as a pool. It cannot: the swap only
+	 * happens inside a feed, never at construction, so every mark is born a splat
+	 * and only accretion changes that. What the low threshold buys is the spurt
+	 * case specifically — a gout marks at 0.32 and so becomes a pool on its first
+	 * feed, which is correct, because a spurt that has since been bled into twice
+	 * over is not a spurt any more, it is the middle of a pool.
+	 */
+	public static final double STAIN_POOL_SPRITE_RADIUS = 0.30;
 	/**
 	 * Stains closer together than this merge and grow instead of stacking. Without
 	 * it, standing still over a critical wound spends the entire capacity on one
 	 * square of floor and erases the trail that led there.
 	 */
 	public static final double STAIN_MERGE_DISTANCE = 0.22;
-	/** A merged stain grows by this fraction of the incoming one, and never past the max. */
-	public static final double STAIN_MERGE_GROWTH = 0.35;
+	/**
+	 * A merged stain grows by this fraction of the incoming one, and never past
+	 * {@link #STAIN_POOL_SIZE_MAX}.
+	 *
+	 * <p>Was 0.35. A seep drop marks at radius 0.124 and so added 0.0434 a feed:
+	 * five feeds — two and a half seconds — took it to the old ceiling, after which
+	 * every further drop was discarded. Ninety-two per cent of a minute's drops
+	 * changed nothing, and a minute of bleeding looked identical to three seconds
+	 * of it.
+	 *
+	 * <p>At 0.12 the same drop adds 0.0149, so 0.124 -> 0.46 takes
+	 * ceil(0.336 / 0.0149) = 23 feeds, about ten seconds of a moderate wound; an
+	 * arterial spurt lands at 0.32 and takes four. Ten seconds is roughly how long
+	 * a player stands still before they look down, so the growth happens while
+	 * someone is watching it rather than before they arrive.
+	 */
+	public static final double STAIN_MERGE_GROWTH = 0.12;
 	/** Beyond this many blocks stains are not drawn. */
 	public static final double STAIN_RENDER_DISTANCE = 40.0;
 	/** Distance off the surface a stain is drawn, to lose the z-fight without floating. */
@@ -518,6 +584,16 @@ public final class Balance {
 	 * Vanilla's gaussian blur has no intensity parameter — it is on or off — so it
 	 * is held back to a late, distinct stage while the ghosting carries the smooth
 	 * build-up above it. Otherwise it simply pops in mid-ladder.
+	 *
+	 * <p>A backstop, then, and not a rung. That distinction is why it is absent
+	 * from the published ladder and why it belongs below {@link
+	 * #SYMPTOM_MICROSLEEP}: every rung above it is something the player is meant
+	 * to notice arriving and act on, and a switch that can only be thrown cannot
+	 * be one of those. It marks the floor the ghost ramps down to rather than an
+	 * event of its own, and 1.6 made that honest — {@link
+	 * dev.captience.realisticdamage.body.Vitals#afterimageStrength} ends its band
+	 * here, so the ghost hands over at full strength instead of the blur arriving
+	 * out of nowhere.
 	 */
 	public static final double SYMPTOM_BLUR = 18.0;
 
@@ -666,6 +742,47 @@ public final class Balance {
 	public static final double LEG_PENALTY_TOTAL_CAP = 0.75;
 	/** Jump penalty scales off the movement penalty with this factor. */
 	public static final double JUMP_PENALTY_FACTOR = 0.8;
+	/**
+	 * The most a limb injury may take off your jump. Chosen against vanilla
+	 * arithmetic rather than by feel, because jump height is not linear in launch
+	 * velocity and a penalty that reads as a smooth dial turns into a wall without
+	 * anyone deciding that it should.
+	 *
+	 * <p>A jumping player rises {@code y += v; v = (v - 0.08) * 0.98} every tick,
+	 * so JUMP_STRENGTH 0.42 peaks at 1.2522 blocks and is at or above y=1.0 for six
+	 * consecutive ticks — that six-tick window is why a one-block step-up feels free
+	 * in vanilla. Step-assist cannot help: it only fires while on the ground. Peak
+	 * height falls to exactly 1.0 at JUMP_STRENGTH 0.36813, i.e. at a penalty of
+	 * 1 - 0.36813/0.42 = 0.1235. Every penalty this system produced past the middle
+	 * of INJURED was above that line, so an injury stopped being a limp and started
+	 * deleting the way out of the ravine you fell into — while both legs still read
+	 * amber on the HUD, with no warning anywhere.
+	 *
+	 * <p>0.10 leaves JUMP_STRENGTH 0.42 * 0.90 = 0.378, a 1.047-block peak and three
+	 * ticks of overlap with the ledge against vanilla's six. That is deliberately the
+	 * minimum and not the normal height. Overlap is a step function of the cap: three
+	 * ticks survives up to a cap of 0.1019, two up to 0.1052, and one — a peak of
+	 * exactly 1.0, which is an apex you have to hit rather than a ledge you walk onto
+	 * — up to 0.1235. 0.10 is the round number just inside the three-tick band, 0.0019
+	 * below where it would drop to two and 0.0235 below the cliff where the climb
+	 * stops existing at all. The nearness of the two-tick line is the point and not an
+	 * oversight: this is meant to sit at the bottom of what still works. There is no
+	 * runtime spread to absorb — the arc is fully determined by launch velocity, and
+	 * this is the mod's only JUMP_STRENGTH modifier — so the margin that matters is
+	 * the 0.0235 to the cliff, not the 0.0019 to a slightly tighter window. The limp
+	 * keeps everything else it had:
+	 * no sprint, up to 75% off walk speed, shorter jump distance, doubled fall
+	 * trauma. Same principle as {@link #LEG_PENALTY_TOTAL_CAP} one screen up — an
+	 * injury may cost you the journey, never the map — and the same reason: getting
+	 * to food is how you heal, so an injury that strands you blocks its own cure.
+	 *
+	 * <p>Deliberately NOT applied to the hard vetoes in ImpairmentSystem.tick.
+	 * Crawling on two lost legs, dragging a body, kneeling on a wound, knockdown and
+	 * its unsteady tail, microsleep and unconsciousness all assign the penalty 1.0
+	 * outright after the derived value is computed, and must keep doing so. This caps
+	 * what an injury costs, not what a state forbids.
+	 */
+	public static final double JUMP_PENALTY_INJURY_CAP = 0.10;
 
 	/** Injured legs amplify subsequent fall trauma (spec §13): multiplier at worst. */
 	public static final double FALL_TRAUMA_INJURED_LEG_MAX_AMP = 2.0;
