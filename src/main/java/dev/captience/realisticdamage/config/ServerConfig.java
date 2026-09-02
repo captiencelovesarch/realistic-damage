@@ -14,6 +14,11 @@ import net.fabricmc.loader.api.FabricLoader;
  * Server-authoritative gameplay settings (spec §45). These scale or disable
  * systems; the deterministic base numbers stay in {@link Balance}. Loaded from
  * {@code config/realisticdamage-server.json}; missing file writes defaults.
+ *
+ * <p>Editable in game with {@code /rdmg config <setting> [value]}; the JSON is
+ * storage, not the interface. Nobody should have to alt-tab to a text editor to
+ * try a toggle, and the command is generated from these fields by reflection, so
+ * a setting added here appears there without anyone remembering to wire it up.
  */
 public final class ServerConfig {
 	public double bodyDamageMultiplier = 1.0;
@@ -47,6 +52,20 @@ public final class ServerConfig {
 	 * is a permanent limp, and a destroyed head or torso kills.
 	 */
 	public boolean enableLimbDestruction = true;
+
+	/**
+	 * Hardcore mode: injuries leave a ceiling (1.6). A part driven to zero, a
+	 * limb broken, a limb lost — each costs that region one rung of how well it
+	 * can ever heal again, and food and time then take it that far and stop. The
+	 * ceilings follow you through death, which is the whole point: a long-lived
+	 * character accumulates a history you can read off their body.
+	 *
+	 * <p>Off by default, and deliberately so. Every other setting here scales
+	 * something that already happens; this one changes what a life is worth, and
+	 * that is a decision a server makes on purpose rather than one it discovers
+	 * three weeks in.
+	 */
+	public boolean enableLongTermInjuries = false;
 
 	/**
 	 * How much attention a body on the floor attracts.

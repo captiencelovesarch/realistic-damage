@@ -195,7 +195,16 @@ public final class ImpairmentSystem {
 		}
 		RealisticDamageData data = RDAttachments.get(serverPlayer);
 		BodyPartData mainArm = data.part(armFor(serverPlayer, true));
-		if (mainArm.broken() || mainArm.state().isAtLeastAsBadAs(BodyState.CRITICAL)) {
+		// A recovery pause is for an arm that still has recovering to do. An arm
+		// sitting at a permanent Critical ceiling (1.6) is as good as it will ever
+		// be, and pausing its repair every swing would make the ceiling cost more
+		// than the ceiling — every fight and every mined block would re-arm a
+		// five-second pause for the rest of that character's life.
+		//
+		// Byte-identical with no ceiling: a full arm cannot be CRITICAL, so
+		// !atCeiling() is true wherever the 1.5 condition was. A destroyed arm
+		// still strains, because atCeiling() is deliberately false while destroyed.
+		if (mainArm.broken() || (!mainArm.atCeiling() && mainArm.state().isAtLeastAsBadAs(BodyState.CRITICAL))) {
 			mainArm.strain(Balance.ARM_STRAIN_PAUSE_TICKS);
 		}
 	}

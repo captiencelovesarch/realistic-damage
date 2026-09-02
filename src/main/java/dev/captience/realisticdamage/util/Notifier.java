@@ -4,9 +4,11 @@ import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.net.InjurySound;
 import dev.captience.realisticdamage.net.InjurySoundPayload;
+import dev.captience.realisticdamage.systems.CeilingMath;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Action-bar feedback on meaningful transitions only — never per tick
@@ -25,7 +27,41 @@ public final class Notifier {
 		injurySound(player, InjurySound.DESTRUCTION);
 	}
 
+	/**
+	 * The ceiling came down (1.6). No sound: the break or destruction that caused
+	 * it already played its cue, and the wording folds that injury into this line
+	 * so the one action-bar slot carries both pieces of news instead of one
+	 * overwriting the other. Losing the part outright says nothing here — the
+	 * destruction line owns that moment.
+	 */
+	public static void ceilingLowered(ServerPlayer player, BodyPart part, CeilingMath.Event event) {
+		switch (event) {
+			case BROKEN -> message(player, "realisticdamage.msg.ceiling.broken." + part.id());
+			case DISABLED -> message(player, "realisticdamage.msg.ceiling.gave." + part.id());
+			case DESTROYED -> { }
+		}
+	}
+
+	private static @Nullable String lastMessageKey;
+
+	/**
+	 * The last key handed to {@link #message}, recorded before the connection
+	 * guard so a gametest — whose mock players and practice dummies receive no
+	 * packets at all — can still prove which line the server chose. Last write
+	 * wins, which is the point rather than a limitation: sendOverlayMessage means
+	 * the last line written on a frame is the only one the player reads, so this
+	 * hook answers exactly the question the player would ask. Server thread only.
+	 */
+	public static @Nullable String lastMessageKey() {
+		return lastMessageKey;
+	}
+
+	public static void clearLastMessageKey() {
+		lastMessageKey = null;
+	}
+
 	public static void message(ServerPlayer player, String key) {
+		lastMessageKey = key;   // before the guard, or the hook sees nothing in a gametest
 		// Mock players (gametests) have no connection; skip the cosmetic packet.
 		if (player.connection != null) {
 			player.sendOverlayMessage(Component.translatable(key));

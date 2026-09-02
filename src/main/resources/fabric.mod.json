@@ -41,7 +41,10 @@
 			"dev.captience.realisticdamage.gametest.LandingGameTest",
 			"dev.captience.realisticdamage.gametest.MicrosleepGameTest",
 			"dev.captience.realisticdamage.gametest.BloodGameTest",
-			"dev.captience.realisticdamage.gametest.DeathGameTest"
+			"dev.captience.realisticdamage.gametest.DeathGameTest",
+			"dev.captience.realisticdamage.gametest.LongTermInjuryGameTest",
+			"dev.captience.realisticdamage.gametest.CeilingCommandGameTest",
+			"dev.captience.realisticdamage.gametest.ConfigCommandGameTest"
 		]
 	},
 	"mixins": [

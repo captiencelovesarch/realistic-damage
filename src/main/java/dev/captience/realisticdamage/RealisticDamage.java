@@ -44,6 +44,7 @@ public class RealisticDamage implements ModInitializer {
 		dev.captience.realisticdamage.systems.ConsciousnessSystem.init();
 		dev.captience.realisticdamage.systems.HealingSystem.init();
 		dev.captience.realisticdamage.systems.RescueSystem.init();
+		dev.captience.realisticdamage.systems.RespawnCarryover.init();
 		dev.captience.realisticdamage.damage.DamageHooks.init();
 		dev.captience.realisticdamage.command.RealisticDamageCommands.init();
 		TINNITUS = net.minecraft.core.Registry.register(

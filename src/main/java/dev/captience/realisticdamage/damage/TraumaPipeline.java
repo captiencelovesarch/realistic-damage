@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.body.BodyPartData;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
@@ -49,6 +50,13 @@ public final class TraumaPipeline {
 		ServerConfig config = ServerConfig.get();
 		DamageProfile profile = DamageProfiles.of(classified.category());
 		List<AppliedTrauma> result = new ArrayList<>(4);
+
+		// Captured before anything in this event can break or destroy a part — including
+		// explosive dismemberment (1.6), which runs before the health-derived trauma.
+		// "Before" has to mean before the whole event, or a limb torn off by a blast is
+		// not a new event by the time the ceiling rule looks.
+		int brokenBefore = CeilingLogic.mask(data, BodyPartData::broken);
+		int destroyedBefore = CeilingLogic.mask(data, BodyPartData::destroyed);
 
 		// A fully successful block prevents body injury, but extremely heavy
 		// blunt/explosive hits transfer reduced shock to the shield arm (spec §32).
@@ -140,6 +148,9 @@ public final class TraumaPipeline {
 		}
 		if (config.enableLimbDestruction) {
 			DestructionLogic.evaluate(player, data, result);
+		}
+		if (config.enableLongTermInjuries) {
+			CeilingLogic.evaluate(player, data, result, brokenBefore, destroyedBefore);
 		}
 		if (config.enableBleeding) {
 			createWounds(player, data, classified, profile, result, source);

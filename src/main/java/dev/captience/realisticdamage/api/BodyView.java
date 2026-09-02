@@ -31,6 +31,14 @@ public interface BodyView {
 
 	boolean burned();
 
+	/**
+	 * 0 none, 1 pinned at Hurt, 2 at Injured, 3 at Critical (1.6 long-term
+	 * injuries). A band, like {@link #bloodBand()}. There is deliberately no
+	 * accessor for the ceiling as a figure — {@link #condition(BodyPart)} already
+	 * gives you the raw fraction if you need arithmetic.
+	 */
+	int ceilingBand(BodyPart part);
+
 	/** 0 stable through 4 bleeding out — the banding the mod itself presents. */
 	int bloodBand();
 

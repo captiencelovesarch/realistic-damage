@@ -149,6 +149,11 @@ public final class RealisticDamageApi {
 		}
 
 		@Override
+		public int ceilingBand(dev.captience.realisticdamage.body.BodyPart part) {
+			return data.part(part).ceilingBand();
+		}
+
+		@Override
 		public int bloodBand() {
 			return data.bloodBand();
 		}

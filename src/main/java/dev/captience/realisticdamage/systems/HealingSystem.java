@@ -6,6 +6,7 @@ import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BleedWound;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyPartData;
+import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
@@ -132,12 +133,18 @@ public final class HealingSystem {
 		}
 	}
 
-	/** Heals a part and announces a Broken limb mending back to HEALTHY (spec §15, §43). */
+	/** Heals a part and announces a Broken limb mending (spec §15, §43). */
 	private static void trackBrokenHeal(ServerPlayer player, BodyPartData part, double amount) {
 		boolean wasBroken = part.broken();
 		part.heal(amount);
 		if (wasBroken && !part.broken()) {
-			Notifier.message(player, "realisticdamage.msg.mended." + part.part().id());
+			// Mended at a ceiling is not mended whole, and the line has to say so.
+			// With no ceiling anywhere, clearing Broken implies HEALTHY, so this
+			// picks the 1.5 wording verbatim while the hardcore toggle is off.
+			String key = part.state() == BodyState.HEALTHY
+					? "realisticdamage.msg.mended."
+					: "realisticdamage.msg.mended_ceiling.";
+			Notifier.message(player, key + part.part().id());
 		}
 	}
 
@@ -153,7 +160,13 @@ public final class HealingSystem {
 			// Stable means: head mended, consciousness sitting at its ceiling, not
 			// bleeding. Only then does the clock toward recovery run, and it has to
 			// run for a while — a concussion is supposed to linger.
-			boolean stable = data.part(BodyPart.HEAD).state() == dev.captience.realisticdamage.body.BodyState.HEALTHY
+			//
+			// "Mended" is HEALTHY or, since 1.6, the head sitting at its own
+			// ceiling: a capped head that will never read HEALTHY again would
+			// otherwise carry a permanent concussion, and a concussion nothing can
+			// clear is a second injury the ceiling never promised.
+			BodyPartData head = data.part(BodyPart.HEAD);
+			boolean stable = (head.state() == BodyState.HEALTHY || head.atCeiling())
 					&& data.consciousness() >= data.consciousnessCap() - Balance.CONCUSSION_STABLE_MARGIN
 					&& !data.bleeding();
 			data.setConcussionStableTicks(stable ? data.concussionStableTicks() + 1 : 0);
@@ -162,23 +175,39 @@ public final class HealingSystem {
 				Notifier.message(player, "realisticdamage.msg.concussion_cleared");
 			}
 		}
-		if (data.burned() && !player.isOnFire() && averageFraction(data) >= Balance.BURNED_CLEAR_AVG_FRACTION) {
+		if (data.burned() && !player.isOnFire() && averageRecovery(data) >= Balance.BURNED_CLEAR_AVG_FRACTION) {
 			data.setBurned(false);
 			Notifier.message(player, "realisticdamage.msg.burns_healed");
 		}
 	}
 
-	private static double averageFraction(RealisticDamageData data) {
+	/**
+	 * How far along the body is toward the best it can be, not how close it is to
+	 * new. Burns clear when the body has recovered, and a capped body has done all
+	 * the recovering it will ever do — measuring it against an unreachable maximum
+	 * would leave it Burned for good.
+	 */
+	private static double averageRecovery(RealisticDamageData data) {
 		double total = 0.0;
 		for (BodyPart part : BodyPart.values()) {
-			total += data.part(part).fraction();
+			total += data.part(part).recoveryFraction();
 		}
 		return total / BodyPart.values().length;
 	}
 
-	private static boolean hasAnythingToHeal(RealisticDamageData data) {
+	/**
+	 * Is there any point running the full-HP repair cycle? Public because it is
+	 * the only observable answer to "this body is as good as it gets", which is
+	 * what a ceiling makes possible for the first time.
+	 *
+	 * <p>Keyed on {@link BodyPartData#missing()}, which measures against the
+	 * ceiling — so a fully capped body stops paying exhaustion for a repair that
+	 * can never land, instead of burning a hunger point every eighty ticks
+	 * forever.
+	 */
+	public static boolean hasAnythingToHeal(RealisticDamageData data) {
 		for (BodyPartData part : data.allParts()) {
-			if (part.missing() > 1.0e-9) {
+			if (part.missing() > Balance.CONDITION_EPSILON) {
 				return true;
 			}
 		}
