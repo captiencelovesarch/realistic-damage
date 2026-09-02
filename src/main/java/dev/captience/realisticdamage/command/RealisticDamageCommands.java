@@ -11,6 +11,7 @@ import java.util.stream.Stream;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -26,6 +27,7 @@ import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.ServerConfig;
+import dev.captience.realisticdamage.damage.BodyHitResolver;
 import dev.captience.realisticdamage.dummy.PracticeDummy;
 import dev.captience.realisticdamage.systems.CeilingMath;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -37,6 +39,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionLevel;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import static net.minecraft.commands.Commands.argument;
@@ -122,6 +125,12 @@ public final class RealisticDamageCommands {
 																.map(l -> l.name().toLowerCase(Locale.ROOT)),
 														builder))
 												.executes(RealisticDamageCommands::scar)))))
+				.then(literal("blast")
+						.then(argument("player", EntityArgument.player())
+								.then(partArg()
+										.executes(ctx -> blast(ctx, 3.0F))
+										.then(argument("radius", FloatArgumentType.floatArg(0.5F, 16.0F))
+												.executes(ctx -> blast(ctx, FloatArgumentType.getFloat(ctx, "radius")))))))
 				.then(literal("preset")
 						.then(literal("arcade").executes(ctx -> preset(ctx, true)))
 						.then(literal("grounded").executes(ctx -> preset(ctx, false))))
@@ -381,6 +390,42 @@ public final class RealisticDamageCommands {
 		RDAttachments.pushSnapshot(player);
 		ctx.getSource().sendSuccess(() -> Component.literal(
 				"Destroyed " + part.id() + " of " + player.getName().getString()), true);
+		return 1;
+	}
+
+	/**
+	 * A real blast, through the real path — {@code ServerExplosion}, the mixin,
+	 * the damage hooks — nine tenths of a block outward from the limb's region
+	 * centre so that limb is the one the blast is nearest. No block damage and no
+	 * fire: it is for finding out what a creeper would do to this body without
+	 * redecorating the base. Default radius 3, which is a creeper; 4 is TNT and 6
+	 * a charged creeper or an end crystal.
+	 *
+	 * <p>Limbs only, deliberately, and unlike every other subcommand here this one
+	 * does <em>not</em> bypass its feature's toggles — it detonates something and
+	 * lets the rules decide, which is the only way it can prove the live path
+	 * works. Aiming it at the head or chest would point it straight at the core
+	 * finish-off path, which can kill through a totem that has just fired.
+	 */
+	private static int blast(CommandContext<CommandSourceStack> ctx, float radius) throws CommandSyntaxException {
+		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		BodyPart part = parsePart(ctx);
+		if (part == null) {
+			return 0;
+		}
+		if (!part.isLimb()) {
+			ctx.getSource().sendFailure(Component.literal("Only arms and legs come off in a blast"));
+			return 0;
+		}
+		Vec3 region = BodyHitResolver.regionCenter(player, part);
+		Vec3 forward = Vec3.directionFromRotation(0.0F, player.yBodyRot);
+		Vec3 right = forward.yRot((float) (-Math.PI / 2.0));
+		Vec3 outward = part == BodyPart.LEFT_ARM || part == BodyPart.LEFT_LEG ? right.scale(-1.0) : right;
+		Vec3 at = region.add(outward.scale(0.9));
+		player.level().explode(null, at.x, at.y, at.z, radius, Level.ExplosionInteraction.NONE);
+		RDAttachments.pushSnapshot(player);
+		ctx.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+				"Blast r=%.1f beside %s of %s", radius, part.id(), player.getName().getString())), true);
 		return 1;
 	}
 

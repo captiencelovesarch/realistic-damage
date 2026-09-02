@@ -65,6 +65,14 @@ public final class RealisticDamageData {
 	private transient double pendingFallHeight;
 	private transient double pendingFallSurface = 1.0;
 	private transient boolean pendingFallLeadingLeft;
+	/**
+	 * Transient blast state (1.6), the same shape as the landing record and for
+	 * the same reason. Set by {@code ServerExplosionMixin} on the tick the
+	 * explosion hurts this player and consumed by the trauma pipeline inside the
+	 * same call. Not persisted: you are not still mid-blast after a restart, and
+	 * {@code RDCodecs} never sees it.
+	 */
+	private transient @Nullable PendingExplosion pendingExplosion;
 	/** Counts down while you are on the ground after a hard landing. */
 	private transient int knockdownTicks;
 	/** ...and then while you are back up but not yet steady. */
@@ -306,6 +314,38 @@ public final class RealisticDamageData {
 	public void clearPendingFall() {
 		pendingFallHeight = 0.0;
 		pendingFallSurface = 1.0;
+	}
+
+	// --- Blasts (1.6) ---
+
+	/** Records the blast the pipeline is about to be asked about. */
+	public void setPendingExplosion(PendingExplosion blast) {
+		pendingExplosion = blast;
+	}
+
+	/** Non-consuming read, for the mixin's bookkeeping and for tests. */
+	public @Nullable PendingExplosion pendingExplosion() {
+		return pendingExplosion;
+	}
+
+	public boolean hasPendingExplosion() {
+		return pendingExplosion != null;
+	}
+
+	/**
+	 * Single-use, for the same reason as {@link #consumePreHurt} and the pending
+	 * fall: a blast scores exactly one damage event, and a stale one left lying
+	 * around would re-score the next unrelated hit as though you had been standing
+	 * on a barrel of TNT.
+	 */
+	public @Nullable PendingExplosion consumePendingExplosion() {
+		PendingExplosion blast = pendingExplosion;
+		pendingExplosion = null;
+		return blast;
+	}
+
+	public void clearPendingExplosion() {
+		pendingExplosion = null;
 	}
 
 	/**
@@ -584,6 +624,7 @@ public final class RealisticDamageData {
 		clearKnockdown();
 		clearMicrosleep();
 		clearPendingFall();
+		clearPendingExplosion();
 	}
 
 	/**

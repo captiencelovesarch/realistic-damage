@@ -2,6 +2,7 @@ package dev.captience.realisticdamage;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyState;
+import dev.captience.realisticdamage.body.PendingExplosion;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
@@ -10,6 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RealisticDamageDataTest {
@@ -186,5 +189,37 @@ class RealisticDamageDataTest {
 		assertTrue(data.part(BodyPart.LEFT_ARM).broken());
 		data.part(BodyPart.LEFT_ARM).heal(1.0); // 10/13 = 77% -> HEALTHY
 		assertFalse(data.part(BodyPart.LEFT_ARM).broken(), "Broken clears at HEALTHY (spec §15)");
+	}
+
+	/**
+	 * A blast scores exactly one damage event (1.6). A stale record left lying
+	 * around would re-score the next unrelated hit as though the player had been
+	 * standing on a barrel of TNT, which is the same reason the pending fall and
+	 * the pre-hurt health are single-use.
+	 */
+	@Test
+	void aPendingBlastIsSingleUse() {
+		RealisticDamageData data = new RealisticDamageData();
+		PendingExplosion blast = new PendingExplosion(43.0, 1.0, 2.0, 3.0);
+		data.setPendingExplosion(blast);
+		assertTrue(data.hasPendingExplosion());
+		assertEquals(blast, data.pendingExplosion(), "reading it must not spend it");
+		assertEquals(blast, data.consumePendingExplosion());
+		assertFalse(data.hasPendingExplosion());
+		assertNull(data.consumePendingExplosion(), "and a second consume finds nothing");
+	}
+
+	@Test
+	void resetClearsThePendingBlast() {
+		RealisticDamageData data = new RealisticDamageData();
+		data.setPendingExplosion(new PendingExplosion(57.0, 0.0, 64.0, 0.0));
+		data.reset();
+		assertFalse(data.hasPendingExplosion(), "a pristine body is not mid-blast");
+		// The record exists to be exact, so a blast with no force and no centre is
+		// a programmer error rather than a value the game can produce: vanilla's
+		// own formula ends in "+ 1", so every real amount is at least 1.
+		assertThrows(IllegalArgumentException.class, () -> new PendingExplosion(0.0, 0.0, 0.0, 0.0));
+		assertThrows(IllegalArgumentException.class,
+				() -> new PendingExplosion(43.0, Double.NaN, 0.0, 0.0));
 	}
 }

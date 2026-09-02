@@ -70,6 +70,67 @@ public final class Balance {
 	 */
 	public static final double ONE_HANDED_PENALTY = 0.80;
 
+	// --- Explosive dismemberment (1.6) ---
+	/**
+	 * Blast trauma — vanilla's pre-armour blast figure x {@link #TRAUMA_EXPLOSION}
+	 * x the region's share x (1 - localized armour) x the server multipliers — at
+	 * or above this fraction of a limb's maximum condition takes the limb
+	 * outright.
+	 *
+	 * <p><b>The gate is survival, not trauma.</b> Fabric's {@code AFTER_DAMAGE}
+	 * never fires on the blow that kills, so to lose a limb you have to live
+	 * through the blast that took it: every figure below is therefore a
+	 * <em>window</em>, the stretch of distance between the closest you can stand
+	 * and survive and the furthest you can stand and still be maimed. Survival is
+	 * vanilla's own chain — {@code Player.hurtServer}'s difficulty scaling, then
+	 * {@code CombatRules.getDamageAfterAbsorb}, then
+	 * {@code getDamageAfterMagicAbsorb} — and it is what a threshold picked off
+	 * the band table alone cannot see.
+	 *
+	 * <p>0.75 was that threshold: {@code 1 - INJURED_ABOVE}, a blast that would by
+	 * itself drive a full limb into the CRITICAL band. Derived, tidy, and against
+	 * a creeper on Normal it gave a plain-diamond player at 20 HP a window of
+	 * 0.37 blocks and a plain-diamond player at 10 HP a window of exactly
+	 * <em>zero</em> — closest survivable stand 2.14 blocks, furthest maiming
+	 * stand 1.08. On Hard every plain kit died first. The feature it actually
+	 * shipped was enchanted-armour-only, which is the outcome the design panel had
+	 * already rejected.
+	 *
+	 * <p>0.45 is the largest fraction — the smallest move off 0.75 — that gives
+	 * the case this is for a window with room in it rather than a knife edge.
+	 * Against a creeper on Normal, window = (leg comes off out to) - (you survive
+	 * from):
+	 * <pre>
+	 *   plain diamond, 20 HP   0.37 -> 1.92 blocks   (2.63 - 0.71)
+	 *   plain diamond, 10 HP   0.00 -> 0.49 blocks   (2.63 - 2.14)   &lt;- the case
+	 *   plain diamond, Hard 20 0.00 -> 0.58 blocks   (2.63 - 2.05)
+	 *   unarmoured,    10 HP   0.00 -> 0.00 blocks   (3.94 - 4.06)
+	 * </pre>
+	 * The last row is the rule working, not failing: at half health with nothing
+	 * on, a creeper close enough to take your leg is a creeper that kills you, and
+	 * it should be. 0.50 was the alternative and gives the 10 HP case 0.21 blocks,
+	 * which is one stride — a knife edge, not a window.
+	 *
+	 * <p>The cost is Blast Protection IV, and it was accepted knowingly. At 0.75
+	 * the 0.60 armour cap needed an intensity of 44.44 and a creeper peaks at 43,
+	 * so Blast IV was flat immunity to creeper dismemberment. At 0.45 the cap
+	 * needs 26.67 and loses the leg inside 1.72 blocks. That is still the strongest
+	 * protection in the game — a plain-diamond leg goes out to 2.63 — but it is
+	 * protection, a shorter reach, rather than a line the game cannot cross.
+	 *
+	 * <p>The bar an intensity has to clear is
+	 * {@code threshold / (1.35 x 0.50 x (1 - reduction))}: 7.2 / 0.675 = 10.67 on
+	 * a bare leg, 7.2 / 0.37125 = 19.39 behind a plain diamond set, 7.2 / 0.27 =
+	 * 26.67 at the cap. Keyed to the blast, not to the difficulty: Easy makes
+	 * creepers less lethal, not less violent — difficulty moves only the survival
+	 * half of the window, which is why the table above names one.
+	 */
+	public static final double EXPLOSIVE_DESTROY_FRACTION = 0.45;
+	/** 13.0 x 0.45 = 5.85. Arms are only 60% covered by a chestplate, so they are the exposed limb. */
+	public static final double EXPLOSIVE_DESTROY_ARM = ARM_MAX * EXPLOSIVE_DESTROY_FRACTION;
+	/** 16.0 x 0.45 = 7.2. Legs are the best-covered region (leggings full, boots half) and the one a grounded creeper reaches first. */
+	public static final double EXPLOSIVE_DESTROY_LEG = LEG_MAX * EXPLOSIVE_DESTROY_FRACTION;
+
 	// --- Long-term injuries (1.6, hardcore) ---
 	/**
 	 * A ceiling is a band, never a figure: 1 pins the part at Hurt, 2 at Injured,

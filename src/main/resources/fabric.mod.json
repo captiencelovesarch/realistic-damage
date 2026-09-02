@@ -46,7 +46,9 @@
 			"dev.captience.realisticdamage.gametest.LongTermInjuryGameTest",
 			"dev.captience.realisticdamage.gametest.CeilingCommandGameTest",
 			"dev.captience.realisticdamage.gametest.ConfigCommandGameTest",
-			"dev.captience.realisticdamage.gametest.ScarGameTest"
+			"dev.captience.realisticdamage.gametest.ScarGameTest",
+			"dev.captience.realisticdamage.gametest.StumpGameTest",
+			"dev.captience.realisticdamage.gametest.ExplosiveDismembermentGameTest"
 		]
 	},
 	"mixins": [

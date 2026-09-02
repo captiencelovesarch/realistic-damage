@@ -54,6 +54,23 @@ public final class ServerConfig {
 	public boolean enableLimbDestruction = true;
 
 	/**
+	 * A blast can take a limb outright (1.6): TNT and creepers are judged on the
+	 * blast itself rather than on what the health bar let through. Sits under
+	 * {@link #enableLimbDestruction}, because that flag is what makes a Destroyed
+	 * limb exist at all — the hand lock and the offhand block key on it — so a
+	 * blast must never create one while the Grounded preset says there is no
+	 * destruction.
+	 *
+	 * <p>Off, no blast takes a limb. Explosion trauma is still routed from the
+	 * blast's real centre, which is a 1.6 fix — an ownerless explosion had no
+	 * source position at all and fell back to the head-and-chest split — and is
+	 * deliberately not part of this toggle: it is geometry, not an injury rule.
+	 * "Explosions exactly as they were in 1.5" would be a promise this flag does
+	 * not keep.
+	 */
+	public boolean enableExplosiveDismemberment = true;
+
+	/**
 	 * Hardcore mode: injuries leave a ceiling (1.6). A part driven to zero, a
 	 * limb broken, a limb lost — each costs that region one rung of how well it
 	 * can ever heal again, and food and time then take it that far and stop. The
