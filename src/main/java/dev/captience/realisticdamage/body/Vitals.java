@@ -134,4 +134,66 @@ public final class Vitals {
 		}
 		return (Balance.SYMPTOM_MICROSLEEP - effectiveConsciousness) / Balance.SYMPTOM_MICROSLEEP;
 	}
+
+	/**
+	 * How blown-out the world looks, 0 (normal) to 1 (a full milky veil), from
+	 * {@link Balance#SYMPTOM_EXPOSURE} down.
+	 *
+	 * <p>Two corrections to the curve this replaces, both bought with a beta
+	 * playtest that reported the symptom simply did not work. The old ramp ran
+	 * 35 → 0 linearly, which put full strength at zero consciousness — underneath
+	 * the blackout that has already covered the screen by then. So the effect's
+	 * best frame was the one frame nobody could see, and the band a conscious
+	 * player actually walks around in got its weakest sixth. Full strength now
+	 * lands at {@link Balance#SYMPTOM_SEVERE}, which is the lowest rung the
+	 * player is still looking at the world through.
+	 *
+	 * <p>And it is square-rooted rather than linear, so the wash announces itself
+	 * at the threshold instead of arriving twenty points later. The band is
+	 * 35 − 10 = 25 points wide, so one point below the threshold a linear ramp is
+	 * at 1/25 = 0.04 — nothing — where the square root is at sqrt(0.04) = 0.20,
+	 * a fifth of full strength straight away.
+	 *
+	 * <p>Perceptibility is not a nicety here. Blood and Consciousness are hidden
+	 * on purpose (spec §42) on the argument that the symptoms are the readout; a
+	 * symptom emitting one unit of signal does not make the mod subtler, it makes
+	 * the hidden meter unknowable, which is the one thing that design must not do.
+	 */
+	public static double exposureStrength(double effectiveConsciousness) {
+		if (effectiveConsciousness >= Balance.SYMPTOM_EXPOSURE) {
+			return 0.0;
+		}
+		double t = Math.clamp((Balance.SYMPTOM_EXPOSURE - effectiveConsciousness)
+				/ (Balance.SYMPTOM_EXPOSURE - Balance.SYMPTOM_SEVERE), 0.0, 1.0);
+		return Math.sqrt(t);
+	}
+
+	/**
+	 * How doubled the world looks, 0 (single) to 1 (a full second copy), over the
+	 * band the ghost actually owns: {@link Balance#SYMPTOM_AFTERIMAGE} down to
+	 * {@link Balance#SYMPTOM_BLUR}, where the real gaussian takes over.
+	 *
+	 * <p>The rung is 45 and always has been, in the spec and in the renderer's own
+	 * comment, but the code underneath was squaring a 45 → 0 ramp: at 44 that is
+	 * (1/45)² = 0.0005, and it does not clear even a hundredth until 40. Twenty-seven
+	 * points of the ladder were emitting nothing, and then the deep-end clamp at
+	 * {@link Balance#SYMPTOM_BLUR} slammed it to 0.95 in one step. That is not a
+	 * ladder, it is a cliff with a long flat approach. Ending the band at 18
+	 * rather than 0 and taking the square root instead of the square turns it back
+	 * into rungs: 45 − 18 = 27 points wide, so one point below the threshold gives
+	 * sqrt(1/27) = 0.19 rather than 0.0005.
+	 *
+	 * <p>A concussion holds a floor of it at any consciousness — seeing double is
+	 * what being dazed looks like, and it is a floor rather than a precondition:
+	 * a clear-headed player losing consciousness ghosts too.
+	 */
+	public static double afterimageStrength(double effectiveConsciousness, boolean concussed) {
+		double floor = concussed ? Balance.CONCUSSION_GHOST : 0.0;
+		if (effectiveConsciousness >= Balance.SYMPTOM_AFTERIMAGE) {
+			return floor;
+		}
+		double t = Math.clamp((Balance.SYMPTOM_AFTERIMAGE - effectiveConsciousness)
+				/ (Balance.SYMPTOM_AFTERIMAGE - Balance.SYMPTOM_BLUR), 0.0, 1.0);
+		return Math.max(floor, Math.sqrt(t));
+	}
 }

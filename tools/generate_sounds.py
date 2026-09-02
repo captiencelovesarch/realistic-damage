@@ -12,6 +12,15 @@ Two styles of each event, chosen client-side (see ClientEffectsConfig):
   visceral  sells the injury. Sharper transients, more high end, wet tails,
             longer decays.
 
+"Sharper, brighter" is a claim with a number behind it, and until 1.6 the
+visceral set failed it: measured, they were *darker* than the muted ones, with
+50-73% of their weighted energy under 200 Hz against a vanilla damage palette
+that runs 0.2-23% (only TNT is mostly sub-bass). Each one was mostly a single
+pure sine gliding down an octave — a bass drop. The budget is now a rule rather
+than an intention, and tools/test_sounds.py enforces it: no injury sound puts
+more than a quarter of its K-weighted energy below 200 Hz, and no pitch glide
+covers more than seven semitones.
+
 Run from the repo root:  python3 tools/generate_sounds.py
 Requires numpy, scipy and ffmpeg.
 """
@@ -70,6 +79,55 @@ def crack(dur: float, lo: float, hi: float, decay: float, salt: int) -> np.ndarr
     return band(rng(salt).normal(0, 1, n), lo, hi) * env(n, 0.0004, decay, curve=5.0)
 
 
+# How far a struck body's partials droop over the whole sound. 0.72 is
+# 12 * log2(1 / 0.72) = 5.7 semitones — enough to hear the mass settle, and
+# under the seven or so where a downward glide stops being the pitch-droop of
+# something heavy and starts being a portamento, i.e. a musical gesture.
+BODY_DROOP = 0.72
+
+
+def body(dur: float, f: float, decay: float,
+         ratios=(1.0, 1.83, 3.11), tilt=(1.0, 0.45, 0.22)) -> np.ndarray:
+    """A struck mass: inharmonic partials, each with its own decay.
+
+    Unlike thump() this has weight without having a note, which is the whole
+    point of it. thump() is one pure sine, and a pure sine sliding down an
+    octave is an 808 — the visceral sounds measured 57-74% of their weighted
+    energy in that one element and read as a bass drop with clicks on top.
+    The ratios here are deliberately non-integer: 1 : 1.83 : 3.11 is nobody's
+    harmonic series, so there is nothing in it to sing back.
+    """
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    out = np.zeros(n)
+    for k, (ratio, gain) in enumerate(zip(ratios, tilt)):
+        f_t = f * ratio * BODY_DROOP ** (t / dur)
+        # The higher partials go first, at decay / (1 + 0.8k) — full, then 0.56
+        # and 0.38 of it. Let them all ring equally and the stack settles into a
+        # sustained chord, which is the pitched boom by another route.
+        out += gain * np.sin(2 * np.pi * np.cumsum(f_t) / SR) * env(n, 0.0015, decay / (1 + 0.8 * k))
+    return out / np.max(np.abs(out))
+
+
+def moving_band(x: np.ndarray, lo: float, top_start: float, top_end: float,
+                chunks: int = 48) -> np.ndarray:
+    """A bandpass whose top cutoff walks geometrically while the sound plays.
+
+    The same chunked technique as destruction's tearing tail, which was measured
+    for stepping and has none: all the chunks filter one shared noise buffer, so
+    neighbouring slices differ only by a little filter skirt and the crossovers
+    sit inside the ordinary sample-to-sample variation of the noise itself.
+    Forty-eight chunks over a 0.7 s exhale is a step every 15 ms.
+    """
+    n = len(x)
+    out = np.zeros(n)
+    for s in range(chunks):
+        a, b = s * n // chunks, (s + 1) * n // chunks
+        top = top_start * (top_end / top_start) ** (s / max(chunks - 1, 1))
+        out[a:b] = band(x, lo, top)[a:b]
+    return out
+
+
 def place(base: np.ndarray, piece: np.ndarray, at: float, gain: float = 1.0) -> None:
     """Mixes a piece into base at a time offset, in place."""
     i = int(at * SR)
@@ -103,17 +161,30 @@ def fracture_muted() -> np.ndarray:
 
 
 def fracture_visceral() -> np.ndarray:
-    out = np.zeros(int(0.55 * SR))
+    # 0.40 s rather than 0.55: nothing was audible past 183 ms of it anyway.
+    out = np.zeros(int(0.40 * SR))
     # Bone does not break in one clean event: it fails in a splintering
-    # cluster. Irregular spacing is what stops it reading as a drum roll.
+    # cluster. Irregular spacing is what stops it reading as a drum roll — and
+    # so, since 1.6, does giving each splinter its own voice. Five bursts
+    # through one identical (300, 5200, 0.016) filter is one sample retriggered
+    # five times, at constant brightness and constant decay; these run
+    # 3800-7000 Hz with decays from 10 to 20 ms, so the cluster has bright
+    # shards and dull ones in it.
+    tops = [6200, 4600, 7000, 5000, 3800]
+    decays = [0.020, 0.012, 0.017, 0.010, 0.014]
     for i, (at, gain) in enumerate([(0.0, 1.0), (0.011, 0.7), (0.026, 0.85),
                                     (0.045, 0.5), (0.071, 0.35)]):
-        place(out, crack(0.13, 300, 5200, 0.016, 10 + i), at, gain)
+        place(out, crack(0.13, 340, tops[i], decays[i], 10 + i), at, gain)
     # The wet part: low, damp noise under the cracks.
     n = int(0.34 * SR)
     wet = lowpass(rng(20).normal(0, 1, n), 700) * env(n, 0.004, 0.10, curve=4.0)
     place(out, wet, 0.008, 0.55)
-    place(out, thump(0.30, 190, 65, 0.08), 0.0, 0.65)
+    # The low end is a thud underneath the snap, not the snap itself. It was
+    # thump(0.30, 190, 65) at 0.65 — an 11.5-semitone sine glide holding 60% of
+    # the weighted energy, which is exactly the "tuned boom" the muted variant
+    # above is written to avoid. The same guard, applied here at last: an
+    # inharmonic body, a third of the length, and half the gain.
+    place(out, body(0.14, 190, 0.030), 0.0, 0.32)
     return norm(out, 0.85)
 
 
@@ -135,13 +206,28 @@ def destruction_muted() -> np.ndarray:
 
 
 def destruction_visceral() -> np.ndarray:
-    out = np.zeros(int(0.95 * SR))
-    place(out, thump(0.70, 130, 38, 0.20), 0.0, 1.0)
-    # Crunch: dense granular crackle, thinning out as it goes.
+    # 0.75 s rather than 0.95, now the low end no longer rings for 461 ms.
+    out = np.zeros(int(0.75 * SR))
+    # Was thump(0.70, 130, 38) at full gain: a 14-semitone sine drop carrying
+    # 57% of the weighted energy. That is a bass drop, and this is the sound
+    # explosive dismemberment will reuse and play often, so it has to be weight
+    # rather than pitch.
+    place(out, body(0.30, 125, 0.075), 0.0, 0.62)
+    # Crunch: dense granular crackle, thinning out as it goes — in character as
+    # well as in volume. Every grain used to share one (500, 7000, 0.010)
+    # filter, so 26 of them were one sound retriggered; drawing each grain's
+    # brightness and decay from a seeded generator, and darkening the draw as
+    # the crunch runs on, is what makes it a limb coming apart instead.
     r = rng(40)
-    for i in range(26):
-        at = float(r.uniform(0.0, 0.34))
-        place(out, crack(0.08, 500, 7000, 0.010, 50 + i), at, 0.85 * (1.0 - at / 0.45))
+    ats = [float(r.uniform(0.0, 0.34)) for _ in range(26)]
+    v = rng(91)
+    for i, at in enumerate(ats):
+        # 1 - 0.35 * at / 0.34 walks the top cutoff down to 65% of its draw
+        # across the 0.34 s the grains are scattered over.
+        top = float(v.uniform(4200, 10000)) * (1.0 - 0.35 * at / 0.34)
+        decay = float(v.uniform(0.006, 0.018))
+        place(out, crack(0.08, 420, max(top, 900), decay, 50 + i), at,
+              0.85 * (1.0 - at / 0.45))
     # Tearing tail: a noise band sliding downward, which is what gives it the
     # sense of something coming apart rather than just being hit.
     n = int(0.55 * SR)
@@ -173,23 +259,38 @@ def collapse_muted() -> np.ndarray:
 
 
 def collapse_visceral() -> np.ndarray:
-    out = np.zeros(int(1.15 * SR))
-    # Full weight going down, then the limbs following a moment later.
-    place(out, thump(0.55, 95, 34, 0.18), 0.0, 1.0)
-    place(out, thump(0.30, 70, 32, 0.10), 0.085, 0.42)
+    out = np.zeros(int(1.00 * SR))
+    # Full weight going down, then the limbs following a moment later. Two pure
+    # sines gliding 95 -> 44 Hz held three quarters of this sound's weighted
+    # energy and 73% of it lived under 200 Hz — further into the sub-bass than
+    # any vanilla sound but a TNT blast. Bodies are inharmonic; explosions are
+    # not what this is.
+    place(out, body(0.30, 105, 0.070), 0.0, 0.70)
+    place(out, body(0.18, 84, 0.045), 0.085, 0.28)
     n = int(0.34 * SR)
     place(out, lowpass(rng(70).normal(0, 1, n), 900) * env(n, 0.003, 0.09), 0.0, 0.35)
     # The air being knocked out: a long noisy exhale, shaped so it reads as a
     # throat rather than as hiss.
     n = int(0.70 * SR)
     ex = rng(71).normal(0, 1, n)
-    # One wide band with a warm shelf under it. Stacking narrow bands to fake
-    # vowel formants put a steady tone in the middle of the exhale — a whistle,
-    # not a throat. Overlapping filter skirts are what built the resonance.
-    voiced = band(ex, 240, 2600) + 0.40 * lowpass(ex, 620)
-    # A slow tremble, so the breath is unsteady the way a winded one is.
-    tremble = 1.0 + 0.18 * np.sin(2 * np.pi * 7.5 * np.arange(n) / SR)
-    place(out, voiced * tremble * env(n, 0.10, 0.32, curve=2.0), 0.10, 0.52)
+    # A band that closes as the breath runs out, over a warm shelf. It used to
+    # be one fixed band(240, 2600), which left 0.4% of the sound above 4 kHz and
+    # pinned its spectral centroid at an unmoving 1900 Hz for 630 ms — a noise
+    # generator behind a volume fader, not a throat. Walking the top cutoff
+    # 5600 -> 1400 Hz puts real air in the front of the breath and closes it off
+    # at the end. Stacking narrow bands to fake vowel formants was tried and put
+    # a steady tone in the middle of the exhale: a whistle. This is one moving
+    # band, so there are no overlapping skirts to build a resonance.
+    voiced = moving_band(ex, 260, 5600, 1400) + 0.40 * lowpass(ex, 620)
+    # A slow tremble, so the breath is unsteady the way a winded one is. It was
+    # a 7.5 Hz sine, which measured 4.5x above the exhale's own envelope
+    # variation and is perfectly periodic — an LFO, i.e. the one thing a
+    # struggling breath is not. Low-passed noise at 6 Hz wavers on roughly the
+    # same timescale without ever repeating. Seeded from SEED like every other
+    # noise here, so the file is still identical every time it is generated.
+    waver = lowpass(rng(72).normal(0, 1, n), 6.0)
+    waver = waver / (np.max(np.abs(waver)) + 1e-9)
+    place(out, voiced * (1.0 + 0.22 * waver) * env(n, 0.10, 0.32, curve=2.0), 0.10, 0.52)
     return norm(out, 0.80)
 
 

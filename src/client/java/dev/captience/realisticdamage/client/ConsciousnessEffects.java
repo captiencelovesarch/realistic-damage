@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.client;
 
+import dev.captience.realisticdamage.body.Vitals;
 import dev.captience.realisticdamage.config.Balance;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
@@ -32,6 +33,55 @@ public final class ConsciousnessEffects {
 	/** Haze lost per tick on the way down: a touch under a second and a half. */
 	private static final double HAZE_FALLOFF = 0.035;
 
+	/**
+	 * Peak washout alpha, 120/255 = 47% of the way to near-white. Presentation
+	 * magnitude rather than a ladder threshold, so it lives with the renderer and
+	 * not in {@link Balance}.
+	 *
+	 * <p>Deliberately assertive, because the value it replaces (60, and reachable
+	 * only at zero consciousness) has been proven invisible in play: over the whole
+	 * band a conscious player occupies it never got past 25/255, and it was
+	 * lerping toward a near-white that daylight is already most of the way to. A
+	 * lerp 47% of the way to (235, 232, 220) is an unmistakable milky veil and is
+	 * still well short of hiding the world, which is the distinction this rung is
+	 * for: the world looks wrong, not gone. It is also the one number here that a
+	 * test cannot settle — if the author's eye says 47% is now too much at 20,
+	 * this is the single constant to lower.
+	 */
+	private static final double EXPOSURE_MAX_ALPHA = 120.0;
+	/**
+	 * How far the ghosted copy slides out of register at the top of its pulse.
+	 * The old 0.06 was a 6% breath, which reads as a static tint rather than as a
+	 * doubled image — and an afterimage that never separates is not one. Vanilla
+	 * sweeps this same texture across 2.0 → 1.0, so 1.03 → 1.17 is still far more
+	 * restrained than vanilla nausea.
+	 */
+	private static final double GHOST_SEPARATION = 0.14;
+	/** One ghost pulse: 40 / 20 = two seconds, slow enough to read as dazed. */
+	private static final double GHOST_PERIOD = 40.0;
+
+	// What the last frame actually asked for. Written here and read by the client
+	// gametests, because "the symptom is perceptible" is a claim about magnitude
+	// and a screenshot cannot tell 8/255 from 50/255.
+	private static boolean blurRequested;
+	private static int exposureAlpha;
+	private static double ghostStrength;
+
+	/** True if the last rendered frame asked vanilla for its gaussian blur. */
+	public static boolean blurRequestedLastFrame() {
+		return blurRequested;
+	}
+
+	/** The washout alpha, 0-255, drawn on the last frame. */
+	public static int lastExposureAlpha() {
+		return exposureAlpha;
+	}
+
+	/** The ghost blit's strength, 0 to 1, on the last frame. */
+	public static double lastGhostStrength() {
+		return ghostStrength;
+	}
+
 	/** Slow deterministic pulse (no RNG flicker) driven by game time. */
 	private static double pulse(double periodTicks) {
 		double time = Minecraft.getInstance().level == null ? 0.0
@@ -40,6 +90,11 @@ public final class ConsciousnessEffects {
 	}
 
 	public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+		// Cleared first thing, so the three readouts always describe this frame
+		// rather than the last frame that got past the early returns below.
+		blurRequested = false;
+		exposureAlpha = 0;
+		ghostStrength = 0.0;
 		// Dying gets its own pass (1.5). active() excludes dead players — rightly,
 		// for gameplay effects — but that exclusion is exactly why death used to
 		// snap the screen back to normal on the frame it happened.
@@ -88,27 +143,35 @@ public final class ConsciousnessEffects {
 		}
 
 		// Exposure / washout (from 35 down): the world looks wrong, not hidden.
-		double exposure = ClientState.ramp(Balance.SYMPTOM_EXPOSURE, 0.0) * config.exposureIntensity;
+		// The curve is Vitals.exposureStrength — full at 10 rather than at 0, and
+		// square-rooted — because the linear 35 → 0 ramp this replaces spent its
+		// whole useful range underneath the blackout.
+		double exposure = Vitals.exposureStrength(ClientState.effectiveConsciousness())
+				* config.exposureIntensity;
 		if (exposure > 0.01) {
 			// The same breathing clock the heart's sinus arrhythmia rides, so the
 			// screen and the pulse breathe as one body rather than drifting apart.
-			double breathe = 0.55 + 0.45 * ClientState.breath();
-			int alpha = (int) (Math.min(1.0, exposure) * breathe * 60.0);
-			graphics.fill(0, 0, width, height, ARGB.color(alpha, 235, 232, 220));
+			// Narrowed from 0.55-1.00: the coupling is worth keeping, halving the
+			// effect twice every 4.5 seconds was not. A wash that keeps ducking
+			// back to nothing is one the eye renormalises away instead of reading.
+			double breathe = 0.80 + 0.20 * ClientState.breath();
+			exposureAlpha = (int) (Math.min(1.0, exposure) * breathe * EXPOSURE_MAX_ALPHA);
+			graphics.fill(0, 0, width, height, ARGB.color(exposureAlpha, 235, 232, 220));
 		}
 
-		// Vision blur (from 45 down): vanilla's own gaussian blur applied to
-		// everything already drawn — i.e. the whole world. This replaces the
-		// earlier additive-ghost fake, which was imperceptible. Guarded because
-		// the blur may only be requested once per frame and an open Screen
-		// already claims it.
-		double blur = ClientState.ramp(Balance.SYMPTOM_AFTERIMAGE, 0.0) * config.afterimageIntensity;
+		// Vision blur (from 18 down): vanilla's own gaussian blur applied to
+		// everything already drawn — i.e. the whole world. Guarded because the
+		// blur may only be requested once per frame and an open Screen already
+		// claims it.
+		//
+		// 18, not 45, and now it says so. The 45 here was never real: the ramp was
+		// squared before the 0.62 cutoff, so (45-c)/45 > sqrt(0.62) only past
+		// c = 9.6, by which point the deep clamp below had already forced 0.95.
+		// The quadratic term was dead code for every consciousness it could ever
+		// see, and pretending it carried the 45 rung is what left that rung empty.
+		// It is deleted here and the ghost carries 45 properly, below.
 		boolean deep = ClientState.effectiveConsciousness() < Balance.SYMPTOM_BLUR;
-		double hazeTarget = Math.max(blur * blur, ClientState.concussed()
-				? Balance.CONCUSSION_GHOST * config.afterimageIntensity : 0.0);
-		if (deep) {
-			hazeTarget = Math.max(hazeTarget, 0.95 * config.afterimageIntensity);
-		}
+		double hazeTarget = deep ? 0.95 * config.afterimageIntensity : 0.0;
 		if (hazeTarget >= haze) {
 			haze = hazeTarget;   // getting worse lands immediately
 		} else {
@@ -120,22 +183,33 @@ public final class ConsciousnessEffects {
 		if (haze > BLUR_CUTOFF && config.afterimageIntensity > 0.0
 				&& Minecraft.getInstance().gui.screen() == null) {
 			graphics.blurBeforeThisStratum();
+			blurRequested = true;
 		}
-		// Ghosting: doubles as the concussion symptom. A concussion holds a
-		// constant low level of it — seeing double is what being dazed looks
-		// like — and it deepens as consciousness actually falls. A club to the
-		// head adds a burst of it on top (1.5), which is the same symptom
-		// arriving suddenly rather than settling in.
-		double ghost = Math.max(haze, ImpactEffect.doubled() * 0.8);
+		// Ghosting: doubles as the concussion symptom, and since 1.6 it is what
+		// actually carries the 45 rung. A concussion holds a constant low level of
+		// it — seeing double is what being dazed looks like — and it deepens as
+		// consciousness falls, over 45 → 18 rather than 45 → 0, so the whole band
+		// is rungs instead of twenty-seven points of nothing in front of a cliff.
+		// A club to the head adds a burst of it on top (1.5), which is the same
+		// symptom arriving suddenly rather than settling in.
+		double ghost = Math.max(Math.max(haze,
+						Vitals.afterimageStrength(ClientState.effectiveConsciousness(),
+								ClientState.concussed()) * config.afterimageIntensity),
+				ImpactEffect.doubled() * 0.8);
 		if (ghost > 0.01) {
-			double phase = pulse(50.0);
-			float strength = (float) (Math.min(1.0, ghost) * (0.35 + 0.4 * phase));
+			double phase = pulse(GHOST_PERIOD);
+			// Floor raised from 0.35 to 0.55 for the same reason the breath was
+			// narrowed: a pulse that drops to a third of itself twice a cycle is
+			// read as flicker, not as a second image coming and going.
+			float strength = (float) (Math.min(1.0, ghost) * (0.55 + 0.45 * phase));
+			ghostStrength = strength;
 			graphics.pose().pushMatrix();
 			graphics.pose().translate(width / 2.0F, height / 2.0F);
-			graphics.pose().scale((float) (1.02 + 0.06 * phase), (float) (1.02 + 0.06 * phase));
+			float scale = (float) (1.03 + GHOST_SEPARATION * phase);
+			graphics.pose().scale(scale, scale);
 			graphics.pose().translate(-width / 2.0F, -height / 2.0F);
 			graphics.blit(RenderPipelines.GUI_NAUSEA_OVERLAY, NAUSEA, 0, 0, 0.0F, 0.0F, width, height,
-					width, height, ARGB.colorFromFloat(1.0F, strength * 0.55F, strength * 0.30F, strength * 0.30F));
+					width, height, ARGB.colorFromFloat(1.0F, strength * 0.85F, strength * 0.55F, strength * 0.55F));
 			graphics.pose().popMatrix();
 		}
 
