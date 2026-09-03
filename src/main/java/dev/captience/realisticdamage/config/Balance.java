@@ -574,6 +574,52 @@ public final class Balance {
 	/** Minimum time unconscious, in ticks (~2.5s). */
 	public static final int MIN_UNCONSCIOUS_TICKS = 50;
 
+	// --- Injury-aware aggro (1.6) ---
+	// A ladder, not a set of weights. Each rung is sized so that nothing below
+	// it — stacked with everything else below it, plus the grudge, plus the
+	// switch margin — can reach it, which is what makes "a body on the floor
+	// always outranks a limp" a property rather than a hope. PreyMathTest
+	// enumerates the seven inequalities so a retune cannot silently reorder
+	// them.
+
+	/** A body on the floor: unconscious, knocked down, or crawling on two lost legs. */
+	public static final int PREY_TIER_DOWN = 600;
+	/** A leg that is gone. The limp is permanent and the model draws the absence. */
+	public static final int PREY_TIER_LEG_DESTROYED = 300;
+	/** A broken leg: an event, with a message and a sound everyone nearby hears. */
+	public static final int PREY_TIER_LEG_BROKEN = 200;
+	/**
+	 * Per visible limp rung of the worse leg: Critical 1, Disabled 2. Healthy,
+	 * Hurt and Injured are all rung 0 — the leg curve is flat above 0.75, 7% at
+	 * 0.50 and 18% at 0.25, and the worse leg is weighted 0.70, so a Hurt leg
+	 * costs under 5% of your speed and an Injured one under 13%. A limp nobody
+	 * can see is not a limp anyone can hunt. The rung itself is
+	 * {@code LimpMath}'s, shared with the pose the model draws.
+	 */
+	public static final int PREY_LIMP_BAND = 60;
+	/**
+	 * Per wound severity above MINOR: MODERATE 10, SEVERE 20, CRITICAL 30. A
+	 * MINOR wound scores nothing — at 0.25 Blood/s it is below the rate that
+	 * even produces a falling drop.
+	 */
+	public static final int PREY_WOUND_STEP = 10;
+	/**
+	 * How much better a candidate must be before a mob abandons the player it is
+	 * already fighting. Above two wound steps and below three, so blood alone
+	 * never flips a fight until it turns arterial; below one limp rung, so a leg
+	 * giving out always does.
+	 */
+	public static final int PREY_SWITCH_MARGIN = 25;
+	/**
+	 * The player who last hit this mob holds it. Replaces the switch margin
+	 * rather than stacking with it, so the rule reads the same on a fresh grudge
+	 * and a held one: hit it and it stays on you against any limp and any blood
+	 * (150 at worst), and loses you to a broken leg (200), a lost leg (300) or a
+	 * body on the floor (600). Vanilla forgets an attacker after 100 ticks; so
+	 * does this.
+	 */
+	public static final int PREY_REVENGE_BONUS = 175;
+
 	// --- Rescue (1.2) ---
 
 	/** How close you must be to grab, press or feed someone. */

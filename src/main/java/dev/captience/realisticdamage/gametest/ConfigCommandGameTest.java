@@ -24,8 +24,16 @@ import net.minecraft.server.MinecraftServer;
  * think to look for. So every touched field is put back <em>and saved</em>, even
  * when an assertion above it threw. The {@code realisticdamage:isolated}
  * environment puts this class in its own batch, which is the other half of the
- * same argument: {@code unconsciousAggro} is exercised here and read by
- * {@code UnconsciousAggroGameTest}, and only separate batches make that safe.
+ * same argument.
+ *
+ * <p>The enum branch is exercised through {@code preyOnWounded} rather than
+ * {@code unconsciousAggro}, and that is deliberate rather than arbitrary. When
+ * this class was written {@code unconsciousAggro} was the only enum the config
+ * had — and it is exactly the field {@code UnconsciousAggroGameTest} depends on,
+ * in a process-wide singleton, in a run where fifty tests share a world. The
+ * moment 1.6 gave the config a second enum, these two methods moved onto it, so
+ * that no 1.6 test mutates a field another test reads. It would have stayed
+ * green either way, right up until the batch partitioning changed.
  */
 public class ConfigCommandGameTest {
 	private void run(GameTestHelper helper, String command) {
@@ -40,7 +48,7 @@ public class ConfigCommandGameTest {
 		ServerConfig config = ServerConfig.get();
 		boolean previousMode = config.enableLongTermInjuries;
 		double previousHealing = config.healingMultiplier;
-		ServerConfig.UnconsciousAggro previousAggro = config.unconsciousAggro;
+		ServerConfig.PreyOnWounded previousPrey = config.preyOnWounded;
 		try {
 			run(helper, "rdmg config enableLongTermInjuries true");
 			helper.assertTrue(config.enableLongTermInjuries, "the boolean branch must actually write the field");
@@ -49,9 +57,9 @@ public class ConfigCommandGameTest {
 			helper.assertTrue(Math.abs(config.healingMultiplier - 2.5) < 1.0e-9,
 					"the double branch must write the field, got " + config.healingMultiplier);
 
-			run(helper, "rdmg config unconsciousAggro none");
-			helper.assertTrue(config.unconsciousAggro == ServerConfig.UnconsciousAggro.NONE,
-					"the enum branch must parse a lower-cased word, got " + config.unconsciousAggro);
+			run(helper, "rdmg config preyOnWounded limping");
+			helper.assertTrue(config.preyOnWounded == ServerConfig.PreyOnWounded.LIMPING,
+					"the enum branch must parse a lower-cased word, got " + config.preyOnWounded);
 
 			// The listing order is the sorted one, not whatever the JVM handed back:
 			// getFields() promises nothing, and the README's table is supposed to be a
@@ -62,7 +70,7 @@ public class ConfigCommandGameTest {
 		} finally {
 			config.enableLongTermInjuries = previousMode;
 			config.healingMultiplier = previousHealing;
-			config.unconsciousAggro = previousAggro;
+			config.preyOnWounded = previousPrey;
 			ServerConfig.save();
 		}
 		helper.succeed();
@@ -72,14 +80,46 @@ public class ConfigCommandGameTest {
 	@GameTest(environment = "realisticdamage:isolated")
 	public void aBadValueLeavesTheSettingAlone(GameTestHelper helper) {
 		ServerConfig config = ServerConfig.get();
-		ServerConfig.UnconsciousAggro previousAggro = config.unconsciousAggro;
+		ServerConfig.PreyOnWounded previousPrey = config.preyOnWounded;
 		try {
-			config.unconsciousAggro = ServerConfig.UnconsciousAggro.NEARBY;
-			run(helper, "rdmg config unconsciousAggro bogus");
-			helper.assertTrue(config.unconsciousAggro == ServerConfig.UnconsciousAggro.NEARBY,
-					"a rejected value must leave the field exactly as it was, got " + config.unconsciousAggro);
+			config.preyOnWounded = ServerConfig.PreyOnWounded.VISIBLE;
+			run(helper, "rdmg config preyOnWounded bogus");
+			helper.assertTrue(config.preyOnWounded == ServerConfig.PreyOnWounded.VISIBLE,
+					"a rejected value must leave the field exactly as it was, got " + config.preyOnWounded);
 		} finally {
-			config.unconsciousAggro = previousAggro;
+			config.preyOnWounded = previousPrey;
+			ServerConfig.save();
+		}
+		helper.succeed();
+	}
+
+	/**
+	 * The reflection claim, not the enum-parse claim: {@code preyOnWounded} was
+	 * added three features after the command shipped, and nobody wired it up. If
+	 * the generator works, its node exists anyway — and the whole reason
+	 * {@code /rdmg config} is built this way is that the alternative is a setting
+	 * a player can only reach by editing a file.
+	 */
+	@GameTest(environment = "realisticdamage:isolated")
+	public void preyOnWoundedIsSettableInGame(GameTestHelper helper) {
+		ServerConfig config = ServerConfig.get();
+		ServerConfig.PreyOnWounded previousPrey = config.preyOnWounded;
+		try {
+			config.preyOnWounded = ServerConfig.PreyOnWounded.VISIBLE;
+			run(helper, "rdmg config preyOnWounded off");
+			helper.assertTrue(config.preyOnWounded == ServerConfig.PreyOnWounded.OFF,
+					"a setting added after the command shipped must still have a node, got "
+							+ config.preyOnWounded);
+
+			run(helper, "rdmg config preyOnWounded downed");
+			helper.assertTrue(config.preyOnWounded == ServerConfig.PreyOnWounded.DOWNED,
+					"every constant, not just the first, got " + config.preyOnWounded);
+
+			helper.assertTrue(RealisticDamageCommands.settingFields().stream()
+							.anyMatch(field -> field.getName().equals("preyOnWounded")),
+					"and the generator must actually be listing it");
+		} finally {
+			config.preyOnWounded = previousPrey;
 			ServerConfig.save();
 		}
 		helper.succeed();

@@ -26,7 +26,8 @@
 			"dev.captience.realisticdamage.client.gametest.MultiplayerClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.BloodClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.DeathClientGameTest",
-			"dev.captience.realisticdamage.client.gametest.ScarClientGameTest"
+			"dev.captience.realisticdamage.client.gametest.ScarClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.InjuryPoseClientGameTest"
 		],
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
@@ -48,7 +49,8 @@
 			"dev.captience.realisticdamage.gametest.ConfigCommandGameTest",
 			"dev.captience.realisticdamage.gametest.ScarGameTest",
 			"dev.captience.realisticdamage.gametest.StumpGameTest",
-			"dev.captience.realisticdamage.gametest.ExplosiveDismembermentGameTest"
+			"dev.captience.realisticdamage.gametest.ExplosiveDismembermentGameTest",
+			"dev.captience.realisticdamage.gametest.InjuryAggroGameTest"
 		]
 	},
 	"mixins": [

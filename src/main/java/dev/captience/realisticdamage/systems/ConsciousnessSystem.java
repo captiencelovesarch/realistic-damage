@@ -208,6 +208,13 @@ public final class ConsciousnessSystem {
 	 *
 	 * <p>Only hostile mobs, only ones that can actually see you, and only every
 	 * half second so it costs nothing.
+	 *
+	 * <p>The push goes through {@code MobTargetMixin} like every other
+	 * acquisition, so it can never land on a target the composed policy would
+	 * refuse, and a body on the floor outranks any limper by the prey constants
+	 * alone (1.6) — nothing this method pushes can be talked out of it by
+	 * somebody nearby with a bad leg. A bypass would be worse than useless: it
+	 * would let NEARBY and ALL force a mob off a <em>more</em> wounded target.
 	 */
 	private static void keepMobsInterested(ServerPlayer player) {
 		if (player.tickCount % 10 != 0) {

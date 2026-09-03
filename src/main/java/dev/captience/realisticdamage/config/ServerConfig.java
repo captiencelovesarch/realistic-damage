@@ -131,6 +131,52 @@ public final class ServerConfig {
 		}
 	}
 
+	/**
+	 * Which injuries make a player the preferred target (1.6).
+	 *
+	 * <p>{@link PreyOnWounded#VISIBLE} is the default because it is the sentence
+	 * on the roadmap: hostiles prefer targets that are visibly limping or
+	 * bleeding. Both halves of that adjective are load-bearing. A leg the game
+	 * itself calls Hurt or Injured costs at most a twelfth of your speed, which
+	 * nobody can see, so the limp only counts from Critical down — the same rung
+	 * the model starts posing at, because both read one definition. And a
+	 * scratch seeps rather than drips, so blood only counts from a wound that is
+	 * actually running. What is left fires on real injuries, and blood — the
+	 * briefest of the signals — carries so little weight that it can tip a fresh
+	 * acquisition but never pull a mob off the player it is already fighting.
+	 * {@link PreyOnWounded#LIMPING} and {@link PreyOnWounded#DOWNED} scale it
+	 * back for a server that wants less; {@code /rdmg config preyOnWounded off}
+	 * turns it off entirely.
+	 *
+	 * <p>Only hostiles hunt this way, and only the ones that choose a target
+	 * through {@code Mob.setTarget}. Brain-driven hostiles — piglins, hoglins,
+	 * zoglins, wardens, breezes, creakings — read their target out of a memory
+	 * instead, so this setting and {@link #unconsciousAggro} both leave them
+	 * alone, as they always have.
+	 */
+	public PreyOnWounded preyOnWounded = PreyOnWounded.VISIBLE;
+
+	public enum PreyOnWounded {
+		/** 1.5 behaviour: the nearest player wins. */
+		OFF,
+		/** Only a body on the floor — unconscious, knocked down, or legless — is preferred. */
+		DOWNED,
+		/** Also a leg that is gone, broken, or worn down past the point where the limp shows. */
+		LIMPING,
+		/** Also a wound that is actually bleeding. The roadmap's "limping or bleeding". */
+		VISIBLE;
+
+		/** Legs count toward the score. Pure, so {@code PreyMath} stays unit-testable. */
+		public boolean includesLimp() {
+			return ordinal() >= LIMPING.ordinal();
+		}
+
+		/** Wounds count toward the score. */
+		public boolean includesBleed() {
+			return this == VISIBLE;
+		}
+	}
+
 	public void applyArcadePreset() {
 		enableLimbDestruction = true;
 	}
@@ -170,6 +216,11 @@ public final class ServerConfig {
 				RealisticDamage.LOGGER.warn(
 						"Unknown unconsciousAggro in {}, using {}", path, UnconsciousAggro.NEARBY);
 				instance.unconsciousAggro = UnconsciousAggro.NEARBY;
+			}
+			if (instance.preyOnWounded == null) {
+				RealisticDamage.LOGGER.warn(
+						"Unknown preyOnWounded in {}, using {}", path, PreyOnWounded.VISIBLE);
+				instance.preyOnWounded = PreyOnWounded.VISIBLE;
 			}
 		}
 		save();

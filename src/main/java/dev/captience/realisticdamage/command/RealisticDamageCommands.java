@@ -30,6 +30,7 @@ import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.damage.BodyHitResolver;
 import dev.captience.realisticdamage.dummy.PracticeDummy;
 import dev.captience.realisticdamage.systems.CeilingMath;
+import dev.captience.realisticdamage.systems.PreyMath;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.permission.v1.PermissionPredicates;
 import net.minecraft.commands.CommandSourceStack;
@@ -257,6 +258,12 @@ public final class RealisticDamageCommands {
 		}
 		out.add(String.format(Locale.ROOT, "  blood: %.1f/100   consciousness: %.1f (cap %.0f)",
 				data.blood(), data.consciousness(), data.consciousnessCap()));
+		// The body's own prey score, without any grudge — a grudge belongs to a
+		// mob and not to a player, so no single number here could state it. Same
+		// sanctioned exact-number channel as the two lines above.
+		ServerConfig.PreyOnWounded prey = ServerConfig.get().preyOnWounded;
+		out.add(String.format(Locale.ROOT, "  prey: %d (%s)",
+				PreyMath.score(data, prey), prey.name().toLowerCase(Locale.ROOT)));
 		StringJoiner statuses = new StringJoiner(", ");
 		if (data.unconscious()) {
 			statuses.add("UNCONSCIOUS (" + data.unconsciousTicks() + "t)");
