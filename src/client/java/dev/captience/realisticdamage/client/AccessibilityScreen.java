@@ -74,6 +74,17 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						.create(0, 0, 150, 20,
 								Component.translatable("realisticdamage.config.injury_messages"),
 								(button, value) -> config.showInjuryMessages = value));
+		// And the fifth: how an injured limb is carried on the model. Display
+		// rather than Vision for the same reason as the four above — it is the
+		// body telling you what is wrong with it, not something happening to
+		// your eyes — and it sits next to Scars because the two are the only
+		// controls over what the player model itself says.
+		this.list.addSmall(
+				CycleButton.onOffBuilder(config.showInjuryPose)
+						.create(0, 0, 150, 20,
+								Component.translatable("realisticdamage.config.injury_pose"),
+								(button, value) -> config.showInjuryPose = value),
+				null);
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.vision"));
 		this.list.addSmall(

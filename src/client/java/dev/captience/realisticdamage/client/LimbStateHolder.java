@@ -14,14 +14,12 @@ package dev.captience.realisticdamage.client;
  * <p>The rule {@link BloodStainHolder} states is one carrier per
  * <em>consumer</em>, and the broken mask is the case where that rule runs out:
  * it has two. {@link BloodBodyLayer} reads it to suppress a scar seam on a limb
- * that has not healed yet, and the injury pose — deferred, and to be built
- * alongside the injury-aware mob AI so that what a mob reads and what the
- * player sees come from one definition — will read it from the model side,
+ * that has not healed yet, and {@link InjuryPose} reads it from the model side,
  * where it needs {@code destroyedMask} in the same breath to skip a limb that
  * is not being drawn at all. Grouping it with the destroyed mask costs the
- * layer one extra cast today and saves the model a second carrier tomorrow,
- * which is the cheaper of the two, and it keeps "what state is this limb in"
- * answerable from one interface.
+ * layer one extra cast and saves the model a second carrier, which is the
+ * cheaper of the two, and it keeps "what state is this limb in" answerable from
+ * one interface.
  */
 public interface LimbStateHolder {
 	int realisticdamage$destroyedMask();
@@ -36,4 +34,24 @@ public interface LimbStateHolder {
 	int realisticdamage$brokenMask();
 
 	void realisticdamage$setBrokenMask(int mask);
+
+	/**
+	 * Every limb's limp rung, three bits each, packed by
+	 * {@code LimpMath.withRung} (1.6).
+	 *
+	 * <p>A derived field rather than a fourth raw mask, and that is the point:
+	 * the rung is what "how badly is this limb hurt" <em>means</em>, and it is
+	 * computed at exactly one place on this side — the renderer mixin, straight
+	 * off the snapshot — so the model cannot arrive at a different answer from
+	 * the one the server's prey score reaches from the same body. It is packed
+	 * rather than carried as six numbers because a condition fraction on the
+	 * render state would be a second copy of the truth, and the one thing worth
+	 * copying here is the conclusion.
+	 *
+	 * <p>Local to the client and never written to disk or to the wire, so unlike
+	 * a scar ordinal its width is free to change.
+	 */
+	int realisticdamage$limbRungs();
+
+	void realisticdamage$setLimbRungs(int rungs);
 }

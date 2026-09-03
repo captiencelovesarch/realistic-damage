@@ -45,6 +45,33 @@ public final class ClientEffectsConfig {
 	 */
 	public boolean showScars = true;
 	/**
+	 * How an injured limb is carried on the player model (1.6): a broken arm
+	 * held against the ribs, a bad leg turned out and taking a shorter step.
+	 *
+	 * <p>Information, not atmosphere, and that is why it is here rather than in
+	 * the Blood section and why {@link #disableAllEffects()} leaves it alone.
+	 * The panic button exists for things happening to your <em>senses</em> — a
+	 * swimming screen, a ringing ear, blood on the lens — and a limb held wrong
+	 * is a fact about a body, the same kind of statement as the injury icons and
+	 * the scar marks, which are excluded for the same reason. There is a second
+	 * reason peculiar to this one: the mob AI prefers targets that are visibly
+	 * limping, so this pose is the only warning a bystander gets that the player
+	 * beside them is about to be singled out. A preset that silenced it would be
+	 * hiding information the game is acting on.
+	 *
+	 * <p>On by default: it is the model's only statement about a break, and a
+	 * fracture that shows nothing is the bug this setting exists to close.
+	 *
+	 * <p>Its own switch rather than riding {@link #showScars}, per the rule that
+	 * every effect keeps its own control, and because the two say opposite
+	 * things — a scar is history, a posture is now.
+	 *
+	 * <p>A plain boolean. Absent from a 1.5 config file Gson leaves the
+	 * initialiser standing, which is already the right answer, so
+	 * {@link #migrate()} has nothing to say about it.
+	 */
+	public boolean showInjuryPose = true;
+	/**
 	 * The white line at the bottom of the screen — "Your right leg breaks!"
 	 * (1.6). Every other visible layer of this mod already had a control and
 	 * this one did not, which made the output that uses <em>words</em> the only

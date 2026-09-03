@@ -7,8 +7,8 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 /**
- * Storage slots for the destroyed-limb mask, the broken-limb mask, blood
- * staining and scars on the player's render state.
+ * Storage slots for the destroyed-limb mask, the broken-limb mask, the packed
+ * limp rungs, blood staining and scars on the player's render state.
  */
 @Mixin(AvatarRenderState.class)
 public abstract class AvatarRenderStateMixin implements LimbStateHolder, BloodStainHolder {
@@ -16,6 +16,8 @@ public abstract class AvatarRenderStateMixin implements LimbStateHolder, BloodSt
 	private int realisticdamage$destroyedMask;
 	@Unique
 	private int realisticdamage$brokenMask;
+	@Unique
+	private int realisticdamage$limbRungs;
 	@Unique
 	private float[] realisticdamage$bloodStains;
 	@Unique
@@ -39,6 +41,16 @@ public abstract class AvatarRenderStateMixin implements LimbStateHolder, BloodSt
 	@Override
 	public void realisticdamage$setBrokenMask(int mask) {
 		this.realisticdamage$brokenMask = mask;
+	}
+
+	@Override
+	public int realisticdamage$limbRungs() {
+		return this.realisticdamage$limbRungs;
+	}
+
+	@Override
+	public void realisticdamage$setLimbRungs(int rungs) {
+		this.realisticdamage$limbRungs = rungs;
 	}
 
 	@Override

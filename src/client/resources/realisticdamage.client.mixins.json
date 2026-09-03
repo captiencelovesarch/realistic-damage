@@ -9,6 +9,7 @@
 		"ClientInputMixin",
 		"ContainerLayoutAccessor",
 		"GameRendererAccessor",
+		"HumanoidModelMixin",
 		"InventoryLayoutAccessor",
 		"ItemInHandRendererMixin",
 		"MouseHandlerMixin",
