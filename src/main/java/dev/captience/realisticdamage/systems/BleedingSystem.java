@@ -85,8 +85,14 @@ public final class BleedingSystem {
 		}
 		ServerLevel level = player.level();
 		Vec3 at = BodyHitResolver.regionCenter(player, part);
+		// Straight up for want of a direction. Unit length, because `away` is a
+		// direction and the throw speed is applied to it two lines below: the 0.35
+		// this used to be was not shaping the cone, it was quietly throwing the
+		// direction-less spray at 35% of SPRAY_SPEED — 2.45 b/s against 7.0, which
+		// peaks 0.16 blocks above a torso origin that has 0.72 blocks of hitbox
+		// above it, so not one drop of it ever left the body.
 		Vec3 away = direction.lengthSqr() < 1.0e-6
-				? new Vec3(0.0, 0.35, 0.0)
+				? new Vec3(0.0, 1.0, 0.0)
 				: direction.normalize().scale(-1.0);
 		int count = Balance.SPRAY_DROPS_PER_SEVERITY * (1 + severity.ordinal());
 		double speed = Balance.SPRAY_SPEED / 20.0;

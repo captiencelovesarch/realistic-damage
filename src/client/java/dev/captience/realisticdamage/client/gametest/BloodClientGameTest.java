@@ -11,12 +11,19 @@ import dev.captience.realisticdamage.client.BloodLens;
 import dev.captience.realisticdamage.client.BloodStains;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
 import dev.captience.realisticdamage.config.Balance;
+import dev.captience.realisticdamage.systems.BleedingSystem;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The blood system, running for real (1.5).
@@ -200,6 +207,19 @@ public class BloodClientGameTest implements FabricClientGameTest {
 						+ " square blocks of blood; a pool that only fills and never widens stops at 8.46"
 						+ " — the drops are being thrown away again");
 			}
+			// ...and after twenty seconds of standing over an open artery, some of
+			// those marks have to actually be DRAWN as pools. This is the positive
+			// half of the roadmap's promise; the negative half — that walking
+			// leaves none — is asserted a few lines below, and neither is worth
+			// anything without the other. It costs no extra ticks: this is already
+			// the longest stationary bleed in the suite.
+			int poolsStanding = context.computeOnClient(client -> BloodStains.poolMarks());
+			if (poolsStanding <= 0) {
+				throw new AssertionError("twenty seconds of standing over a critical wound drew "
+						+ poolsStanding + " marks as pools out of "
+						+ context.computeOnClient(client -> BloodStains.count())
+						+ " — a player who stands still is supposed to grow a pool");
+			}
 			context.takeScreenshot("rd_blood_08_pool");
 
 			// The other half of the same promise, and the half nothing has ever
@@ -214,9 +234,40 @@ public class BloodClientGameTest implements FabricClientGameTest {
 			});
 			int standing = marksLaidOver(context, 60, false);
 			int walking = marksLaidOver(context, 60, true);
+			int poolsWalkingSevere = context.computeOnClient(client -> BloodStains.poolMarks());
 			if (walking <= standing) {
 				throw new AssertionError("walking left " + walking + " marks and standing left " + standing
 						+ " — a trail and a pool are supposed to look different");
+			}
+			// The count above says the blood was spread out. It cannot say what the
+			// spread-out blood is drawn as, and that is where the whole distinction
+			// actually lives: a trail is made of splats. A pool is twenty seconds of
+			// standing over an open wound, not one heartbeat's spurt landing on its
+			// own sibling. Before the feed gate, a player walking with an open
+			// artery laid one pool-sprited mark per heartbeat — three blocks apart
+			// at a sprint, all the same size — and every measure this test had
+			// (count, ink, largest mark) read exactly the same as a trail of splats,
+			// which is how it shipped.
+			if (poolsWalkingSevere > 0) {
+				throw new AssertionError("walking with a severe wound left " + poolsWalkingSevere
+						+ " marks drawn as pools out of " + walking
+						+ " — the trail is claiming to be a pool at every heartbeat");
+			}
+			// Again at critical, which is where the author saw it and where it fails
+			// with the most margin: severe throws two drops a beat, critical three
+			// or four, so critical put roughly three times as many false pools on
+			// the ground as severe did.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.clearWounds();
+				data.addWound(BodyPart.TORSO, WoundSeverity.CRITICAL);
+			});
+			int walkingCritical = marksLaidOver(context, 60, true);
+			int poolsWalkingCritical = context.computeOnClient(client -> BloodStains.poolMarks());
+			if (poolsWalkingCritical > 0) {
+				throw new AssertionError("walking with a critical wound left " + poolsWalkingCritical
+						+ " marks drawn as pools out of " + walkingCritical
+						+ " — one heartbeat's burst is still minting a pool");
 			}
 
 			// Healing closes the wounds; the blood must then dry off rather than
@@ -231,6 +282,108 @@ public class BloodClientGameTest implements FabricClientGameTest {
 						+ whileBleeding + " then " + whileHealed);
 			}
 			context.takeScreenshot("rd_blood_05_healed");
+
+			// The burst a blow throws, which is the only blood in the mod with a
+			// direction and the only blood that was ever going to reach a wall.
+			//
+			// Everything above this line is the client emitter: blood that seeps
+			// out of a standing wound and falls at the player's feet. The burst is
+			// the other path — thrown by the server, aimed back along the blow —
+			// and it had been deleting itself since 1.5. Every drop of it is born
+			// at BodyHitResolver.regionCenter, which is inside the victim's own
+			// hitbox by construction, and the drop was built with a source entity
+			// id of -1, which matches no player: the "do not splash the body you
+			// came out of" guard therefore never recognised the body it came out
+			// of, found the victim on tick one, painted them and deleted the drop.
+			//
+			// So: close the wounds and wipe both fields first, and the only blood
+			// in the next second and a half is the one burst thrown below.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.clearWounds();
+			});
+			context.waitTicks(5);
+			context.runOnClient(client -> {
+				BloodStains.reset();
+				BloodBody.reset();
+			});
+			sprayCritical(singleplayer, false);
+			context.waitTicks(30);
+
+			// It has to get out of the body. Measured, same scenario, by putting the
+			// -1 back and taking it out again: with the id wrong the twenty drops
+			// leave 1 mark and 0.4624 square blocks of ink — which is 4 x 0.34^2,
+			// i.e. exactly one drop at STAIN_DROP_SIZE_MAX, the single survivor.
+			// With it right they leave 14 marks and 6.54. Six sits between the two
+			// with a wide margin on both sides.
+			int burstMarks = context.computeOnClient(client -> BloodStains.count());
+			if (burstMarks < 6) {
+				throw new AssertionError("a critical blow threw "
+						+ Balance.SPRAY_DROPS_PER_SEVERITY * (1 + WoundSeverity.CRITICAL.ordinal())
+						+ " drops and left " + burstMarks + " marks on the world — they are being"
+						+ " deleted inside the body they came out of");
+			}
+			// ...and the body it came out of has to be clean. This is the invariant
+			// the source id actually encodes, and the half a count cannot see: a
+			// count that went up would look like success even if every drop had
+			// bounced straight off the victim. Blood on your own limbs is
+			// BloodBody's business, fed by the open wound, not by your own spray
+			// splashing back onto you.
+			//
+			// Measured under the same mutation: the torso reads 0.972 with the id
+			// wrong and 0.0 with it right. 0.972 is BODY_STAIN_MAX clamped at 1.0
+			// and then dried for the thirty ticks above at BODY_STAIN_DECAY / 20 —
+			// 1.0 - 30 x 0.001 = 0.97. One blow saturating a body to its ceiling is
+			// what the missing splatter actually looked like on screen: the blood
+			// was not absent, it was all over the victim.
+			assertNoStain(context, "a spray thrown clear of the body");
+			context.takeScreenshot("rd_blood_09_burst");
+
+			// Now the wall, which is the complaint in the author's own words. Same
+			// burst, thrown at stone about a metre away, and the marks have to land
+			// on the vertical face rather than at the thrower's feet.
+			//
+			// A flat world has no natural vertical surface anywhere near the player,
+			// so a mark facing NORTH can only have come off the wall built below.
+			// NORTH is the right face: spray() throws back along the blow, the blow
+			// passed in is -Z, so the drops travel +Z and stop against the side of
+			// the wall that points -Z.
+			//
+			// Measured across the same mutation: with the id right, 10 marks on the
+			// wall out of 11 in the whole field. With it wrong, 1 out of 1 — the
+			// single drop that got out went the whole way and hit the wall. So the
+			// threshold cannot be "any at all": the broken build does put the
+			// occasional drop on a wall, which is exactly why the author reported
+			// this as blood that does not reach walls rather than as no blood.
+			// Three is above the one and far below the ten, and it has to tolerate
+			// the wall's near face landing anywhere from 0.5 to 1.5 blocks out
+			// depending on where in his own block the player is standing (see
+			// sprayCritical) against a drop that carries about 2.0.
+			context.runOnClient(client -> BloodStains.reset());
+			sprayCritical(singleplayer, true);
+			context.waitTicks(30);
+			int onWall = context.computeOnClient(client -> BloodStains.countOnFace(Direction.NORTH));
+			if (onWall < 3) {
+				throw new AssertionError("a critical blow thrown at a wall a metre away left " + onWall
+						+ " marks on it, out of " + context.computeOnClient(client -> BloodStains.count())
+						+ " marks in total — the blood is reaching the floor but not the wall");
+			}
+			// Look at the wall for the picture. The camera has been pointed at the
+			// floor since the ground stage; yaw 0 is +Z, which is where the wall and
+			// the blood are. Forty degrees down rather than level, because the eye is
+			// 1.62 up and the drops cross the wall between the floor and about 1.2 —
+			// atan(1.0 / 1.2) over a metre of gap puts that band under the crosshair.
+			// After the assertion, so the view cannot be part of what is being
+			// measured: this is the one screenshot in the file that shows the thing
+			// the author said was missing.
+			context.runOnClient(client -> {
+				if (client.player != null) {
+					client.player.setXRot(40.0F);
+					client.player.setYRot(0.0F);
+				}
+			});
+			context.waitTicks(5);
+			context.takeScreenshot("rd_blood_10_wall");
 
 			// The panic button has to cover blood too. This is the promise
 			// disableAllEffects makes, and a new effect that forgot to join it
@@ -312,6 +465,43 @@ public class BloodClientGameTest implements FabricClientGameTest {
 		}
 		context.waitTicks(20);
 		return context.computeOnClient(client -> BloodStains.count());
+	}
+
+	/**
+	 * Throws one critical torso burst on the server, optionally at a wall built
+	 * for it to hit.
+	 *
+	 * <p>The blow is passed as {@code -Z} because {@code spray} throws back along
+	 * it, so the drops travel {@code +Z} and the face they contact is
+	 * {@link Direction#NORTH}.
+	 *
+	 * <p>The wall goes at {@code floor(z + 1.5)}, which puts its near face between
+	 * 0.5 and 1.5 blocks out wherever in his block the player happens to be
+	 * standing — never closer than 0.2 blocks to his own hitbox, and never further
+	 * than the 2.0 blocks a thrown drop can carry. Five wide and three high
+	 * because the cone is {@link Balance#SPRAY_SPREAD} degrees in both yaw and
+	 * pitch: at a metre out that is about 0.8 blocks of lateral spread, and the
+	 * drops cross the wall anywhere from the floor to a little above head height.
+	 */
+	private static void sprayCritical(TestSingleplayerContext singleplayer, boolean intoWall) {
+		singleplayer.getServer().runOnServer(server -> {
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				if (intoWall) {
+					ServerLevel level = player.level();
+					int wallZ = Mth.floor(player.getZ() + 1.5);
+					int originX = Mth.floor(player.getX());
+					int originY = Mth.floor(player.getY());
+					for (int dx = -2; dx <= 2; dx++) {
+						for (int dy = 0; dy <= 2; dy++) {
+							level.setBlockAndUpdate(new BlockPos(originX + dx, originY + dy, wallZ),
+									Blocks.STONE.defaultBlockState());
+						}
+					}
+				}
+				BleedingSystem.spray(player, BodyPart.TORSO, WoundSeverity.CRITICAL,
+						new Vec3(0.0, 0.0, -1.0));
+			}
+		});
 	}
 
 	private static void assertStain(ClientGameTestContext context, BodyPart part, String when) {
