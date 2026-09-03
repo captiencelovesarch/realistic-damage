@@ -219,6 +219,17 @@ public final class Balance {
 	public static final double ARTERIAL_SPURT_SPEED = 5.5;
 	/** How wide the spurt cone is, in degrees — narrow, because it is pressure, not spray. */
 	public static final double ARTERIAL_SPURT_SPREAD = 14.0;
+	/**
+	 * However bad an artery is, one beat may not throw more than this many drops.
+	 *
+	 * <p>Lived in {@code BloodEmitter} as a private until the pool tier needed it.
+	 * It is a balance number, and it is the exact bound
+	 * {@link #STAIN_POOL_SPRITE_FEEDS} has to beat: every drop in a burst leaves
+	 * one point on one tick, so a burst is the largest number of drops that can
+	 * land in a single mark with no time passing at all. A pure test cannot check
+	 * that gate against a number it cannot see.
+	 */
+	public static final int ARTERIAL_SPURT_DROPS_MAX = 7;
 
 	/** Blocks per second a drop simply falling out of a wound starts with. */
 	public static final double DROP_SEEP_SPEED = 0.6;
@@ -293,15 +304,59 @@ public final class Balance {
 	 * what the author reported. Past this size the sprite is swapped for a round,
 	 * dense one instead.
 	 *
-	 * <p>The threshold is below {@link #STAIN_DROP_SIZE_MAX}, which sounds like it
-	 * would let a big spurt land already drawn as a pool. It cannot: the swap only
-	 * happens inside a feed, never at construction, so every mark is born a splat
-	 * and only accretion changes that. What the low threshold buys is the spurt
-	 * case specifically — a gout marks at 0.32 and so becomes a pool on its first
-	 * feed, which is correct, because a spurt that has since been bled into twice
-	 * over is not a spurt any more, it is the middle of a pool.
+	 * <p>Set above {@link #STAIN_DROP_SIZE_MAX}, so that no size one drop is
+	 * capable of marking is already at the tier. It was 0.30, below it, defended
+	 * on the grounds that the swap only happens inside a feed and never at
+	 * construction — true, and not enough. A gout marks at
+	 * 0.10 + (0.34 - 0.10) x (5.5 / 6.0) = 0.32, which is 94% of what any drop may
+	 * mark, so it crossed 0.30 on its first feed of any size whatever. The old
+	 * javadoc called that correct because "a spurt that has since been bled into
+	 * twice over is not a spurt any more"; the word doing the work there is
+	 * "since", and there is no since. Both drops leave one point on one tick.
+	 *
+	 * <p>Raising it is belt-and-braces, not the fix — {@link #STAIN_POOL_SPRITE_FEEDS}
+	 * is the fix — but it makes "no single drop lands already drawn as a puddle"
+	 * checkable as one comparison of two constants, which is the guard that stops
+	 * this coming back. It also costs a moderate seep pool four extra feeds
+	 * (ceil((0.36 - 0.124) / 0.0149) = 16 rather than 12, about 1.7 s more), which
+	 * is a real change to the standing case and is named here rather than
+	 * discovered.
 	 */
-	public static final double STAIN_POOL_SPRITE_RADIUS = 0.30;
+	public static final double STAIN_POOL_SPRITE_RADIUS = 0.36;
+	/**
+	 * ...and how many drops must have gone into a mark before the swap may happen
+	 * at all. A pool is an accretion, and only a count can say so.
+	 *
+	 * <p>Size alone provably cannot. Feeding a gout mark adds
+	 * 0.32 x {@link #STAIN_MERGE_GROWTH} = 0.0384, so it goes
+	 * 0.32 -> 0.3584 -> 0.3968 -> 0.4352 -> {@link #STAIN_POOL_SIZE_MAX}: four
+	 * feeds, five drops, and it is at the ceiling. One heartbeat throws up to
+	 * {@link #ARTERIAL_SPURT_DROPS_MAX} drops from one point on one tick, of which
+	 * roughly two in five land inside {@link #STAIN_MERGE_DISTANCE} of each other.
+	 * There is therefore no radius at or below the ceiling that a single beat
+	 * cannot cross, and at severe and critical rates every beat was minting one: a
+	 * player sprinting with an open artery left a pool every three blocks, one per
+	 * heartbeat, evenly spaced, all the same size. The even spacing was his pulse.
+	 * That is a trail lying about being a pool, and it erases the only distinction
+	 * the ground was carrying — standing still grows a pool, walking lays a trail.
+	 *
+	 * <p>A burst of N drops puts N-1 feeds into one mark, so a gate of
+	 * {@link #ARTERIAL_SPURT_DROPS_MAX} clears the largest burst there is with one
+	 * feed to spare. It costs nothing in latency: measured, the first pool sprite
+	 * appears at the same moment for gates of 6, 7 and 8, because what binds is
+	 * the mark's growth and not the count — a mark being fed continuously passes
+	 * seven feeds within a second of passing four.
+	 *
+	 * <p>Falsifiable, if anyone wants to check the diagnosis by hand on a build
+	 * from before this: the artifact should disappear on its own at a high enough
+	 * heart rate, because a one-drop burst has nothing to merge with. A severe
+	 * wound's burst is round(4.8 x 0.72 x 60/bpm), which drops to 1 once
+	 * 3.456 x 60/bpm &lt; 1.5, i.e. above 138 bpm. Sprint with a severe wound while
+	 * panicked and the trail goes back to discrete splats. A critical wound never
+	 * gets there — it would need 231 bpm against a {@link #HEART_MAX_BPM} of 190 —
+	 * which is why the artifact was worst exactly where the bleeding was worst.
+	 */
+	public static final int STAIN_POOL_SPRITE_FEEDS = ARTERIAL_SPURT_DROPS_MAX;
 	/**
 	 * Stains closer together than this merge and grow instead of stacking. Without
 	 * it, standing still over a critical wound spends the entire capacity on one

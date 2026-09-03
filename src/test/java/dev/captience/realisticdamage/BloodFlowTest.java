@@ -129,9 +129,59 @@ class BloodFlowTest {
 		assertTrue(Balance.STAIN_POOL_SIZE_MAX < 0.5,
 				"a pool quad this big clips more than half a block into whatever is beside it");
 		// The sprite tier can only be reached by accretion: no single drop may
-		// land already drawn as a puddle.
+		// land already drawn as a puddle. That sentence is about what ONE DROP
+		// marks, and the assertion under it used to compare against the pool
+		// ceiling instead — 0.30 < 0.46, true for every value the tier could
+		// possibly hold, so it checked nothing the comment claimed. A gout marked
+		// at 0.32, over the 0.30 tier, the whole time this test was green.
+		assertTrue(Balance.STAIN_POOL_SPRITE_RADIUS > Balance.STAIN_DROP_SIZE_MAX,
+				"one drop marks up to " + Balance.STAIN_DROP_SIZE_MAX
+						+ ", which is already at the pool sprite tier");
+		// ...and the tier still has to be reachable, or the pool sprites are art
+		// nothing ever draws. This is what the assertion above used to be, kept
+		// for the half of the job it did do.
 		assertTrue(Balance.STAIN_POOL_SPRITE_RADIUS < Balance.STAIN_POOL_SIZE_MAX,
 				"nothing ever reaches the pool sprite");
+	}
+
+	/**
+	 * A pool is how many drops built it, not how big it is — and this is the
+	 * assertion that makes the alternative unrepeatable without a running client.
+	 *
+	 * <p>An arterial gout marks at 94% of what any drop may mark, and one
+	 * heartbeat throws a whole burst of them from one point on one tick, of which
+	 * roughly two in five land near enough to merge. So a size threshold anywhere
+	 * below the pool ceiling is a threshold a single beat can cross, and at severe
+	 * and critical rates every beat did: a sprinting player laid one "pool" per
+	 * heartbeat, evenly spaced three blocks apart, all the same size. The author's
+	 * words were "each tick makes this weird pool ... like i was standing still (i
+	 * wasn't, i was constantly moving)". The even spacing was his pulse.
+	 */
+	@Test
+	void noSingleHeartbeatCanMintAPool() {
+		// A burst of N drops lands one mark and feeds it N-1 times, so a gate at
+		// the burst cap clears the largest burst there is with a feed to spare.
+		assertTrue(Balance.STAIN_POOL_SPRITE_FEEDS >= Balance.ARTERIAL_SPURT_DROPS_MAX,
+				"one heartbeat throws " + Balance.ARTERIAL_SPURT_DROPS_MAX
+						+ " drops and they can all land in one mark");
+
+		// Concretely, and this is the part no radius could have survived: feed a
+		// critical gout its own worst-case burst and count what it takes.
+		double gout = BloodFlow.stainSize(BloodFlow.dropScale(
+				BloodFlow.dropSpeed(Balance.BLEED_RATE_CRITICAL, true) / 20.0));
+		double radius = gout;
+		int feeds = 0;
+		for (int i = 1; i < Balance.ARTERIAL_SPURT_DROPS_MAX; i++) {
+			radius = Math.min(Balance.STAIN_POOL_SIZE_MAX, radius + gout * Balance.STAIN_MERGE_GROWTH);
+			feeds++;
+		}
+		assertTrue(feeds < Balance.STAIN_POOL_SPRITE_FEEDS,
+				"one beat's worth of gouts landing in one mark draws it as a pool");
+		// ...and by then it is at the pool CEILING, which is the proof that no
+		// radius alone could ever have separated a heartbeat from an accretion:
+		// there is no size above this one for a threshold to hide at.
+		assertEquals(Balance.STAIN_POOL_SIZE_MAX, radius, 1.0e-9,
+				"the burst no longer fills a mark; re-derive the gate above");
 	}
 
 	/**

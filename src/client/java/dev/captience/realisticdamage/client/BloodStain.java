@@ -33,9 +33,11 @@ import org.joml.Quaternionf;
  * <p>Growing has a ceiling, and what happens at the ceiling is the difference
  * between a pool and a splat. A full mark does not swallow the next drop — the
  * field lays that one beside it, and the pool gets wider rather than staying
- * the size of the first quad forever. Past
- * {@link Balance#STAIN_POOL_SPRITE_RADIUS} the mark also stops drawing itself
- * with a splat sprite, because a magnified splat is a magnified splat.
+ * the size of the first quad forever. Once enough drops have gone in and the
+ * mark is big enough with it — {@link Balance#STAIN_POOL_SPRITE_FEEDS} and
+ * {@link Balance#STAIN_POOL_SPRITE_RADIUS}, see {@link #isPool} — it also stops
+ * drawing itself with a splat sprite, because a magnified splat is a magnified
+ * splat.
  */
 public class BloodStain extends SingleQuadParticle {
 	/**
@@ -53,6 +55,15 @@ public class BloodStain extends SingleQuadParticle {
 	private final TextureAtlasSprite poolSprite;
 	private final Direction face;
 	private double radius;
+	/**
+	 * How many drops have been fed into this mark since it was laid. The pool tier
+	 * is a count and not a size — a pool is an accretion, and no radius can say
+	 * how many drops built it. See {@link Balance#STAIN_POOL_SPRITE_FEEDS}.
+	 *
+	 * <p>A counter, not a random draw: the tier a mark draws itself with stays a
+	 * deterministic function of what landed on it.
+	 */
+	private int feeds;
 
 	BloodStain(ClientLevel level, double x, double y, double z, Direction face, double radius, long seed,
 			TextureAtlasSprite sprite, TextureAtlasSprite poolSprite) {
@@ -108,15 +119,32 @@ public class BloodStain extends SingleQuadParticle {
 		return z;
 	}
 
+	/**
+	 * Whether this mark is drawn as a pool: enough drops went into it, and it got
+	 * big enough. Both, because either alone lies. Size alone cannot tell one
+	 * arterial gout from twenty seconds of bleeding, since a gout is born at 94%
+	 * of what any single drop may mark; count alone would let a mark built of
+	 * beads claim to be a pool while still the size of a splat.
+	 */
+	boolean isPool() {
+		return feeds >= Balance.STAIN_POOL_SPRITE_FEEDS && radius >= Balance.STAIN_POOL_SPRITE_RADIUS;
+	}
+
 	/** Feeds another drop into this mark, growing it toward the pool maximum. */
 	void grow(double incomingRadius) {
 		radius = Math.min(Balance.STAIN_POOL_SIZE_MAX, radius + incomingRadius * Balance.STAIN_MERGE_GROWTH);
+		feeds++;
 		// Past a certain size the splat sprite stops being the truth about what
 		// this is. A splat is an off-centre mass with flung satellite droplets
 		// around it, and scaling that up gives a magnified splatter rather than a
 		// pool — which is precisely what the playtest report called it. The swap
 		// is one-way: blood accumulating never turns back into a thrown drop.
-		if (radius >= Balance.STAIN_POOL_SPRITE_RADIUS) {
+		//
+		// Gated on the feed count as well as the size, because size on its own put
+		// a pool under every heartbeat of a running player: one beat throws a
+		// whole burst from one point on one tick, and a burst landing in one mark
+		// crossed any radius the tier could sensibly use.
+		if (isPool()) {
 			setSprite(poolSprite);
 		}
 		// A mark that is still being fed is a mark that is still wet. Winding the

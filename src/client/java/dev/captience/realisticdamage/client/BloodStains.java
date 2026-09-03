@@ -294,6 +294,46 @@ public final class BloodStains {
 		return largest;
 	}
 
+	/**
+	 * How many live marks are drawn with the pool sprite.
+	 *
+	 * <p>Exists so tests can ask the thing {@link #count()}, {@link #inkArea()}
+	 * and {@link #largestMark()} all miss: not how much blood is down or how big
+	 * the biggest mark got, but whether a mark that two drops built is claiming to
+	 * be a pool. Every one of those three reads the same on a trail of pools as on
+	 * a trail of splats, which is how a moving player came to leave one pool per
+	 * heartbeat with the suite green.
+	 */
+	public static int poolMarks() {
+		int pools = 0;
+		for (BloodStain stain : live) {
+			if (stain.isPool()) {
+				pools++;
+			}
+		}
+		return pools;
+	}
+
+	/**
+	 * How many live marks sit on the given face.
+	 *
+	 * <p>Exists so tests can tell a wall from a floor, which none of the four
+	 * measures above can: blood that fell at the player's feet and blood that was
+	 * thrown across a room and stopped against stone read identically as a count,
+	 * as ink and as a largest mark. The face is the only thing that separates
+	 * them, and "does a blow put blood on the wall behind you" is the whole of
+	 * what the burst is for.
+	 */
+	public static int countOnFace(Direction face) {
+		int found = 0;
+		for (BloodStain stain : live) {
+			if (stain.face() == face) {
+				found++;
+			}
+		}
+		return found;
+	}
+
 	/** Drops references to dead stains so the buckets do not grow without bound. */
 	public static void tick() {
 		if (live.isEmpty()) {

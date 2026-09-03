@@ -54,8 +54,6 @@ public final class BloodEmitter {
 	public static final int SPRITE_COUNT = 12;
 	/** Beyond this, someone else's bleeding is not worth the particles. */
 	private static final double EMIT_RANGE = 28.0;
-	/** However bad an artery is, one beat may not throw more than this. */
-	private static final int SPURT_DROPS_MAX = 7;
 
 	private static @Nullable SpriteSet sprites;
 	private static final Map<Integer, Bleeder> bleeders = new HashMap<>();
@@ -135,7 +133,10 @@ public final class BloodEmitter {
 			if (arterial && beat) {
 				double perBeat = BloodFlow.dropsPerSecond(wound.bloodPerSecond()) * share
 						* 60.0 / heart.bpm();
-				int burst = (int) Math.clamp(Math.round(perBeat), 1L, SPURT_DROPS_MAX);
+				// The cap moved to Balance: it is the exact bound
+				// STAIN_POOL_SPRITE_FEEDS has to beat, and a pure test cannot
+				// check that against a private in a client class.
+				int burst = (int) Math.clamp(Math.round(perBeat), 1L, Balance.ARTERIAL_SPURT_DROPS_MAX);
 				for (int i = 0; i < burst; i++) {
 					spawn(player, part, wound.bloodPerSecond(), true, bleeder.emitted++);
 				}
