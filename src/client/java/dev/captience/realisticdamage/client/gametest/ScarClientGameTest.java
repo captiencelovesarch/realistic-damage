@@ -28,10 +28,17 @@ import net.minecraft.server.level.ServerPlayer;
  * of thing that rots quietly: a seam that stopped drawing, a hover line that
  * survived a toggle it should have obeyed, a model pass that never ran. None of
  * those changes a number anywhere, so nothing but a client that has actually
- * rendered a frame can catch them. The three questions asked here are whether
- * each surface draws when it should, whether it stops when the player says
- * stop, and whether a mark ever manages to look like an injury to the code that
- * decides whether the player is hurt.
+ * rendered a frame can catch them. The four questions asked here are whether
+ * each surface draws when it should, whether it draws <em>only</em> when it
+ * should, whether it stops when the player says stop, and whether a mark ever
+ * manages to look like an injury to the code that decides whether the player is
+ * hurt.
+ *
+ * <p>The second of those is new in beta4 and is the one the first pass missed.
+ * Every assertion here used to be of the form "the seam appeared", which a mark
+ * drawn on the wrong body state passes just as happily as a mark drawn on the
+ * right one — and that is exactly how a currently broken limb came to wear the
+ * seam of its own mending for a release.
  *
  * <p>Registered last under {@code fabric-client-gametest} and it calls
  * {@link ClientEffectsConfig#load()} at both ends: the config is a singleton
@@ -73,13 +80,41 @@ public class ScarClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("an unscarred body drew scars");
 			}
 
-			// 1. Break an arm and then heal it all the way back. The mark is the
-			// only thing left over: nothing else about the region still says it
-			// ever happened, which is the whole feature in one assertion.
+			// 1. Break an arm, and look at it before it mends. The mark is
+			// already set — setBroken raises ScarLevel.BROKEN inside the setter,
+			// which is right, because /rdmg break and the dismemberment path both
+			// go round BreakLogic — so this is the one moment where the mask says
+			// "scarred" and the truth says "still broken", and the model must
+			// keep quiet. Beta3 is where that showed: a fresh fracture drew the
+			// pale seam of its own healing and so looked like nothing at all.
+			//
+			// This is the assertion the class was missing. Every scar check below
+			// asks whether a seam APPEARS; none of them asked whether it appears
+			// ONLY when it is true, and that is the shape of the bug.
 			mutate(singleplayer, data -> {
 				data.part(BodyPart.LEFT_ARM).setCondition(2.0);
 				data.part(BodyPart.LEFT_ARM).setBroken(true);
 			});
+			context.waitTicks(WINDOW);
+			BodySnapshot fractured = snapshot(context);
+			if (!fractured.broken(BodyPart.LEFT_ARM)
+					|| fractured.scar(BodyPart.LEFT_ARM) != ScarLevel.BROKEN) {
+				throw new AssertionError("a broken arm should be broken and already marked, got "
+						+ fractured.broken(BodyPart.LEFT_ARM) + "/"
+						+ fractured.scar(BodyPart.LEFT_ARM));
+			}
+			if (scarSubmitsOver(context, WINDOW, ScarLevel.BROKEN) != 0) {
+				throw new AssertionError("an unhealed break wore the seam of its own mending");
+			}
+			// The before half of rd_scar_00_model: the same arm, the same camera,
+			// nothing on it. What a break looks like on the model is the injury
+			// pose's problem, and the pose is deferred to be built with the mob AI
+			// that has to read the same limp.
+			context.takeScreenshot("rd_scar_00_broken");
+
+			// 2. Now heal it all the way back. The mark is the only thing left
+			// over: nothing else about the region still says it ever happened,
+			// which is the whole feature in one assertion.
 			mutate(singleplayer, data -> data.part(BodyPart.LEFT_ARM).setCondition(13.0));
 			context.waitTicks(WINDOW);
 			BodySnapshot healed = snapshot(context);
@@ -91,14 +126,16 @@ public class ScarClientGameTest implements FabricClientGameTest {
 						+ "/" + healed.state(BodyPart.LEFT_ARM));
 			}
 
-			// 2. And it is on the model.
+			// 3. And it is on the model — the same limb, the same window and the
+			// same camera as the zero above, which is what makes that zero mean
+			// "suppressed while broken" rather than "nothing was drawing".
 			context.waitTicks(10);
-			if (scarSubmitsOver(context, WINDOW) <= 0) {
-				throw new AssertionError("a scarred body drew no scar pass on the model");
+			if (scarSubmitsOver(context, WINDOW, ScarLevel.BROKEN) <= 0) {
+				throw new AssertionError("a mended arm drew no scar pass on the model");
 			}
 			context.takeScreenshot("rd_scar_00_model");
 
-			// 3. The panel: a seam on that region and no other, and one sentence
+			// 4. The panel: a seam on that region and no other, and one sentence
 			// for it. Both halves — the region that must be marked and the one
 			// that must not — because a whole-body gate would pass the first.
 			context.setScreen(() -> new InventoryScreen(Minecraft.getInstance().player));
@@ -130,7 +167,7 @@ public class ScarClientGameTest implements FabricClientGameTest {
 			context.setScreen(() -> null);
 			context.waitTicks(3);
 
-			// 4. The fade. A body whose only mark is a scar is a healed body, and
+			// 5. The fade. A body whose only mark is a scar is a healed body, and
 			// a healed body's HUD goes away — otherwise one bad break in April
 			// pins the diagram on screen for the rest of the character's life.
 			context.waitTicks(80);
@@ -139,7 +176,7 @@ public class ScarClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("a scar kept the HUD open, at visibility " + visibility);
 			}
 
-			// 5. The panic button. It silences the paint on the body, because that
+			// 6. The panic button. It silences the paint on the body, because that
 			// is paint on a body — and it leaves the panel alone, because the
 			// panel is information, like the injury icons.
 			context.runOnClient(client -> ClientEffectsConfig.get().disableAllEffects());
@@ -159,7 +196,7 @@ public class ScarClientGameTest implements FabricClientGameTest {
 			context.runOnClient(client -> ClientEffectsConfig.load());
 			context.waitTicks(10);
 
-			// 6. The display toggle, which is the other half of stage 5: this one
+			// 7. The display toggle, which is the other half of stage 6: this one
 			// is the switch that means "I do not want to see scars", so it takes
 			// the mark and the sentence together. A toggle that hid the seam and
 			// kept the line describing it would be worse than either half.
@@ -191,13 +228,20 @@ public class ScarClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("switching scars back on drew nothing");
 			}
 
-			// 7. A destroyed region: marked, but not seamed. The cross already
+			// 8. A destroyed region: marked, but not seamed. The cross already
 			// says everything a mark could there — and the sentence is still
 			// printed, because the words are the half that can say "once lost".
 			mutate(singleplayer, data -> data.part(BodyPart.RIGHT_ARM).setDestroyed(true));
 			context.waitTicks(WINDOW);
 			if (snapshot(context).scar(BodyPart.RIGHT_ARM) != ScarLevel.DESTROYED) {
 				throw new AssertionError("destroying an arm left it unmarked");
+			}
+			// Nor on the model, and for the older of the two reasons: the limb is
+			// hidden, so there is no surface. Worth pinning next to the broken
+			// case, because it is what makes the heavy mark in the stage below
+			// specifically the mark of a limb that came BACK.
+			if (scarSubmitsOver(context, WINDOW, ScarLevel.DESTROYED) != 0) {
+				throw new AssertionError("a limb that is gone drew a seam on nothing");
 			}
 			context.setScreen(() -> new InventoryScreen(Minecraft.getInstance().player));
 			context.waitTicks(5);
@@ -211,7 +255,7 @@ public class ScarClientGameTest implements FabricClientGameTest {
 			context.setScreen(() -> null);
 			context.waitTicks(3);
 
-			// 8. Death. The only stage that runs the real respawn path, and the
+			// 9. Death. The only stage that runs the real respawn path, and the
 			// only proof that the carry-over listener fires in a live client
 			// session rather than only under a mock player. The right arm comes
 			// back whole and still marked: the seam is now on an arm that exists.
@@ -235,9 +279,33 @@ public class ScarClientGameTest implements FabricClientGameTest {
 			}
 			context.runOnClient(client -> client.options.setCameraType(CameraType.THIRD_PERSON_BACK));
 			context.waitTicks(10);
-			if (scarSubmitsOver(context, WINDOW) <= 0) {
-				throw new AssertionError("the respawned body drew no scars");
+			// Both rungs at once, on one body, in one window: the left arm's
+			// mended break and the right arm's regrown limb, drawn at two
+			// different weights. That is the model doing what the panel does with
+			// one seam against two, and it is the whole of the "does a mended
+			// break look different from a limb that grew back" question — no
+			// third ScarLevel, because the data already had both rungs and only
+			// the presentation was missing. (A bone that is broken right now is
+			// not a third kind of history; it is a current condition, and its cue
+			// is the deferred pose.)
+			long paleBefore = scarSubmits(context, ScarLevel.BROKEN);
+			long heavyBefore = scarSubmits(context, ScarLevel.DESTROYED);
+			context.waitTicks(WINDOW);
+			long pale = scarSubmits(context, ScarLevel.BROKEN) - paleBefore;
+			long heavy = scarSubmits(context, ScarLevel.DESTROYED) - heavyBefore;
+			if (pale <= 0 || heavy <= 0) {
+				throw new AssertionError("the respawned body drew " + pale + " mended-break marks and "
+						+ heavy + " regrown-limb marks; both should be positive");
 			}
+			if (BloodBodyLayer.scarWeight(ScarLevel.DESTROYED)
+					<= BloodBodyLayer.scarWeight(ScarLevel.BROKEN)) {
+				throw new AssertionError("a limb that was lost should be marked more heavily than "
+						+ "one that was only broken");
+			}
+			// The only picture of both rungs on one body. The counters prove which
+			// was drawn; a mark this faint is easier to believe in a screenshot
+			// than to measure in one, so the two live side by side here.
+			context.takeScreenshot("rd_scar_04_two_rungs");
 			context.setScreen(() -> new InventoryScreen(Minecraft.getInstance().player));
 			context.waitTicks(5);
 			hover(context, BodyPart.RIGHT_ARM);
@@ -249,7 +317,7 @@ public class ScarClientGameTest implements FabricClientGameTest {
 			context.setScreen(() -> null);
 			context.waitTicks(3);
 
-			// 9. And the debug heal forgets everything, marks included — the one
+			// 10. And the debug heal forgets everything, marks included — the one
 			// place in the mod where history is allowed to go away.
 			mutate(singleplayer, RealisticDamageData::reset);
 			context.waitTicks(WINDOW);
@@ -287,6 +355,22 @@ public class ScarClientGameTest implements FabricClientGameTest {
 		context.waitTicks(ticks);
 		long after = context.computeOnClient(client -> BloodBodyLayer.scarSubmits());
 		return after - before;
+	}
+
+	/**
+	 * The same window, narrowed to one rung. Needed because the two marks differ
+	 * only in tint and opacity — nothing a gametest can read off the screen — so
+	 * "the mended break drew and the unhealed one did not" is only sayable if the
+	 * counter knows which rung it counted.
+	 */
+	private long scarSubmitsOver(ClientGameTestContext context, int ticks, ScarLevel level) {
+		long before = scarSubmits(context, level);
+		context.waitTicks(ticks);
+		return scarSubmits(context, level) - before;
+	}
+
+	private long scarSubmits(ClientGameTestContext context, ScarLevel level) {
+		return context.computeOnClient(client -> BloodBodyLayer.scarSubmits(level));
 	}
 
 	/** Puts the real cursor over the centre of a body region and lets it render. */

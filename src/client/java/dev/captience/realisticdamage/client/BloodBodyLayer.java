@@ -69,6 +69,35 @@ import net.minecraft.world.entity.player.PlayerModelType;
  * passes over the same entity is unspecified — and an unspecified order between
  * two translucent shells a fraction of a pixel apart is a flicker.
  *
+ * <h2>What a seam is allowed to mean (1.6)</h2>
+ *
+ * <p>A scar is "kept after the injury itself has healed" ({@code ScarLevel}'s
+ * own words), and this pass now enforces that sentence: the seam is suppressed
+ * while the region is still broken. It has to be, because
+ * {@code BodyPartData.setBroken} raises {@code ScarLevel.BROKEN} <em>inside the
+ * setter</em> — the right call, since {@code /rdmg break} and the dismemberment
+ * path both bypass {@code BreakLogic} and the setter is the only choke point —
+ * so the mark exists from the tick the bone snaps. Drawing it then made the
+ * model state the memory of an injury in place of the injury, and the two are
+ * not the same thing. The seam returns the moment {@code heal()} clears the
+ * flag, which is exactly when it starts being true. The panel and the HUD keep
+ * drawing theirs while broken on purpose: there the seam sits beside a fracture
+ * line and a state colour and reads as history among other statements, where
+ * here it is the only statement the model makes.
+ *
+ * <p>That leaves the model saying two things and only two, which is the whole
+ * answer to "should a mended break look different from a limb that was blown
+ * off and grew back". It should, and it already can: {@code BROKEN} is the
+ * mended break and {@code DESTROYED} is the regrown limb, the two tones and
+ * alphas above tell them apart the way the panel's one seam and two do, and
+ * both rungs have been in the save and on the wire since {@code ScarLevel} was
+ * written. No third rung was added and none is wanted — a bone that is broken
+ * <em>right now</em> is not a kind of history at all, it is a current
+ * condition, and giving it a scar ordinal would put a gameplay state into an
+ * append-only enum whose javadoc says it changes no outcome anywhere. Its cue
+ * belongs to the injury pose instead, which is deferred so that it and the
+ * injury-aware mob AI can be built off one definition of a limp.
+ *
  * <p>The parts are also no longer posed in place. A layer instance is shared by
  * every player using the renderer, and a submit stores the {@code ModelPart} by
  * reference while the frame's prepare phase reads it back later, after every
@@ -106,7 +135,9 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 	private static final int ORDER_BLOOD = 2;
 
 	// A mark is faint; a region that was lost and came back is not. Both are
-	// still shares of the Blood on Bodies strength, never absolutes.
+	// still shares of the Blood on Bodies strength, never absolutes. The gap is
+	// 0.88 / 0.70 = 1.26, a quarter more opacity, on top of a tone two thirds as
+	// bright — the model's version of the panel's one seam against two.
 	private static final float SCAR_ALPHA_BROKEN = 0.70F;
 	private static final float SCAR_ALPHA_DESTROYED = 0.88F;
 	// Pale and pinkish for a healed break, darker and duller for the region that
@@ -121,7 +152,8 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 	private final ModelPart[] scarWide;
 	private final ModelPart[] scarSlim;
 
-	private static long scarSubmitCount;
+	/** Indexed by {@code ScarLevel.ordinal()}; slot 0 is never written. */
+	private static final long[] scarSubmitCounts = new long[ScarLevel.values().length];
 
 	/**
 	 * How many scar submits have been drawn this session. Monotonic, and sampled
@@ -131,7 +163,30 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 	 * anything was drawn at all.
 	 */
 	public static long scarSubmits() {
-		return scarSubmitCount;
+		return scarSubmitCounts[ScarLevel.BROKEN.ordinal()]
+				+ scarSubmitCounts[ScarLevel.DESTROYED.ordinal()];
+	}
+
+	/**
+	 * The same count split by rung, so a test can tell the mended break's pale
+	 * seam from the regrown limb's heavier one. Without it the two are one
+	 * number and "the model distinguishes them" is unassertable — the difference
+	 * is a tint, and a tint leaves no trace a gametest can read.
+	 */
+	public static long scarSubmits(ScarLevel level) {
+		return scarSubmitCounts[level.ordinal()];
+	}
+
+	/**
+	 * The opacity share a rung is drawn at, before the Blood on Bodies strength
+	 * scales it. Exposed so the test can assert that one rung really is heavier
+	 * than the other against the constants themselves rather than against two
+	 * numbers copied into the test, where they would stop tracking the moment
+	 * anyone retuned them.
+	 */
+	public static float scarWeight(ScarLevel level) {
+		return level == ScarLevel.DESTROYED ? SCAR_ALPHA_DESTROYED
+				: level == ScarLevel.BROKEN ? SCAR_ALPHA_BROKEN : 0.0F;
 	}
 
 	public BloodBodyLayer(RenderLayerParent<AvatarRenderState, PlayerModel> renderer) {
@@ -158,6 +213,9 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 		BloodStainHolder holder = (BloodStainHolder) state;
 		float[] stains = holder.realisticdamage$bloodStains();
 		int scars = config.showScars ? holder.realisticdamage$scarMask() : 0;
+		// The second cast, and the only one in this class: broken is limb state,
+		// not paint, and it rides with the destroyed mask. See LimbStateHolder.
+		int broken = ((LimbStateHolder) state).realisticdamage$brokenMask();
 		if (stains == null && scars == 0) {
 			return;   // a scarred but clean player still has to draw
 		}
@@ -169,6 +227,12 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 
 		for (BodyPart part : BodyPart.values()) {
 			ScarLevel scar = ScarMask.level(scars, part);
+			if (isSet(broken, part)) {
+				// Not yet history. A break raises its mark inside the setter, so
+				// on an unhealed limb the mark is present and false; the class
+				// javadoc has the long version.
+				scar = ScarLevel.NONE;
+			}
 			float level = stains == null ? 0.0F : stains[part.ordinal()];
 			if (scar == ScarLevel.NONE && level < VISIBLE) {
 				continue;
@@ -184,11 +248,13 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 			if (scar != ScarLevel.NONE) {
 				boolean lost = scar == ScarLevel.DESTROYED;
 				float[] tone = lost ? SCAR_TONE_DESTROYED : SCAR_TONE_BROKEN;
-				float alpha = (float) (strength * (lost ? SCAR_ALPHA_DESTROYED : SCAR_ALPHA_BROKEN));
+				// Through the accessor rather than past it, so the number the test
+				// reads is the number that was drawn.
+				float alpha = (float) (strength * scarWeight(scar));
 				collector.order(ORDER_SCARS).submitModelPart(scarParts[part.ordinal()], poseStack,
 						RenderTypes.entityTranslucent(SCAR_TEXTURE), lightCoords, overlay, null,
 						ARGB.colorFromFloat(alpha, tone[0], tone[1], tone[2]), null, 0);
-				scarSubmitCount++;
+				scarSubmitCounts[scar.ordinal()]++;
 			}
 			if (level >= VISIBLE) {
 				// Blood on a body dries where it lands. Wetness trails the amount,
@@ -258,6 +324,11 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 		byRegion[BodyPart.LEFT_LEG.ordinal()] = baked.getChild("left_leg");
 		byRegion[BodyPart.RIGHT_LEG.ordinal()] = baked.getChild("right_leg");
 		return byRegion;
+	}
+
+	/** One region's bit out of a {@code BodySnapshot} limb mask. */
+	private static boolean isSet(int mask, BodyPart part) {
+		return (mask & (1 << part.ordinal())) != 0;
 	}
 
 	/**

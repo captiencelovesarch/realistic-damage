@@ -1,7 +1,7 @@
 package dev.captience.realisticdamage.client.mixin;
 
 import dev.captience.realisticdamage.body.BodyPart;
-import dev.captience.realisticdamage.client.DestroyedLimbHolder;
+import dev.captience.realisticdamage.client.LimbStateHolder;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
@@ -31,7 +31,7 @@ public abstract class PlayerModelMixin {
 
 	@Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;)V", at = @At("TAIL"))
 	private void realisticdamage$hideDestroyedLimbs(AvatarRenderState state, CallbackInfo ci) {
-		int mask = ((DestroyedLimbHolder) state).realisticdamage$destroyedMask();
+		int mask = ((LimbStateHolder) state).realisticdamage$destroyedMask();
 		if (mask == 0) {
 			return;
 		}
