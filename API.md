@@ -92,6 +92,18 @@ if (body != null && body.broken(BodyPart.RIGHT_ARM)) {
 
 Null for creative and spectator players, who are outside the mod entirely.
 
+The 1.6 history fields are available through the same view:
+
+```java
+BodyState bestRecovery = body.ceilingState(BodyPart.LEFT_LEG);
+ScarLevel history = body.scar(BodyPart.LEFT_LEG);
+```
+
+`ceilingBand(part)` is `0` for no cap, then `1..3` for Hurt, Injured and Critical.
+Prefer `ceilingState(part)` in player-facing work: the band exists to avoid turning a
+long-term injury into a hidden-number leak. `scar(part)` is cosmetic history only; it must
+not be used as evidence that a player is currently impaired.
+
 `blood()` and `consciousness()` are available, but the mod hides both from
 players on purpose. If you surface them, show a band (`bloodBand()`) rather
 than a figure — being surprised by your own blood level is the point of hiding
@@ -99,7 +111,7 @@ it.
 
 ## Stability
 
-`DamageCategory`, `BodyPart` and `BodyState` are enums other mods are expected
-to switch on; new constants may be added but existing ones will not be renamed
-or removed without a major version. The `api` package is the supported surface —
-everything else is internal and will move.
+`DamageCategory`, `BodyPart`, `BodyState` and `ScarLevel` are enums other mods are
+expected to switch on; new constants may be added but existing ones will not be renamed
+or removed without a major version. The `api` package and the body value types its methods
+return are the supported surface — everything else is internal and will move.

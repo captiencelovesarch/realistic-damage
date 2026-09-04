@@ -47,11 +47,30 @@ And the lethal tail is compressed — you survive drops that used to kill you, c
 limping, which is usually worse.
 
 **Limb destruction** (Arcade preset, on by default). Keep hitting a limb that is already
-Disabled and it is gone for good: no healing, no golden apple, only death restores it. A
-destroyed arm cannot use that hand and works one-handed at a heavy penalty, destroyed legs
-are a permanent limp, losing both means you crawl, and a destroyed head or torso kills.
-Destroyed limbs vanish from your body in first and third person. Turn it off with
+Disabled and it is gone for good — and an extreme TNT or creeper blast can take the nearest
+limb outright, after the same localized armour check as every other injury. A destroyed arm
+cannot use that hand and works one-handed at a heavy penalty, destroyed legs are a permanent
+limp, losing both means you crawl, and a destroyed head or torso kills. Destroyed limbs
+vanish from your body in first and third person; the stump keeps bleeding, and the loss
+leaves a larger mark on the world than an ordinary wound. Turn it off with
 `/rdmg preset grounded`.
+
+**A body keeps the receipt.** Once a limb has broken or a region has been destroyed, its
+scar stays in the body panel and on the player model, through healing and even through
+death. Scars are presentation only: mobs, healing and impairment never read them, and the
+accessibility screen can hide them.
+
+**Long-term injuries** are an optional hardcore rule, off by default. A break, a region
+driven to zero or a limb lost lowers that region's best possible recovery by one familiar
+state band. Food and time still do all the healing, but they stop at that ceiling; sleep and
+totems cannot erase it, and while the mode remains enabled it follows the character through
+death. The panel shows the ceiling as a band, never a hidden number.
+
+**Predators pick off the wounded.** Hostiles prefer a player whose injury is actually
+visible: down first, then a missing or broken leg, then a visible limp, then running blood.
+They do not roll for it, do not smell cosmetic scars or hidden meters, and keep a grudge
+long enough that a scratch cannot peel them off the player who just hit them. The same limb
+rungs drive both the mob's choice and the pose you see on the player model.
 
 **Rescue.** Sneak-use a downed player to drag them out of the fire — half speed, both
 hands full. Hold use with empty hands to press a wound shut and slow the bleeding, on a
@@ -132,10 +151,13 @@ mod is concerned, so it bleeds, breaks, concusses and goes down exactly as you w
 | `fallTraumaMultiplier` | 1.0 | Scales fall trauma specifically |
 | `pvpTraumaMultiplier` | 1.0 | Scales trauma from other players |
 | `enableLimbDestruction` | true | Arcade preset: limbs can be destroyed permanently |
+| `enableExplosiveDismemberment` | true | Extreme TNT and creeper trauma can take the nearest limb outright; nested under limb destruction |
+| `enableLongTermInjuries` | false | Worst injuries permanently lower a region's healing ceiling by state band |
 | `enableKnockdown` | true | Hard landings put you on the ground for a moment |
 | `enableMicrosleeps` | true | Consciousness cuts out in episodes on the way down |
 | `softenFallLethality` | true | Compresses vanilla's lethal fall tail so long drops maim rather than delete |
 | `unconsciousAggro` | `NEARBY` | Who notices a body on the floor. `ATTACKERS` keeps whatever was already fighting you, `NEARBY` adds anything within 6 blocks that can see you, `ALL` pulls in every hostile with line of sight, `NONE` takes you off the menu entirely |
+| `preyOnWounded` | `VISIBLE` | Which visible injuries hostiles prefer: `OFF`, `DOWNED`, `LIMPING`, or `VISIBLE` (limping and bleeding) |
 | `enableBleeding` / `enableBrokenLimbs` / `enableConsciousness` / `enableBurns` / `enableHitLocation` | true | Turn whole systems off |
 
 Every tuning constant lives in one file (`config/Balance.java`) so rebalancing never means
@@ -158,6 +180,10 @@ hunting magic numbers.
 /rdmg concussion <player>
 /rdmg burn <player>
 /rdmg destroy <player> <part>             destroy a limb outright
+/rdmg blast <player> <part> [radius]      test a localized explosion beside a limb
+/rdmg ceiling <player> <part|all> <band>  set max/hurt/injured/critical recovery
+/rdmg scar <player> <part> <level>        set none/broken/destroyed history
+/rdmg config <setting> [value]            inspect or change any server setting
 /rdmg preset <arcade|grounded>            switch the server-side preset
 /rdmg dummy spawn|remove|heal|equip       practice target (see above)
 /rdmg dummy fightback <true|false>
@@ -174,7 +200,8 @@ hitscan weapons that have no projectile to reconstruct from.
 ## Notes
 
 State persists across logout, dimension changes and restarts — logging out is not a cure.
-Death resets everything. Creative and Spectator are ignored entirely.
+Death resets active injury; scars remain, and long-term ceilings remain while that server
+rule is enabled. Creative and Spectator are ignored entirely.
 
 ## Building
 
@@ -188,8 +215,9 @@ Death resets everything. Creative and Spectator are ignored entirely.
 
 ## What's next
 
-`ROADMAP.md` covers 1.5 and 1.6: deeper consequences and mob anatomy. Medical items are
-explicitly not on it.
+`ROADMAP.md` covers what comes after Consequence: anatomy for mobs, and the physical limb
+that 1.6 deliberately left as a mark rather than an entity. Medical items are explicitly
+not on it.
 
 ## Design
 

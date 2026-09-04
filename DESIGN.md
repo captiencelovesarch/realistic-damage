@@ -1,9 +1,10 @@
-# Realistic Damage — Design (v1.4)
+# Realistic Damage — Design (v1.6)
 
 > "Minecraft, but damage is cooler." Vanilla hearts stay authoritative; this mod adds a
 > physical layer: locational body trauma, deterministic injuries (Broken / Bleeding /
 > Concussion / Burned), a hidden Blood meter, and a hidden Consciousness meter.
-> Food remains the universal cure. No RNG in outcomes. Player-only. Nothing permanent.
+> Food remains the universal cure. No RNG in outcomes. Player-only. Nothing permanent
+> unless a server deliberately enables the long-term-injury rule.
 
 Target: **Fabric, Minecraft 26.2, Fabric API 0.158.0+26.2, Java 25, Mojang mappings.**
 
@@ -18,10 +19,11 @@ Target: **Fabric, Minecraft 26.2, Fabric API 0.158.0+26.2, Java 25, Mojang mappi
 
 ## Architecture
 
-Server-authoritative. All state lives in a `RealisticDamageData` player attachment
-(fabric-data-attachment-api), synced to the owning client via custom payloads on
-login/respawn/meaningful-change plus a low-rate interpolation channel for Blood and
-Consciousness. The client only presents.
+Server-authoritative. Mutable state lives in a persistent `RealisticDamageData` player
+attachment (fabric-data-attachment-api) that is never synced. A separate, immutable and
+quantized `BodySnapshot` attachment is equality-deduplicated and synced to every tracking
+client; remote clients need it for blood, scars, poses and triage. One-shot impact, landing,
+sound, death and rescue events use small custom payloads. The client only presents.
 
 Package layout (`dev.captience.realisticdamage`):
 
@@ -32,7 +34,7 @@ Package layout (`dev.captience.realisticdamage`):
   `BodyHitResolver`, `EnvironmentalRouter`, `TraumaCalculator`, `DamageHooks`
 - `systems/` — `BleedingSystem`, `ConsciousnessSystem`, `HealingSystem`,
   `ImpairmentSystem`, `TickDispatcher`
-- `net/` — payload records + `RealisticDamageNetworking`
+- `net/` — the versioned `BodySnapshot` wire record and one-shot payload records
 - `command/` — `RealisticDamageCommands` (debug/admin)
 - `config/` — `Balance` (all tuning constants), `ServerConfig`
 - `client/` (client source set) — `BodyHud`, `ConsciousnessEffects`, `ClientState`,
@@ -312,11 +314,76 @@ orphaned by a totem save can never colour a later, calmer death. Deaths the clas
 deliberately ignores — the void, `/kill`, starving — score nothing and keep the slow
 ending, which is the right answer for deaths that are not blows.
 
+## Added in 1.6
+
+**The worst injury can become the best a region ever gets again.** Long-term injuries are
+a server rule, off by default, expressed as three bands rather than a hidden condition
+number. A newly Broken limb, any region newly driven to Disabled, or a newly Destroyed limb
+costs that region one rung per damage event. Limbs may descend to Critical; head and torso
+stop at Hurt, because a head pinned any lower would make the consciousness symptom ladder
+permanent rather than making the injury meaningful.
+
+The ceiling belongs to `BodyPartData`, beside the condition it bounds. `fraction()` still
+uses the part's original maximum — a capped leg at its new best is still a visibly and
+mechanically injured leg — while `heal`, `setCondition` and `missing` use the effective
+maximum so every existing recovery route stops naturally instead of spending forever on a
+missing budget. Persistence restores the ceiling before condition, the snapshot packs two
+bits per region under a new versioned attachment id, and the HUD and inventory panel draw
+the state boundary, never its underlying value. Sleep and totems cannot move it. Death
+starts a fresh body at each ceiling while the mode is enabled; switching the mode off stops
+new rungs and lets death clear the old ones. `/rdmg ceiling` is the explicit admin escape.
+
+**Explosions are judged as explosions, not as the health bar's remainder.** A
+`ServerExplosion` mixin captures centre, radius-derived damage and exposure for the victim;
+the ordinary routing and the direct-destruction check consume the same nearest-region share.
+Only the nearest limb is eligible, and only when its post-local-armour blast trauma reaches
+45% of the limb's original condition bar. That threshold leaves a survivable window for TNT
+and creepers without letting a wither-sized remainder take four limbs at once. The feature
+is nested under both destruction toggles, so Grounded remains a complete refusal of the
+Destroyed state.
+
+A qualifying blast goes through `DestructionLogic.destroy`, not a parallel route. It opens
+a fixed Critical stump wound, records the scar, hides the limb, applies the hand or movement
+penalty, plays the destruction sound and leaves the same internal-tagged core-death path in
+charge. Losing the limb now also emits 36 deterministic drops — 1.8 times an ordinary
+Critical opening — in a wider, downward-biased cone. That is the 1.6 severance mark; a
+flying limb is deferred to the entity work in 1.7.
+
+**History is state, but only presentation reads it.** Every part stores one of `NONE`,
+`BROKEN`, `DESTROYED`, raised inside the setters that own those events so commands and future
+damage paths cannot forget. It persists, syncs to every tracking client and follows a player
+through death even when long-term injuries are off. The body panel names the rung; an
+overlay-free `BloodStainLayer` draws it on the actual skin rather than on the inflated hat,
+jacket and sleeves. A lost limb has nowhere to render in that life, so its Destroyed mark is
+visible on the next body. Healing, impairment and prey scoring never read scars. The client
+has a dedicated scar toggle; the sensory panic button leaves informational body markings
+alone, as it does the body diagram and injury icons.
+
+**A limp is one definition on both sides of the network.** `LimpMath` turns destroyed,
+broken and condition band into ordered rungs. The humanoid-model hook carries an injured arm
+and turns out a ruined leg while scaling the step vanilla already calculated, which keeps
+armour on the same pose and avoids a second walk formula drifting from Mojang's. A lost limb
+is not posed — its absence is the louder cue.
+
+`PreyMath` reads those same rungs. At `Mob.setTarget`, hostiles may substitute a candidate
+whose visible injury score clears the current target plus a switching margin: down, missing
+leg, fracture, banded limp, then running wound. Revenge supplies a stronger hold; equal
+candidates break by distance and then entity id. Scars, Blood, Consciousness and MINOR
+wounds are excluded. Scores happen before range checks and line of sight happens last, so a
+server of healthy players pays no raycasts. Brain-driven hostiles that bypass
+`Mob.setTarget` remain outside the rule rather than being half-supported.
+
+**Wall blood moves, without becoming world state.** A bleeding region within the local
+player's reconciled contact envelope transfers a bounded share of its visible flow to the
+actual collision face. A large, wet vertical mark advances a deterministic phase and sheds
+a physics drop from its lower edge, paying radius each time and slowing as it dries. Both
+paths reuse the bounded stain field and disappear with the client particles. Persistent
+per-face block blood would be a different storage system and remains deliberately deferred.
+
 ## Deliberate non-goals
 
-DESTROYED state beyond what 1.0 shipped, medical items, mob anatomy, rescue/carry
-mechanics (1.2), numeric HUD stats — the inventory panel may show condition figures on
-request, the HUD never does, and Blood/Consciousness are named by band and never
-numbered anywhere. TACZ integration is still deferred, but DamageCategory +
-BodyHitResolver accept externally-supplied classification/hit-points so an adapter can
-slot in later.
+Visible severed-limb entities, persistent blood as block/world state, medical items, mob
+anatomy, and numeric HUD stats. The inventory panel may show condition figures on request;
+the HUD never does, and Blood/Consciousness are named by band and never numbered anywhere.
+TACZ integration is still deferred, but `DamageCategory` + `BodyHitResolver` accept
+externally supplied classification and hit points so an adapter can slot in later.

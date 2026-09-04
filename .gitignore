@@ -39,3 +39,7 @@ replay_*.log
 *.hprof
 *.jfr
 .devref/
+
+# local implementation/test journals
+/logs/
+/PROMPT-*.md

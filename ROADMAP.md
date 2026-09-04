@@ -251,24 +251,55 @@ the vignette closes and loses its red, and the world's audio sinks toward quiet
 under the death screen. The respawn button stays readable the whole way, and a
 fresh life starts with a clean frame.
 
-## 1.6: Consequence
+## Shipped in 1.6: Consequence
 
-Deepen what injuries mean rather than adding more of them.
+Deepen what injuries mean rather than adding more of them. Four promised systems,
+plus the presentation each one needed in order to be honest about what happened.
 
-- **Long-term injuries**: an optional hardcore mode where the worst injuries
-  heal to a permanently reduced ceiling rather than to full.
-- **Explosive dismemberment**: TNT and creepers able to destroy limbs directly
-  at extreme trauma, instead of only finishing off an already-Disabled one.
-- **Scarring**: purely cosmetic marks on the body panel for regions that have
-  been destroyed or broken before, so your character carries a history.
-- **Injury-aware mob AI**: hostiles preferring targets that are visibly limping
-  or bleeding. Predators pick off the wounded.
+**Some injuries outlive recovery.** The optional `enableLongTermInjuries` rule is
+off by default and lowers a region's best recovery one state band when a limb
+breaks, a region is driven to zero or a limb is lost. A limb may bottom out at
+Critical; a head or torso stops at Hurt so the hardcore rule cannot make the
+symptom ladder permanent. Food and time still do all the healing, but stop at the
+ceiling. Sleep and totems leave it alone, and death carries it only while the rule
+is enabled. The body panel draws and names the band, never the figure underneath.
+
+**A blast can take the limb in one event.** Server explosions capture their real
+centre and exposure before vanilla damage runs. Only the nearest limb is eligible,
+and it leaves at a deterministic bar of 45% of that limb's full condition after
+the same localized armour reduction as ordinary explosion trauma. The existing
+destruction choke point then owns the stump, wound, scar, sound and notification;
+Grounded still means no destruction at all.
+
+**The body carries its history.** Broken and destroyed are separate scar rungs,
+persisted and synced per region. A healed break shows on the panel and on an
+overlay-free player mesh; a destroyed region records the stronger mark for the
+next body, since there is no limb left to draw it on in the current one. Scars
+change no healing, impairment or mob decision, and have their own presentation
+toggle.
+
+**Predators pick off the wounded.** Hostiles resolve target preference where the
+target is actually written, at `Mob.setTarget`, rather than clearing it on a timer
+for vanilla to reacquire. Down outranks a missing leg, which outranks a break,
+which outranks a visible limp, which outranks a running wound. Existing fights get
+a switching margin and revenge gets a stronger one. Ties go by distance and then
+entity id, and the limp score calls the same pure function that poses the model.
+
+**The consequences show in the world.** Injured limbs hang and step differently,
+including their armour, and the remaining blood review closed three gaps: a lost
+limb throws a wider, floor-biased severance mark; a bleeding region pressed to a
+wall transfers blood to it; and a large wet wall mark sheds a gravity-driven run
+before it dries. These are bounded client presentation, not persistent block
+state, so blood remains a readout rather than a save-file decoration.
 
 ## 1.7: Anatomy for everyone
 
 Mobs get bodies. Deliberately last, because it doubles the surface area of
 every system and needs everything before it to be stable first.
 
+- **The limb itself**: a visible severed-limb entity thrown from the loss. 1.6
+  leaves the mark and the bleeding stump; making the missing piece physical is
+  entity work and belongs beside the anatomy release rather than as a late decal.
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly.
 - **Headshots on mobs** that impair rather than simply damaging, mirroring the
