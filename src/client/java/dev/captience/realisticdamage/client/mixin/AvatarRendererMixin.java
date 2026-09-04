@@ -7,9 +7,13 @@ import dev.captience.realisticdamage.client.BloodStainHolder;
 import dev.captience.realisticdamage.client.LimbStateHolder;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import dev.captience.realisticdamage.systems.LimpMath;
+import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Avatar;
+import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -38,14 +42,45 @@ public abstract class AvatarRendererMixin {
 	private void realisticdamage$carryDestroyedLimbs(Avatar entity, AvatarRenderState state, float partialTicks,
 			CallbackInfo ci) {
 		BodySnapshot snapshot = entity.getAttached(RDAttachments.SNAPSHOT);
-		((LimbStateHolder) state).realisticdamage$setDestroyedMask(
-				snapshot == null ? 0 : snapshot.destroyedMask());
+		int destroyedMask = snapshot == null ? 0 : snapshot.destroyedMask();
+		((LimbStateHolder) state).realisticdamage$setDestroyedMask(destroyedMask);
 		((LimbStateHolder) state).realisticdamage$setBrokenMask(
 				snapshot == null ? 0 : snapshot.brokenMask());
 		((LimbStateHolder) state).realisticdamage$setLimbRungs(realisticdamage$limbRungs(snapshot));
 		((BloodStainHolder) state).realisticdamage$setBloodStains(BloodBody.stains(entity.getId()));
 		((BloodStainHolder) state).realisticdamage$setScarMask(
 				snapshot == null ? 0 : snapshot.scarMask());
+		realisticdamage$hideDestroyedHand(state, destroyedMask, HumanoidArm.RIGHT);
+		realisticdamage$hideDestroyedHand(state, destroyedMask, HumanoidArm.LEFT);
+	}
+
+	/**
+	 * Vanilla carries held items in their own render states, outside the player
+	 * model. Hiding an arm therefore does not hide what it was holding unless the
+	 * matching physical hand is cleared here as well. This only edits the
+	 * per-frame render state; the real stack remains in the player's inventory.
+	 */
+	@Unique
+	private static void realisticdamage$hideDestroyedHand(AvatarRenderState state, int mask, HumanoidArm arm) {
+		BodyPart part = arm == HumanoidArm.RIGHT ? BodyPart.RIGHT_ARM : BodyPart.LEFT_ARM;
+		if ((mask & (1 << part.ordinal())) == 0) {
+			return;
+		}
+
+		if (arm == HumanoidArm.RIGHT) {
+			state.rightHandItemState.clear();
+			state.rightHandItemStack = ItemStack.EMPTY;
+			state.rightArmPose = HumanoidModel.ArmPose.EMPTY;
+		} else {
+			state.leftHandItemState.clear();
+			state.leftHandItemStack = ItemStack.EMPTY;
+			state.leftArmPose = HumanoidModel.ArmPose.EMPTY;
+		}
+
+		InteractionHand hand = arm == state.mainArm ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND;
+		if (state.isUsingItem && state.useItemHand == hand) {
+			state.heldOnHead.clear();
+		}
 	}
 
 	/**

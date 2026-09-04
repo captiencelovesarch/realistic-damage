@@ -13,8 +13,11 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.CameraType;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -218,7 +221,34 @@ public class InjuryPoseClientGameTest implements FabricClientGameTest {
 			}
 			context.takeScreenshot("rd_pose_05_lost_arm");
 
-			// 7. An arm, which is carried rather than swung: pulled in against
+			// 7. Held items are a separate render layer, so making the model part
+			// invisible is not enough: without an explicit guard the tool and shield
+			// hover at the ends of arms that are no longer there. Start with two
+			// visible items, remove one physical arm, then the other. Inspecting the
+			// freshly extracted render state makes this a regression assertion rather
+			// than asking a screenshot to judge whether a few pixels look detached.
+			mutate(singleplayer, RealisticDamageData::reset);
+			equipHands(singleplayer, true);
+			context.waitTicks(WINDOW);
+			assertHeldItem(context, HumanoidArm.RIGHT, true, "a sound right arm lost its held item");
+			assertHeldItem(context, HumanoidArm.LEFT, true, "a sound left arm lost its held item");
+			mutate(singleplayer, data -> data.part(BodyPart.RIGHT_ARM).setDestroyed(true));
+			context.waitTicks(WINDOW);
+			assertHeldItem(context, HumanoidArm.RIGHT, false, "an item floated beside the destroyed right arm");
+			assertHeldItem(context, HumanoidArm.LEFT, true, "destroying the right arm hid the left-hand item");
+			mutate(singleplayer, data -> data.part(BodyPart.LEFT_ARM).setDestroyed(true));
+			context.waitTicks(WINDOW);
+			assertHeldItem(context, HumanoidArm.RIGHT, false, "the right-hand item returned with both arms gone");
+			assertHeldItem(context, HumanoidArm.LEFT, false, "an item floated beside the destroyed left arm");
+			assertInventoryItemsRemain(context);
+			context.runOnClient(client -> client.options.setCameraType(CameraType.THIRD_PERSON_FRONT));
+			context.waitTicks(5);
+			context.takeScreenshot("rd_pose_06_no_floating_items");
+			context.runOnClient(client -> client.options.setCameraType(CameraType.THIRD_PERSON_BACK));
+			equipHands(singleplayer, false);
+			context.waitTicks(5);
+
+			// 8. An arm, which is carried rather than swung: pulled in against
 			// the ribs and held forward. The mirror of the leg case, and the one
 			// the author has to judge by eye, because "does it read as a body"
 			// is not a thing a counter can answer.
@@ -231,14 +261,14 @@ public class InjuryPoseClientGameTest implements FabricClientGameTest {
 			if (posesOver(context, WINDOW, LimpMath.RUNG_FRACTURED) <= 0) {
 				throw new AssertionError("a broken arm was not carried");
 			}
-			context.takeScreenshot("rd_pose_06_broken_arm");
+			context.takeScreenshot("rd_pose_07_broken_arm");
 			context.runOnClient(client -> client.options.setCameraType(CameraType.THIRD_PERSON_FRONT));
 			context.waitTicks(5);
-			context.takeScreenshot("rd_pose_06b_broken_arm_front");
+			context.takeScreenshot("rd_pose_07b_broken_arm_front");
 			context.runOnClient(client -> client.options.setCameraType(CameraType.THIRD_PERSON_BACK));
 			context.waitTicks(5);
 
-			// 8. In armour, which is the whole reason this hooks HumanoidModel and
+			// 9. In armour, which is the whole reason this hooks HumanoidModel and
 			// not PlayerModel. The armour layer renders its own HumanoidModel from
 			// the same render state, so a pose applied to the player's model alone
 			// would rotate the limb and leave the plate behind — at the cradle's
@@ -263,11 +293,11 @@ public class InjuryPoseClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("the armour did not follow the limb it covers: "
 						+ bare + " poses bare against " + dressed + " dressed");
 			}
-			context.takeScreenshot("rd_pose_07_armoured");
+			context.takeScreenshot("rd_pose_08_armoured");
 			dress(singleplayer, false);
 			context.waitTicks(5);
 
-			// 9. And the limp in motion, which is where the shortened step lives:
+			// 10. And the limp in motion, which is where the shortened step lives:
 			// standing still, the pose is only a turned-out foot. Last, after
 			// every assertion, because walking is the one thing in this class
 			// that can move the player somewhere the next stage did not expect.
@@ -277,9 +307,9 @@ public class InjuryPoseClientGameTest implements FabricClientGameTest {
 			context.getInput().holdKey(options -> options.keyUp);
 			try {
 				context.waitTicks(12);
-				context.takeScreenshot("rd_pose_08_walking_a");
+				context.takeScreenshot("rd_pose_09_walking_a");
 				context.waitTicks(4);
-				context.takeScreenshot("rd_pose_09_walking_b");
+				context.takeScreenshot("rd_pose_10_walking_b");
 			} finally {
 				context.getInput().releaseKey(options -> options.keyUp);
 			}
@@ -289,6 +319,43 @@ public class InjuryPoseClientGameTest implements FabricClientGameTest {
 			context.waitTicks(5);
 			context.runOnClient(client -> client.options.setCameraType(CameraType.FIRST_PERSON));
 			context.waitTicks(5);
+		}
+	}
+
+	/** Puts a deliberately obvious item in each hand, or clears both again. */
+	private void equipHands(TestSingleplayerContext singleplayer, boolean on) {
+		singleplayer.getServer().runOnServer(server -> {
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				player.setItemInHand(InteractionHand.MAIN_HAND,
+						on ? new ItemStack(Items.DIAMOND_AXE) : ItemStack.EMPTY);
+				player.setItemInHand(InteractionHand.OFF_HAND,
+						on ? new ItemStack(Items.SHIELD) : ItemStack.EMPTY);
+			}
+		});
+	}
+
+	/** Verifies the actual per-frame item state consumed by the third-person layer. */
+	private void assertHeldItem(ClientGameTestContext context, HumanoidArm arm, boolean expected, String why) {
+		boolean rendered = context.computeOnClient(client -> {
+			if (client.player == null) {
+				throw new AssertionError("the client has no player to render");
+			}
+			AvatarRenderState state = (AvatarRenderState) client.getEntityRenderDispatcher()
+					.extractEntity(client.player, 0.0F);
+			return !(arm == HumanoidArm.RIGHT ? state.rightHandItemState : state.leftHandItemState).isEmpty();
+		});
+		if (rendered != expected) {
+			throw new AssertionError(why);
+		}
+	}
+
+	/** The render fix must hide stacks, never delete them from the actual hands. */
+	private void assertInventoryItemsRemain(ClientGameTestContext context) {
+		boolean intact = context.computeOnClient(client -> client.player != null
+				&& client.player.getMainHandItem().is(Items.DIAMOND_AXE)
+				&& client.player.getOffhandItem().is(Items.SHIELD));
+		if (!intact) {
+			throw new AssertionError("hiding orphaned held items changed the player's inventory");
 		}
 	}
 

@@ -14,7 +14,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * A destroyed arm is gone in first person too — no floating hand, no held item.
- * The third-person model is handled separately by PlayerModelMixin.
+ * Third-person item state is suppressed by {@link AvatarRendererMixin}; the
+ * limb geometry itself is handled by {@link PlayerModelMixin}.
  */
 @Mixin(ItemInHandRenderer.class)
 public abstract class ItemInHandRendererMixin {
