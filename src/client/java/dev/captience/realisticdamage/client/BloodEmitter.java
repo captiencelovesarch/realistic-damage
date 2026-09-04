@@ -62,7 +62,9 @@ public final class BloodEmitter {
 	private static final class Bleeder {
 		private final Cardio heart = new Cardio();
 		private final double[] carry = new double[BodyPart.values().length];
+		private final double[] contactCarry = new double[BodyPart.values().length];
 		private long emitted;
+		private long transferred;
 	}
 
 	static void bindSprites(SpriteSet spriteSet) {
@@ -109,6 +111,7 @@ public final class BloodEmitter {
 			WoundSeverity wound = snapshot.wound(part);
 			if (wound == null) {
 				bleeder.carry[part.ordinal()] = 0.0;
+				bleeder.contactCarry[part.ordinal()] = 0.0;
 				continue;
 			}
 			double rate = wound.bloodPerSecond();
@@ -118,6 +121,15 @@ public final class BloodEmitter {
 				// it. Choking the visible flow to nothing would overstate the one
 				// piece of first aid in the mod, so a seep still gets through.
 				rate *= 0.15;
+			}
+
+			double contactRate = BloodFlow.contactTransfersPerSecond(rate);
+			int transfers = BloodFlow.dropsThisTick(bleeder.contactCarry[part.ordinal()], contactRate);
+			bleeder.contactCarry[part.ordinal()] = BloodFlow.carryAfter(
+					bleeder.contactCarry[part.ordinal()], contactRate);
+			double contactScale = BloodFlow.dropScale(Balance.DROP_SEEP_SPEED / 20.0);
+			for (int i = 0; i < transfers; i++) {
+				BloodStains.transfer(player, part, contactScale, bleeder.transferred++);
 			}
 
 			boolean arterial = BloodFlow.arterial(wound.bloodPerSecond()) && !snapshot.underPressure();

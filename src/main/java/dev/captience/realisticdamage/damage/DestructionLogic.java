@@ -155,7 +155,7 @@ public final class DestructionLogic {
 		boolean bleeds = ServerConfig.get().enableBleeding;
 		if (bleeds) {
 			data.addWound(part, stump);
-			BleedingSystem.spray(player, part, stump, blowDirection);
+			BleedingSystem.spray(player, part, stump, blowDirection, true);
 		}
 		// Last, so the sentence the player reads is this one — and, when it is the
 		// stump wording, it only claims a bleeding stump when one was opened. The

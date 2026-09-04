@@ -1,6 +1,7 @@
 package dev.captience.realisticdamage;
 
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.systems.BloodFlow;
 import org.junit.jupiter.api.Test;
@@ -182,6 +183,67 @@ class BloodFlowTest {
 		// there is no size above this one for a threshold to hide at.
 		assertEquals(Balance.STAIN_POOL_SIZE_MAX, radius, 1.0e-9,
 				"the burst no longer fills a mark; re-derive the gate above");
+	}
+
+	@Test
+	void severanceLeavesMoreThanAnOrdinaryWoundOpening() {
+		int ordinary = BloodFlow.burstDrops(WoundSeverity.CRITICAL.ordinal(), false);
+		int severance = BloodFlow.burstDrops(WoundSeverity.CRITICAL.ordinal(), true);
+		assertEquals(Balance.SPRAY_DROPS_PER_SEVERITY
+				* (1 + WoundSeverity.CRITICAL.ordinal()), ordinary);
+		assertEquals(36, severance, "the severance mark was tuned as a thirty-six-drop event");
+		assertTrue(severance > ordinary, "losing a limb left no more trace than opening its wound");
+	}
+
+	/** The ordinary cone was live-tuned in 1.5; lifting its maths must not retune it. */
+	@Test
+	void ordinaryBurstParametersAreBitIdenticalAfterTheSeveranceSplit() {
+		for (int i = 0; i < 40; i++) {
+			assertEquals(Math.toRadians(BloodFlow.jitterSigned(i, 31) * Balance.SPRAY_SPREAD),
+					BloodFlow.burstYaw(i, Balance.SPRAY_SPREAD));
+			assertEquals(Math.toRadians(BloodFlow.jitterSigned(i, 32) * Balance.SPRAY_SPREAD),
+					BloodFlow.burstPitch(i, Balance.SPRAY_SPREAD));
+			assertEquals(0.55 + 0.45 * BloodFlow.jitter(i, 33), BloodFlow.burstSpeed(i));
+		}
+	}
+
+	@Test
+	void aSeveranceConeIsBiasedTowardTheFloor() {
+		double ordinaryY = 0.0;
+		double severanceY = 0.0;
+		for (int i = 0; i < 36; i++) {
+			ordinaryY += Math.sin((float) BloodFlow.burstPitch(i, Balance.SPRAY_SPREAD));
+			severanceY += Math.sin((float) BloodFlow.burstPitch(i, Balance.SEVERANCE_SPRAY_SPREAD))
+					- Balance.SEVERANCE_DOWN_BIAS;
+		}
+		assertTrue(severanceY / 36.0 < ordinaryY / 36.0 - 0.30,
+				"the extra blood was not aimed toward the surface meant to record the loss");
+		assertTrue(Math.abs(BloodFlow.burstYaw(3, Balance.SEVERANCE_SPRAY_SPREAD))
+				> Math.abs(BloodFlow.burstYaw(3, Balance.SPRAY_SPREAD)),
+				"the severance cone did not get wider");
+	}
+
+	@Test
+	void contactTransferTracksTheWoundWithoutBecomingASecondEmitter() {
+		double minor = BloodFlow.contactTransfersPerSecond(Balance.BLEED_RATE_MINOR);
+		double critical = BloodFlow.contactTransfersPerSecond(Balance.BLEED_RATE_CRITICAL);
+		assertTrue(minor > 0.0, "a bleeding body pressed against stone never leaves a touch");
+		assertTrue(critical > minor, "an artery and a scratch transfer at the same rate");
+		assertTrue(critical < BloodFlow.dropsPerSecond(Balance.BLEED_RATE_CRITICAL),
+				"contact transfer duplicated more blood than the wound visibly emits");
+	}
+
+	@Test
+	void onlyLargeWetWallMarksRun() {
+		assertEquals(0.0, BloodFlow.wallRunDropsPerSecond(
+				Balance.STAIN_WALL_RUN_RADIUS - 0.001, 1.0));
+		assertEquals(0.0, BloodFlow.wallRunDropsPerSecond(Balance.STAIN_POOL_SIZE_MAX, 0.0));
+		double starting = BloodFlow.wallRunDropsPerSecond(Balance.STAIN_WALL_RUN_RADIUS, 1.0);
+		double full = BloodFlow.wallRunDropsPerSecond(Balance.STAIN_POOL_SIZE_MAX, 1.0);
+		assertTrue(starting > 0.0 && full > starting,
+				"a fed wet wall mark never starts moving, or size carries no weight");
+		assertTrue(BloodFlow.wallRunDropsPerSecond(Balance.STAIN_POOL_SIZE_MAX, 0.5) < full,
+				"drying blood runs as quickly as fresh blood");
 	}
 
 	/**

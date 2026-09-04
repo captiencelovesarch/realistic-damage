@@ -90,6 +90,57 @@ public final class BloodFlow {
 	}
 
 	/**
+	 * Drops in the one-shot spray that opens a wound. Severance uses the same
+	 * blood and the same transport, but enough of it to leave a physical record
+	 * where the limb was lost rather than letting the model vanish between two
+	 * frames with only an action-bar sentence behind it.
+	 */
+	public static int burstDrops(int severityOrdinal, boolean severance) {
+		int ordinary = Balance.SPRAY_DROPS_PER_SEVERITY * (1 + Math.max(0, severityOrdinal));
+		return severance ? (int) Math.round(ordinary * Balance.SEVERANCE_SPRAY_SCALE) : ordinary;
+	}
+
+	/** Deterministic yaw of one drop in a spray cone, in radians. */
+	public static double burstYaw(long index, double spreadDegrees) {
+		return Math.toRadians(jitterSigned(index, 31) * spreadDegrees);
+	}
+
+	/** Deterministic pitch of one drop in a spray cone, in radians. */
+	public static double burstPitch(long index, double spreadDegrees) {
+		return Math.toRadians(jitterSigned(index, 32) * spreadDegrees);
+	}
+
+	/** Deterministic speed multiplier for one drop in a spray cone. */
+	public static double burstSpeed(long index) {
+		return 0.55 + 0.45 * jitter(index, 33);
+	}
+
+	/**
+	 * Marks transferred per second while a bleeding region is pressed against a
+	 * wall. This is deliberately a share of the already-bounded visible flow: a
+	 * scratch leaves an occasional touch, while an artery paints the surface, and
+	 * neither can create an unbounded second emitter.
+	 */
+	public static double contactTransfersPerSecond(double bloodPerSecond) {
+		return dropsPerSecond(bloodPerSecond) * Balance.CONTACT_TRANSFER_SHARE;
+	}
+
+	/**
+	 * How quickly a sufficiently large wet wall mark sheds drops. A phase rate,
+	 * not a changing elapsed-time deadline: a drying mark may slow, but the event
+	 * it has already accumulated toward never moves away from it.
+	 */
+	public static double wallRunDropsPerSecond(double radius, double wetness) {
+		if (radius < Balance.STAIN_WALL_RUN_RADIUS || wetness <= 0.0) {
+			return 0.0;
+		}
+		double size = Math.clamp((radius - Balance.STAIN_WALL_RUN_RADIUS)
+				/ Math.max(1.0e-9, Balance.STAIN_POOL_SIZE_MAX - Balance.STAIN_WALL_RUN_RADIUS), 0.0, 1.0);
+		return Balance.STAIN_WALL_RUN_DROPS_PER_SECOND * Math.clamp(wetness, 0.0, 1.0)
+				* (0.35 + 0.65 * size);
+	}
+
+	/**
 	 * How wet a stain still looks, 1 (fresh) to 0 (dry), over its life. Drives the
 	 * colour shift from arterial red to the brown of something that happened a
 	 * while ago — which is what turns a trail into information about *when*.

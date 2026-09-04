@@ -11,6 +11,7 @@ import dev.captience.realisticdamage.client.BloodLens;
 import dev.captience.realisticdamage.client.BloodStains;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
 import dev.captience.realisticdamage.config.Balance;
+import dev.captience.realisticdamage.damage.DestructionLogic;
 import dev.captience.realisticdamage.systems.BleedingSystem;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -317,6 +318,7 @@ public class BloodClientGameTest implements FabricClientGameTest {
 			// With it right they leave 14 marks and 6.54. Six sits between the two
 			// with a wide margin on both sides.
 			int burstMarks = context.computeOnClient(client -> BloodStains.count());
+			double burstInk = context.computeOnClient(client -> BloodStains.inkArea());
 			if (burstMarks < 6) {
 				throw new AssertionError("a critical blow threw "
 						+ Balance.SPRAY_DROPS_PER_SEVERITY * (1 + WoundSeverity.CRITICAL.ordinal())
@@ -384,6 +386,83 @@ public class BloodClientGameTest implements FabricClientGameTest {
 			});
 			context.waitTicks(5);
 			context.takeScreenshot("rd_blood_10_wall");
+
+			// Contact is its own path. A seep falls at your feet and a burst follows
+			// the blow; neither promises that a bleeding body held still against a
+			// wall leaves anything on the surface it is touching. Build that exact
+			// arrangement, use a non-arterial wound so no heartbeat spray can fake the
+			// result, and assert the transfer counter as well as the visible face.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.clearWounds();
+				data.addWound(BodyPart.TORSO, WoundSeverity.MODERATE);
+			});
+			context.runOnClient(client -> BloodStains.reset());
+			prepareContactWall(singleplayer);
+			context.waitTicks(60);
+			long transfers = context.computeOnClient(client -> BloodStains.contactTransfers());
+			if (transfers <= 0) {
+				String contactState = context.computeOnClient(client -> {
+					if (client.player == null) {
+						return "no local player";
+					}
+					int collisions = 0;
+					for (var ignored : client.player.level().getBlockCollisions(client.player,
+							client.player.getBoundingBox().inflate(0.035, 0.0, 0.035))) {
+						collisions++;
+					}
+					return "pos=" + client.player.position() + ", box=" + client.player.getBoundingBox()
+							+ ", nearby collision shapes=" + collisions;
+				});
+				throw new AssertionError("a bleeding body held against stone transferred no blood; "
+						+ contactState);
+			}
+			int contactMarks = context.computeOnClient(client -> BloodStains.countOnFace(Direction.NORTH));
+			if (contactMarks <= 0) {
+				throw new AssertionError(transfers + " contact transfers fired but left no mark on the wall");
+			}
+			context.takeScreenshot("rd_blood_11_contact");
+
+			// A large wet wall mark should not remain a perfectly static decal. Feed
+			// one through the same contact path until it is a pool-sized mark, then
+			// watch the phase accumulator shed a real physics drop from its lower edge.
+			// The counter is the non-vacuous half: a screenshot cannot prove a drop
+			// existed between two frames.
+			mutate(singleplayer, RealisticDamageData::reset);
+			context.waitTicks(10);
+			context.runOnClient(client -> {
+				BloodStains.reset();
+				if (client.player == null) {
+					throw new AssertionError("no local player for the wall-run stage");
+				}
+				for (int i = 0; i < Balance.STAIN_POOL_SPRITE_FEEDS + 2; i++) {
+					if (!BloodStains.transfer(client.player, BodyPart.TORSO, 1.0, 17L)) {
+						throw new AssertionError("the prepared contact wall stopped touching the player");
+					}
+				}
+			});
+			context.waitTicks(80);
+			long runs = context.computeOnClient(client -> BloodStains.wallRuns());
+			if (runs <= 0) {
+				throw new AssertionError("a saturated wet wall mark never ran downward");
+			}
+			context.takeScreenshot("rd_blood_12_wall_run");
+
+			// Losing the limb is a larger physical event than opening the critical
+			// wound on it. Compare the two on the same client and over the same
+			// settling window; both count and ink must clear the ordinary burst, or
+			// the model can still make the limb disappear without the world recording
+			// where it happened.
+			context.runOnClient(client -> BloodStains.reset());
+			severLeftLeg(singleplayer);
+			context.waitTicks(30);
+			int severanceMarks = context.computeOnClient(client -> BloodStains.count());
+			double severanceInk = context.computeOnClient(client -> BloodStains.inkArea());
+			if (severanceMarks <= burstMarks || severanceInk <= burstInk) {
+				throw new AssertionError("severance left " + severanceMarks + " marks / " + severanceInk
+						+ " ink; an ordinary critical opening left " + burstMarks + " / " + burstInk);
+			}
+			context.takeScreenshot("rd_blood_13_severance");
 
 			// The panic button has to cover blood too. This is the promise
 			// disableAllEffects makes, and a new effect that forgot to join it
@@ -500,6 +579,42 @@ public class BloodClientGameTest implements FabricClientGameTest {
 				}
 				BleedingSystem.spray(player, BodyPart.TORSO, WoundSeverity.CRITICAL,
 						new Vec3(0.0, 0.0, -1.0));
+			}
+		});
+	}
+
+	/** Builds a north-facing stone wall and places the player one millimetre from it. */
+	private static void prepareContactWall(TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runOnServer(server -> {
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				ServerLevel level = player.level();
+				int wallZ = Mth.floor(player.getZ()) + 2;
+				int originX = Mth.floor(player.getX());
+				int originY = Mth.floor(player.getY());
+				for (int dx = -2; dx <= 2; dx++) {
+					for (int dy = 0; dy <= 2; dy++) {
+						level.setBlockAndUpdate(new BlockPos(originX + dx, originY + dy, wallZ),
+								Blocks.STONE.defaultBlockState());
+					}
+				}
+				player.setDeltaMovement(Vec3.ZERO);
+				player.teleportTo(player.getX(), player.getY(),
+						wallZ - player.getBbWidth() / 2.0 - 0.001);
+			}
+		});
+	}
+
+	/** Takes the limb through the production choke point, then closes the ongoing wound. */
+	private static void severLeftLeg(TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runOnServer(server -> {
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				player.teleportTo(player.getX(), player.getY(), player.getZ() - 3.0);
+				RealisticDamageData data = RDAttachments.get(player);
+				data.reset();
+				DestructionLogic.destroy(player, data, BodyPart.LEFT_LEG,
+						WoundSeverity.CRITICAL, new Vec3(0.0, 0.0, 1.0));
+				data.clearWounds();
+				RDAttachments.pushSnapshot(player);
 			}
 		});
 	}

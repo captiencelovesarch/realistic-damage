@@ -8,13 +8,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.config.Balance;
+import dev.captience.realisticdamage.damage.BodyHitResolver;
 import dev.captience.realisticdamage.systems.BloodFlow;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -72,6 +78,17 @@ public final class BloodStains {
 	private static final Map<Long, List<BloodStain>> byBlock = new HashMap<>();
 	/** Only ever used to vary splat shape and roll, never to decide anything. */
 	private static long counter;
+	/** Test-visible proof that contact transfer and wall runs actually fired. */
+	private static long contactTransfers;
+	private static long wallRuns;
+	// The local player can settle one movement quantum (about 5.6 cm) off a
+	// server-placed wall after position reconciliation. Keep that visually
+	// touching distance inside the transfer envelope without reaching as far as
+	// even the narrowest intentional walkway gap.
+	private static final double CONTACT_GAP = 0.075;
+	private static final double CONTACT_INSET = 1.0e-4;
+
+	private record Contact(double x, double y, double z, Direction face, double gap) {}
 
 	static void bindSprites(SpriteSet spriteSet) {
 		sprites = spriteSet;
@@ -93,6 +110,12 @@ public final class BloodStains {
 	 * away from where they stood would leave no trail until they were clear of it.
 	 */
 	public static void land(double x, double y, double z, Direction face, double dropScale) {
+		land(x, y, z, face, dropScale, -1);
+	}
+
+	/** As {@link #land(double, double, double, Direction, double)}, retaining the blood's owner. */
+	public static void land(double x, double y, double z, Direction face, double dropScale,
+			int sourceEntityId) {
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		double strength = config.bloodIntensity() * config.bloodStainIntensity;
 		if (strength <= 0.0 || sprites == null) {
@@ -126,11 +149,94 @@ public final class BloodStains {
 
 		long seed = counter++;
 		int variant = Math.min(SPRITE_VARIANTS - 1, (int) (BloodFlow.jitter(seed, 3) * SPRITE_VARIANTS));
-		BloodStain stain = new BloodStain(level, sx, sy, sz, face, radius, seed,
+		BloodStain stain = new BloodStain(level, sx, sy, sz, face, radius, seed, sourceEntityId,
 				sprites.get(variant + SPLAT_SPRITE_OFFSET, BloodEmitter.SPRITE_COUNT - 1),
 				sprites.get(variant + POOL_SPRITE_OFFSET, BloodEmitter.SPRITE_COUNT - 1));
 		client.particleEngine.add(stain);
 		register(stain, sx, sy, sz);
+	}
+
+	/**
+	 * Transfers one visible bead from a bleeding body region to a wall its box is
+	 * actually touching. Collision shapes are used rather than
+	 * {@code horizontalCollision}: the latter only stays true while movement is
+	 * being attempted, so a body that has gone still against stone would stop
+	 * leaving the very mark this method exists to show.
+	 */
+	public static boolean transfer(Player player, BodyPart part, double dropScale, long seed) {
+		ClientEffectsConfig config = ClientEffectsConfig.get();
+		if (sprites == null || config.bloodIntensity() * config.bloodStainIntensity <= 0.0) {
+			return false;
+		}
+		Contact contact = contact(player, part, seed);
+		if (contact == null) {
+			return false;
+		}
+		land(contact.x(), contact.y(), contact.z(), contact.face(), dropScale, player.getId());
+		contactTransfers++;
+		return true;
+	}
+
+	private static @Nullable Contact contact(Player player, BodyPart part, long seed) {
+		AABB body = player.getBoundingBox();
+		Vec3 region = BodyHitResolver.regionCenter(player, part);
+		double y = Math.clamp(region.y + BloodFlow.jitterSigned(seed, 42) * 0.08,
+				body.minY + CONTACT_INSET, body.maxY - CONTACT_INSET);
+		Contact best = null;
+		AABB search = body.inflate(CONTACT_GAP, 0.0, CONTACT_GAP);
+		for (int x = (int) Math.floor(search.minX); x <= (int) Math.floor(search.maxX); x++) {
+			for (int blockY = (int) Math.floor(search.minY); blockY <= (int) Math.floor(search.maxY); blockY++) {
+				for (int z = (int) Math.floor(search.minZ); z <= (int) Math.floor(search.maxZ); z++) {
+					BlockPos pos = new BlockPos(x, blockY, z);
+					VoxelShape shape = player.level().getBlockState(pos)
+							.getCollisionShape(player.level(), pos);
+					for (AABB localBox : shape.toAabbs()) {
+						best = nearer(best, body, region, y, seed, localBox.move(pos));
+					}
+				}
+			}
+		}
+		return best;
+	}
+
+	private static @Nullable Contact nearer(@Nullable Contact best, AABB body,
+			Vec3 region, double y, long seed, AABB wall) {
+		if (y < wall.minY || y > wall.maxY) {
+			return best;
+		}
+		double minZ = Math.max(body.minZ, wall.minZ);
+		double maxZ = Math.min(body.maxZ, wall.maxZ);
+		if (maxZ > minZ) {
+			double z = inside(region.z + BloodFlow.jitterSigned(seed, 43) * 0.10, minZ, maxZ);
+			best = nearer(best, wall.minX - body.maxX, wall.minX, y, z, Direction.WEST);
+			best = nearer(best, body.minX - wall.maxX, wall.maxX, y, z, Direction.EAST);
+		}
+		double minX = Math.max(body.minX, wall.minX);
+		double maxX = Math.min(body.maxX, wall.maxX);
+		if (maxX > minX) {
+			double x = inside(region.x + BloodFlow.jitterSigned(seed, 44) * 0.10, minX, maxX);
+			best = nearer(best, wall.minZ - body.maxZ, x, y, wall.minZ, Direction.NORTH);
+			best = nearer(best, body.minZ - wall.maxZ, x, y, wall.maxZ, Direction.SOUTH);
+		}
+		return best;
+	}
+
+	private static double inside(double value, double min, double max) {
+		double inset = Math.min(CONTACT_INSET, (max - min) * 0.25);
+		return Math.clamp(value, min + inset, max - inset);
+	}
+
+	private static @Nullable Contact nearer(@Nullable Contact best, double gap,
+			double x, double y, double z, Direction face) {
+		double distance = Math.abs(gap);
+		if (distance > CONTACT_GAP) {
+			return best;
+		}
+		if (best == null || distance < best.gap() - 1.0e-9
+				|| Math.abs(distance - best.gap()) <= 1.0e-9 && face.ordinal() < best.face().ordinal()) {
+			return new Contact(x, y, z, face, distance);
+		}
+		return best;
 	}
 
 	/**
@@ -334,6 +440,14 @@ public final class BloodStains {
 		return found;
 	}
 
+	public static long contactTransfers() {
+		return contactTransfers;
+	}
+
+	public static long wallRuns() {
+		return wallRuns;
+	}
+
 	/** Drops references to dead stains so the buckets do not grow without bound. */
 	public static void tick() {
 		if (live.isEmpty()) {
@@ -344,6 +458,25 @@ public final class BloodStains {
 			bucket.removeIf(stain -> !stain.isAlive());
 			return bucket.isEmpty();
 		});
+		Minecraft client = Minecraft.getInstance();
+		ClientLevel level = client.level;
+		if (level == null || sprites == null) {
+			return;
+		}
+		for (BloodStain stain : live) {
+			if (!stain.isAlive() || !stain.advanceWallRun()) {
+				continue;
+			}
+			long seed = counter++;
+			int variant = Math.min(BloodEmitter.DROP_SPRITE_COUNT - 1,
+					(int) (BloodFlow.jitter(seed, 45) * BloodEmitter.DROP_SPRITE_COUNT));
+			BloodDrop drop = new BloodDrop(level, stain.px(),
+					stain.py() - stain.radius() - Balance.STAIN_SURFACE_OFFSET, stain.pz(),
+					0.0, -0.02, 0.0, stain.sourceEntityId(),
+					sprites.get(variant, BloodEmitter.SPRITE_COUNT - 1));
+			client.particleEngine.add(drop);
+			wallRuns++;
+		}
 	}
 
 	/** Dimension change, disconnect, or the player switching the effect off. */
@@ -354,5 +487,7 @@ public final class BloodStains {
 		live.clear();
 		byBlock.clear();
 		counter = 0;
+		contactTransfers = 0;
+		wallRuns = 0;
 	}
 }

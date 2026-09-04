@@ -80,6 +80,16 @@ public final class BleedingSystem {
 	 * by everyone who can see the victim.
 	 */
 	public static void spray(ServerPlayer player, BodyPart part, WoundSeverity severity, Vec3 direction) {
+		spray(player, part, severity, direction, false);
+	}
+
+	/**
+	 * The ordinary wound spray, or the wider floor-biased mark left when the same
+	 * wound is a stump. Kept in one path so the 1.5 cone cannot drift away from the
+	 * severance variant and every particle still carries severity in its velocity.
+	 */
+	public static void spray(ServerPlayer player, BodyPart part, WoundSeverity severity, Vec3 direction,
+			boolean severance) {
 		if (!ServerConfig.get().enableBleeding) {
 			return;
 		}
@@ -91,10 +101,19 @@ public final class BleedingSystem {
 		// direction-less spray at 35% of SPRAY_SPEED — 2.45 b/s against 7.0, which
 		// peaks 0.16 blocks above a torso origin that has 0.72 blocks of hitbox
 		// above it, so not one drop of it ever left the body.
-		Vec3 away = direction.lengthSqr() < 1.0e-6
-				? new Vec3(0.0, 1.0, 0.0)
-				: direction.normalize().scale(-1.0);
-		int count = Balance.SPRAY_DROPS_PER_SEVERITY * (1 + severity.ordinal());
+		Vec3 away;
+		if (direction.lengthSqr() < 1.0e-6) {
+			if (severance) {
+				double yaw = Math.toRadians(player.getYRot());
+				away = new Vec3(-Math.sin(yaw), 0.0, Math.cos(yaw));
+			} else {
+				away = new Vec3(0.0, 1.0, 0.0);
+			}
+		} else {
+			away = direction.normalize().scale(-1.0);
+		}
+		int count = BloodFlow.burstDrops(severity.ordinal(), severance);
+		double spread = severance ? Balance.SEVERANCE_SPRAY_SPREAD : Balance.SPRAY_SPREAD;
 		double speed = Balance.SPRAY_SPEED / 20.0;
 		for (int i = 0; i < count; i++) {
 			// Thrown back along the blow, in a cone. sendParticles' own delta
@@ -102,10 +121,13 @@ public final class BleedingSystem {
 			// express a direction, so each drop is sent individually with its own
 			// velocity — that velocity is also how the client reads the drop's
 			// size, so a critical wound sprays visibly bigger blood.
-			double yaw = Math.toRadians(BloodFlow.jitterSigned(i, 31) * Balance.SPRAY_SPREAD);
-			double pitch = Math.toRadians(BloodFlow.jitterSigned(i, 32) * Balance.SPRAY_SPREAD);
-			Vec3 thrown = away.yRot((float) yaw).xRot((float) pitch)
-					.scale(speed * (0.55 + 0.45 * BloodFlow.jitter(i, 33)));
+			double yaw = BloodFlow.burstYaw(i, spread);
+			double pitch = BloodFlow.burstPitch(i, spread);
+			Vec3 thrown = away.yRot((float) yaw).xRot((float) pitch);
+			if (severance) {
+				thrown = thrown.add(0.0, -Balance.SEVERANCE_DOWN_BIAS, 0.0).normalize();
+			}
+			thrown = thrown.scale(speed * BloodFlow.burstSpeed(i));
 			level.sendParticles(dev.captience.realisticdamage.RDParticles.BLOOD,
 					at.x, at.y, at.z, 0, thrown.x, thrown.y, thrown.z, 1.0);
 		}

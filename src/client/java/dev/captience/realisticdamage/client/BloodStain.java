@@ -54,6 +54,8 @@ public class BloodStain extends SingleQuadParticle {
 	 */
 	private final TextureAtlasSprite poolSprite;
 	private final Direction face;
+	/** Entity the blood came from, so a run down the wall does not splash back onto it. */
+	private final int sourceEntityId;
 	private double radius;
 	/**
 	 * How many drops have been fed into this mark since it was laid. The pool tier
@@ -64,11 +66,16 @@ public class BloodStain extends SingleQuadParticle {
 	 * deterministic function of what landed on it.
 	 */
 	private int feeds;
+	/** True once the one-way splat-to-pool sprite swap has happened. */
+	private boolean pool;
+	/** Phase accumulator for gravity pulling a sufficiently large wet wall mark downward. */
+	private double wallRunPhase;
 
 	BloodStain(ClientLevel level, double x, double y, double z, Direction face, double radius, long seed,
-			TextureAtlasSprite sprite, TextureAtlasSprite poolSprite) {
+			int sourceEntityId, TextureAtlasSprite sprite, TextureAtlasSprite poolSprite) {
 		super(level, x, y, z, sprite);
 		this.face = face;
+		this.sourceEntityId = sourceEntityId;
 		this.poolSprite = poolSprite;
 		this.radius = radius;
 		this.hasPhysics = false;
@@ -87,6 +94,10 @@ public class BloodStain extends SingleQuadParticle {
 
 	Direction face() {
 		return face;
+	}
+
+	int sourceEntityId() {
+		return sourceEntityId;
 	}
 
 	double radius() {
@@ -127,7 +138,7 @@ public class BloodStain extends SingleQuadParticle {
 	 * beads claim to be a pool while still the size of a splat.
 	 */
 	boolean isPool() {
-		return feeds >= Balance.STAIN_POOL_SPRITE_FEEDS && radius >= Balance.STAIN_POOL_SPRITE_RADIUS;
+		return pool;
 	}
 
 	/** Feeds another drop into this mark, growing it toward the pool maximum. */
@@ -144,7 +155,9 @@ public class BloodStain extends SingleQuadParticle {
 		// a pool under every heartbeat of a running player: one beat throws a
 		// whole burst from one point on one tick, and a burst landing in one mark
 		// crossed any radius the tier could sensibly use.
-		if (isPool()) {
+		if (!pool && feeds >= Balance.STAIN_POOL_SPRITE_FEEDS
+				&& radius >= Balance.STAIN_POOL_SPRITE_RADIUS) {
+			pool = true;
 			setSprite(poolSprite);
 		}
 		// A mark that is still being fed is a mark that is still wet. Winding the
@@ -152,6 +165,29 @@ public class BloodStain extends SingleQuadParticle {
 		// bleeding rather than as something that happened and stopped.
 		age = Math.max(0, age - (int) (Balance.STAIN_LIFETIME_SECONDS * 20.0 * Balance.STAIN_WET_FRACTION));
 		applyLook();
+	}
+
+	/**
+	 * Advances the gravity phase for a wall mark and pays one drop's worth of
+	 * radius when it wraps. Returns true on the tick a falling run should spawn.
+	 */
+	boolean advanceWallRun() {
+		if (face.getAxis() == Direction.Axis.Y) {
+			return false;
+		}
+		double wetness = BloodFlow.stainWetness((double) age / lifetime);
+		double rate = BloodFlow.wallRunDropsPerSecond(radius, wetness);
+		if (rate <= 0.0) {
+			return false;
+		}
+		wallRunPhase += rate / 20.0;
+		if (wallRunPhase < 1.0) {
+			return false;
+		}
+		wallRunPhase -= 1.0;
+		radius = Math.max(Balance.STAIN_DROP_SIZE_MIN, radius - Balance.STAIN_WALL_RUN_DRAIN);
+		applyLook();
+		return true;
 	}
 
 	private void applyLook() {

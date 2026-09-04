@@ -250,6 +250,14 @@ public final class Balance {
 	public static final int SPRAY_DROPS_PER_SEVERITY = 5;
 	public static final double SPRAY_SPEED = 7.0;
 	public static final double SPRAY_SPREAD = 38.0;
+	/** A lost limb leaves more than the ordinary wound-opening spray behind. */
+	public static final double SEVERANCE_SPRAY_SCALE = 1.8;
+	/** Wide enough to put the loss on the floor as well as along the blow. */
+	public static final double SEVERANCE_SPRAY_SPREAD = 70.0;
+	/** Downward vector bias applied after the severance cone is rotated. */
+	public static final double SEVERANCE_DOWN_BIAS = 0.45;
+	/** Share of visible wound flow transferred to a wall the body is touching. */
+	public static final double CONTACT_TRANSFER_SHARE = 0.35;
 
 	// Stains: what a drop leaves on the surface it hits.
 	/** Hard cap on tracked stains. Oldest are evicted first (spec §56: no unbounded state). */
@@ -323,6 +331,12 @@ public final class Balance {
 	 * discovered.
 	 */
 	public static final double STAIN_POOL_SPRITE_RADIUS = 0.36;
+	/** A wet wall mark must be this large before gravity starts pulling a run from it. */
+	public static final double STAIN_WALL_RUN_RADIUS = STAIN_POOL_SPRITE_RADIUS;
+	/** Maximum drops per second shed by one saturated wet wall mark. */
+	public static final double STAIN_WALL_RUN_DROPS_PER_SECOND = 1.0;
+	/** Radius paid by a wall mark each time it sheds a drop. */
+	public static final double STAIN_WALL_RUN_DRAIN = 0.025;
 	/**
 	 * ...and how many drops must have gone into a mark before the swap may happen
 	 * at all. A pool is an accretion, and only a count can say so.

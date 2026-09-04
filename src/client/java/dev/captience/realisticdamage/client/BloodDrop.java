@@ -135,7 +135,7 @@ public class BloodDrop extends SingleQuadParticle {
 			case SOUTH -> sz = box.minZ;
 			case NORTH -> sz = box.maxZ;
 		}
-		BloodStains.land(sx, sy, sz, face, scale);
+		BloodStains.land(sx, sy, sz, face, scale, sourceEntityId);
 		remove();
 	}
 
