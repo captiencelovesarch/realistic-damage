@@ -70,6 +70,9 @@ public class RealisticDamageClient implements ClientModInitializer {
 				RealisticDamage.id("body_hud"), BodyHud::render);
 		HudElementRegistry.attachElementAfter(VanillaHudElements.BOSS_BAR,
 				RealisticDamage.id("triage_hud"), TriageHud::render);
+		// The blackout last of all (1.6.2), so going dark covers the hotbar, the
+		// hearts and the body diagram too, and not just the world behind them.
+		HudElementRegistry.addLast(RealisticDamage.id("blackout"), ConsciousnessEffects::renderBlackout);
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			ClientState.tick();

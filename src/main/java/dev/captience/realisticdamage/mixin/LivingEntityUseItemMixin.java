@@ -39,19 +39,28 @@ public abstract class LivingEntityUseItemMixin {
 			return;
 		}
 		RealisticDamageData data = RDAttachments.get(player);
-		double penalty = penaltyFor(player, data, useItem.getUseAnimation());
-		if (penalty > 0.0) {
-			this.useItemRemaining += data.advanceUseStall(penalty);
+		double stall = stallFor(player, data, useItem);
+		if (stall > 0.0) {
+			this.useItemRemaining += data.advanceUseStall(stall);
 		}
 	}
 
-	private static double penaltyFor(ServerPlayer player, RealisticDamageData data, ItemUseAnimation animation) {
+	/**
+	 * Stalled ticks per tick. The two-handed penalty is already in those units
+	 * and capped well under one; the eating curve is a duration factor and goes
+	 * through {@link ImpairmentMath#useStallPerTick}, which also holds the whole
+	 * meal to five seconds (1.6.2).
+	 */
+	private static double stallFor(ServerPlayer player, RealisticDamageData data, ItemStack useItem) {
+		ItemUseAnimation animation = useItem.getUseAnimation();
 		if (animation == ItemUseAnimation.BOW || animation == ItemUseAnimation.CROSSBOW
 				|| animation == ItemUseAnimation.SPEAR) {
 			return ImpairmentSystem.twoHandedPenalty(player, data);
 		}
 		if (animation == ItemUseAnimation.EAT || animation == ItemUseAnimation.DRINK) {
-			return ImpairmentMath.eatingStallPenalty(ConsciousnessSystem.effective(data));
+			return ImpairmentMath.useStallPerTick(
+					ImpairmentMath.eatingStallPenalty(ConsciousnessSystem.effective(data)),
+					useItem.getUseDuration(player));
 		}
 		return 0.0;
 	}

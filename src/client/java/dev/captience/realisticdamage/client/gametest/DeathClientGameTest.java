@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.client.gametest;
 
+import dev.captience.realisticdamage.client.Afterimage;
 import dev.captience.realisticdamage.client.ClientState;
 import dev.captience.realisticdamage.client.ConsciousnessEffects;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -184,6 +185,13 @@ public class DeathClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("meant to die under a full ladder, but the living frame drew vignette "
 						+ living[0] + " and washout " + living[1] + "/255");
 			}
+			// Deep in the band, the blur and the afterimage are both up; they are
+			// the two things the playtest saw snap off on the death frame (1.6.2).
+			double livingGhost = context.computeOnClient(client -> Afterimage.strength());
+			if (livingGhost < 0.5 || !context.computeOnClient(client -> ConsciousnessEffects.blurRequestedLastFrame())) {
+				throw new AssertionError("meant to die blurred and ghosting, but the living frame had ghost "
+						+ livingGhost + " and blur " + context.computeOnClient(client -> ConsciousnessEffects.blurRequestedLastFrame()));
+			}
 			context.takeScreenshot("rd_death_09_low_before");
 			singleplayer.getServer().runOnServer(server -> {
 				for (ServerPlayer player : server.getPlayerList().getPlayers()) {
@@ -218,10 +226,23 @@ public class DeathClientGameTest implements FabricClientGameTest {
 							+ last[0] + " / " + last[1] + " / " + last[2] + ", dying sample " + sample
 							+ " drew " + dying[0] + " / " + dying[1] + " / " + dying[2]);
 				}
+				// ...and neither the ghost nor the blur may have let go.
+				double dyingGhost = context.computeOnClient(client -> Afterimage.strength());
+				if (dyingGhost < livingGhost - 1.0e-6) {
+					throw new AssertionError("the afterimage let go on dying: " + livingGhost + " then " + dyingGhost);
+				}
+				if (!context.computeOnClient(client -> ConsciousnessEffects.blurRequestedLastFrame())) {
+					throw new AssertionError("the blur snapped off on the death screen, dying sample " + sample);
+				}
+				long ghostFrames = context.computeOnClient(client -> Afterimage.framesProcessed());
+				context.waitTicks(2);
+				if (context.computeOnClient(client -> Afterimage.framesProcessed()) <= ghostFrames) {
+					throw new AssertionError("the afterimage chain stopped running on the death screen, sample " + sample);
+				}
 				if (sample == 0) {
 					context.takeScreenshot("rd_death_10_low_moment");
 				}
-				context.waitTicks(35);
+				context.waitTicks(33);
 			}
 			context.takeScreenshot("rd_death_11_low_settled");
 			context.clickScreenButton("deathScreen.respawn");

@@ -71,9 +71,20 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.waitTicks(30);
 			context.takeScreenshot("rd_10_greyout");
 
-			// Collapse: prone pose plus the heavy blackout fade.
+			// Collapse: prone pose plus the heavy blackout fade — drawn by the
+			// last HUD element of all (1.6.2), so it covers the hotbar and hearts
+			// rather than sitting under them.
 			mutate(singleplayer, data -> data.drainConsciousness(100.0));
 			context.waitTicks(40);
+			double collapsed = context.computeOnClient(client -> ConsciousnessEffects.lastBlackoutLevel());
+			if (collapsed < 0.8) {
+				throw new AssertionError("unconscious and the blackout only reached " + collapsed);
+			}
+			long blackDraws = context.computeOnClient(client -> ConsciousnessEffects.blackoutDraws());
+			context.waitTicks(3);
+			if (context.computeOnClient(client -> ConsciousnessEffects.blackoutDraws()) <= blackDraws) {
+				throw new AssertionError("the blackout was computed but the top-of-HUD element never drew it");
+			}
 			context.takeScreenshot("rd_03_unconscious");
 
 			// Recovery: everything must unwind cleanly.

@@ -507,6 +507,19 @@ phase is the model's own `0.6662` scaling of the walk counter; the first build u
 shook the view nine times a second. Server rule
 `spawnSeveredLimbs`, default on, nested under destruction by construction.
 
+**Three more playtest fixes.** The blackout is drawn by a HUD element registered last of
+all, so going dark in Grounded covers the hotbar, the hearts, the crosshair and the body
+diagram instead of leaving them crisp over a black world; screens still draw above it, so
+the death screen's buttons stay reachable. The eating stall was applied as whole extra
+ticks per tick, and at a factor of 1.0 or more that cancels the countdown outright — below
+consciousness 20 food could not be finished until recovery lifted you back over the line,
+"about a minute" in play. `ImpairmentMath.useStallPerTick` now turns the curve's duration
+factor into `1 - 1/factor` stalled ticks per tick, always under one, and caps the whole
+meal at `EAT_MAX_TICKS` (five seconds). And the blur no longer snaps off on the death
+frame: the death screen draws no blur of its own, so the frozen deep-band haze keeps
+requesting vanilla's gaussian through the fade; the afterimage never stopped, and the
+death test now asserts both.
+
 ## Deliberate non-goals
 
 Persistent blood as block/world state, medical items, mob anatomy, and numeric HUD stats. The inventory panel may show condition figures on request;

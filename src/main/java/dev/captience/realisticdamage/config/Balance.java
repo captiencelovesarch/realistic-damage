@@ -844,6 +844,17 @@ public final class Balance {
 	 */
 	public static final double EAT_STALL_AT_20 = 1.0;
 	public static final double EAT_STALL_AT_0 = 4.0;
+	/**
+	 * The longest any meal may take, stalled, in ticks: five seconds (1.6.2).
+	 * The curve above is a factor on the food's own duration — 1.0 extra is
+	 * twice as long, 4.0 is five times — and this caps the product, so bread at
+	 * zero consciousness is five seconds and not eight. Before 1.6.2 the stall
+	 * was applied as whole extra ticks per tick, which at a factor of 1.0 or more
+	 * cancelled the meal's own countdown entirely: below consciousness 20 food
+	 * could not be finished until natural recovery lifted you back over the line,
+	 * which the playtest measured as "about a minute".
+	 */
+	public static final int EAT_MAX_TICKS = 100;
 
 	// --- Microsleeps (1.4) ---
 	/**

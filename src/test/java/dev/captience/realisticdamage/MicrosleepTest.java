@@ -137,15 +137,48 @@ class MicrosleepTest {
 	}
 
 	/**
-	 * Slower, never refused. A stall penalty is extra ticks on the meal; nothing
-	 * in the curve may become large enough to be indistinguishable from "you
-	 * cannot eat", because food is the only cure in this mod.
+	 * Slower, never refused, and never longer than five seconds (1.6.2). This
+	 * runs the actual mechanism — a countdown handed back stalled ticks each
+	 * tick, exactly as the use-item mixin does — rather than multiplying the
+	 * curve's value, which is how the first version of this test passed while
+	 * the game had food that could not be finished below consciousness 20.
 	 */
 	@Test
 	void eatingStaysPossibleHoweverBadItGets() {
-		int normalEatTicks = 32;
-		double worstCase = normalEatTicks * (1.0 + ImpairmentMath.eatingStallPenalty(0.0));
-		assertTrue(worstCase / 20.0 < 12.0,
-				"a meal at zero consciousness must still be finishable, got " + worstCase / 20.0 + "s");
+		int bread = 32;
+		int atZero = ticksToFinish(0.0, bread);
+		assertTrue(atZero > bread, "eating at zero must be slower than normal, took " + atZero);
+		assertTrue(atZero <= Balance.EAT_MAX_TICKS, "and never longer than five seconds, took " + atZero);
+		assertTrue(atZero >= Balance.EAT_MAX_TICKS - 4, "and at the bottom it should use most of them, took " + atZero);
+		int atTwenty = ticksToFinish(Balance.SYMPTOM_SPRINT_LOSS, bread);
+		assertTrue(atTwenty > bread && atTwenty < atZero,
+				"at twenty it is between normal and the bottom, took " + atTwenty);
+		assertEquals(bread, ticksToFinish(Balance.SYMPTOM_ATTACK_RECOVERY, bread), "unimpaired above the curve");
+		// A long food is capped too: honey is forty ticks, and five times that is ten seconds.
+		assertTrue(ticksToFinish(0.0, 40) <= Balance.EAT_MAX_TICKS, "a slow food is still five seconds at most");
+		// The whole curve, on a concussed head as well: nothing anywhere fails to finish.
+		for (double raw = 0.0; raw <= Balance.CONSCIOUSNESS_MAX; raw += 1.0) {
+			double effective = Vitals.effectiveConsciousness(raw, true);
+			int ticks = ticksToFinish(effective, bread);
+			assertTrue(ticks <= Balance.EAT_MAX_TICKS, "a meal must finish inside five seconds at raw " + raw + ", took " + ticks);
+		}
+	}
+
+	/** The use-item mixin's arithmetic, tick by tick: the countdown, and the stall handed back each tick. */
+	private static int ticksToFinish(double effectiveConsciousness, int baseTicks) {
+		double perTick = ImpairmentMath.useStallPerTick(
+				ImpairmentMath.eatingStallPenalty(effectiveConsciousness), baseTicks);
+		int remaining = baseTicks;
+		double carry = 0.0;
+		int ticks = 0;
+		while (remaining > 0 && ticks < 100_000) {
+			carry += perTick;
+			int whole = (int) carry;
+			carry -= whole;
+			remaining += whole;
+			remaining--;
+			ticks++;
+		}
+		return remaining > 0 ? Integer.MAX_VALUE : ticks;
 	}
 }

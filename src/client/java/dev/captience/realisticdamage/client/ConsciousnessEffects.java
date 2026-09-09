@@ -54,6 +54,23 @@ public final class ConsciousnessEffects {
 	/** The consciousness vignette's strength and the total blackout, 0 to 1, on the last frame. */
 	private static double vignetteStrength;
 	private static double blackoutLevel;
+	/**
+	 * What {@link #renderBlackout} draws this frame (1.6.2). The black used to
+	 * be filled here, in an element that sits just above vanilla's overlays —
+	 * and so under the hotbar, the hearts, the crosshair and the body diagram,
+	 * every one of which stayed crisp on top of a screen that was supposed to
+	 * have gone dark. "You can still see the UI," in the Grounded playtest. It
+	 * is now handed to a second element registered last of all, so it covers
+	 * the whole HUD; a Screen (the death screen, an inventory) still draws above
+	 * it, which is the one thing that must stay reachable.
+	 */
+	private static double topBlackout;
+	private static long blackoutDraws;
+
+	/** Times the top-of-HUD blackout element actually filled the screen; read by the client gametest. */
+	public static long blackoutDraws() {
+		return blackoutDraws;
+	}
 
 	/**
 	 * The ladder as death found it (1.6.1). Captured from the last living frame
@@ -131,6 +148,7 @@ public final class ConsciousnessEffects {
 		deathFloorCaptured = false;
 		vignetteStrength = 0.0;
 		blackoutLevel = 0.0;
+		topBlackout = 0.0;
 		lastExposureAlphaDrawn = 0;
 		if (!ClientState.active() || ClientState.snapshot() == null) {
 			return;
@@ -204,8 +222,7 @@ public final class ConsciousnessEffects {
 		//
 		// Vanilla's blur has no intensity, so it is kept on while the haze is
 		// strong and cut once the ghosting is heavy enough to cover its going.
-		if (Afterimage.haze() > BLUR_CUTOFF && config.afterimageIntensity > 0.0
-				&& Minecraft.getInstance().gui.screen() == null) {
+		if (Afterimage.haze() > BLUR_CUTOFF && config.afterimageIntensity > 0.0 && blurAllowed()) {
 			graphics.blurBeforeThisStratum();
 			blurRequested = true;
 		}
@@ -296,10 +313,31 @@ public final class ConsciousnessEffects {
 					ARGB.color((int) (eased * 150.0), 215, 190, 165));
 		}
 
+		// Drawn by renderBlackout, above everything the HUD has to say.
 		blackoutLevel = Math.min(1.0, blackout);
-		if (blackout > 0.01) {
-			black(graphics, width, height, blackoutLevel);
+		topBlackout = blackoutLevel;
+	}
+
+	/**
+	 * The last HUD element of all: the blackout, over the hotbar, the hearts,
+	 * the crosshair and the mod's own body diagram. See {@link #topBlackout}.
+	 */
+	public static void renderBlackout(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+		if (topBlackout > 0.004) {
+			black(graphics, graphics.guiWidth(), graphics.guiHeight(), topBlackout);
+			blackoutDraws++;
 		}
+	}
+
+	/**
+	 * Whether this frame may ask for vanilla's blur. Only one request is allowed
+	 * per frame and an ordinary open Screen makes its own; the death screen
+	 * does not — it draws a gradient instead — so the blur may be kept up
+	 * through the death sequence (1.6.2) without colliding with anything.
+	 */
+	private static boolean blurAllowed() {
+		var screen = Minecraft.getInstance().gui.screen();
+		return screen == null || screen instanceof net.minecraft.client.gui.screens.DeathScreen;
 	}
 
 	/** Washout alpha actually drawn on the last living frame; the floor reads it. */
@@ -352,7 +390,15 @@ public final class ConsciousnessEffects {
 		// What was on the lens when you died stays on the lens, drying.
 		BloodLens.render(graphics, width, height);
 
-		// The ladder, exactly as death found it.
+		// The ladder, exactly as death found it — the blur included (1.6.2).
+		// The haze is frozen with everything else while dying, and the death
+		// screen draws no blur of its own, so the gaussian a deep-band player
+		// was seeing stays up instead of snapping off on the death frame. The
+		// afterimage never stopped: it runs on the world render, not the HUD.
+		if (Afterimage.haze() > BLUR_CUTOFF && config.afterimageIntensity > 0.0 && blurAllowed()) {
+			graphics.blurBeforeThisStratum();
+			blurRequested = true;
+		}
 		if (floorVignette > 0.01) {
 			ladderVignette(graphics, width, height, (float) floorVignette);
 		}
@@ -396,8 +442,6 @@ public final class ConsciousnessEffects {
 			}
 		}
 		blackoutLevel = black;
-		if (black > 0.004) {
-			black(graphics, width, height, black);
-		}
+		topBlackout = black;
 	}
 }

@@ -98,9 +98,10 @@ public final class ImpairmentMath {
 	}
 
 	/**
-	 * How much longer a meal takes as consciousness fades (1.4), expressed as
-	 * stalled use-ticks per tick: 0 is normal speed, 1.0 is twice as long, 4.0 is
-	 * five times.
+	 * How much longer a meal takes as consciousness fades (1.4), as extra
+	 * duration on the food's own: 0 is normal speed, 1.0 is twice as long, 4.0 is
+	 * five times — before {@link #useStallPerTick} caps the whole meal at
+	 * {@link Balance#EAT_MAX_TICKS}.
 	 *
 	 * <p>Food is the only cure in this mod, so eating is the one action that is
 	 * never refused for weakness — but it should not stay a free instant either.
@@ -123,6 +124,30 @@ public final class ImpairmentMath {
 		}
 		double t = (Balance.SYMPTOM_SPRINT_LOSS - effectiveConsciousness) / Balance.SYMPTOM_SPRINT_LOSS;
 		return Balance.EAT_STALL_AT_20 + t * (Balance.EAT_STALL_AT_0 - Balance.EAT_STALL_AT_20);
+	}
+
+	/**
+	 * Turns an extra-duration factor into the stalled use-ticks to add per tick
+	 * (1.6.2). A use that counts down one tick per tick and is handed back
+	 * {@code s} of a tick each time takes {@code 1 / (1 - s)} times as long, so
+	 * a meal that should take {@code 1 + extra} times its length needs
+	 * {@code s = 1 - 1 / (1 + extra)} — always under one, so it always ends.
+	 *
+	 * <p>Capped so the whole meal never exceeds {@link Balance#EAT_MAX_TICKS}:
+	 * the factor is cut to {@code EAT_MAX_TICKS / baseTicks} when the food's own
+	 * duration would carry it past five seconds, and never below one.
+	 *
+	 * <p>The bug this replaces: the curve's value was added directly as ticks,
+	 * so at an extra of 1.0 the countdown gained a tick for every tick it lost
+	 * and never reached zero. Food is the only cure in this mod, and below
+	 * consciousness 20 it had quietly stopped working.
+	 */
+	public static double useStallPerTick(double extra, int baseTicks) {
+		double factor = 1.0 + Math.max(0.0, extra);
+		if (baseTicks > 0) {
+			factor = Math.min(factor, Math.max(1.0, Balance.EAT_MAX_TICKS / (double) baseTicks));
+		}
+		return 1.0 - 1.0 / factor;
 	}
 
 	/**
