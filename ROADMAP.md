@@ -314,16 +314,29 @@ what exists before adding what doesn't.
   horizon sways, nods and slumps as consciousness fails, without the aim moving at all.
   New **Head Sway** slider; the spring rides Impact Shock and vanilla's Damage Tilt.
 
+## Shipped in 1.6.2
+
+The camera brainstorm's four answers, the stump the body was missing, and the limb
+itself — pulled forward from 1.7 the way limb destruction was pulled into 1.0, because the
+author had answered every design question and the mark alone had stopped being enough.
+
+- **Camera Drift on by default** at a low level, a **heavy head** that lets the picture
+  trail the aim on fast turns, a **drunk walk** that lurches the view on each footstep near
+  collapse, and impact kicks that overshoot at any health.
+- **Stumps.** A lost limb leaves five pixels of itself and a cut face, on the model and
+  raised into view in first person, and the stump wound soaks into it.
+- **The severed limb entity.** Thrown along the blow, hard by a blast, dropped when there
+  was none; lands, bounces once, bleeds for most of a minute, burns away in fire or lava,
+  and is gone. Walk-through, ignored by mobs, never saved. Server rule `spawnSeveredLimbs`.
+
 ## 1.7: Anatomy for everyone
 
 Mobs get bodies. Deliberately last, because it doubles the surface area of
 every system and needs everything before it to be stable first.
 
-- **The limb itself**: a visible severed-limb entity thrown from the loss. 1.6
-  leaves the mark and the bleeding stump; making the missing piece physical is
-  entity work and belongs beside the anatomy release rather than as a late decal.
 - **Mob body regions**, starting with humanoids where the existing hitbox
-  geometry transfers directly.
+  geometry transfers directly. (The severed-limb entity originally planned here
+  shipped early in 1.6.2 and is ready for mobs to reuse.)
 - **Headshots on mobs** that impair rather than simply damaging, mirroring the
   player rules so the mod stays symmetric.
 - **Crippling**: hobbled mobs move slower, disarmed ones stop using weapons.

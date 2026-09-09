@@ -212,8 +212,31 @@ public final class ClientEffectsConfig {
 	public double heartbeatVolume = 1.0;
 	/** Grounded preset: the screen goes completely black while unconscious. */
 	public boolean fullBlackUnconscious = false;
-	/** Grounded preset: the camera sways and sags as consciousness fades. */
-	public double cameraDriftIntensity = 0.0;
+	/**
+	 * The camera sways and sags as consciousness fades — on the <em>aim</em>,
+	 * which is what makes it the one camera effect that actually costs control.
+	 * Off everywhere but Grounded until 1.6.2; now on at a low level by default,
+	 * the author's call, because a mod about losing consciousness should let
+	 * the head go a little for everyone. {@link #cameraDriftSeeded} carries an
+	 * existing file across: a plain zero in a 1.6.1 file is the old default,
+	 * not a choice, and is raised once — unless the whole sensory layer was
+	 * silenced, in which case it stays silent.
+	 */
+	public double cameraDriftIntensity = 0.35;
+	public boolean cameraDriftSeeded = false;
+	/**
+	 * The picture trailing the aim on fast turns (1.6.2); see
+	 * {@link CameraMotion}. Its own control rather than part of Head Sway: this
+	 * is the most motion-sickness-prone thing the camera does, and a player who
+	 * wants the horizon to sway may still want the world to stop where their
+	 * hand stopped. Boxed and migrated like {@link #cameraSwayIntensityValue}.
+	 */
+	public Double cameraLagIntensityValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double cameraLag() {
+		return cameraLagIntensityValue == null ? 0.7 : cameraLagIntensityValue;
+	}
 	/**
 	 * The horizon tilting, the head nodding into a microsleep, the slump of
 	 * collapse (1.6.1) — all of it on the view only, never on the aim. See
@@ -250,8 +273,9 @@ public final class ClientEffectsConfig {
 		ringingVolume = 0.8;
 		heartbeatVolume = 1.0;
 		fullBlackUnconscious = false;
-		cameraDriftIntensity = 0.0;
+		cameraDriftIntensity = 0.35;
 		cameraSwayIntensityValue = 0.55;
+		cameraLagIntensityValue = 0.5;
 		desaturationIntensity = 0.7;
 		distortionIntensity = 0.5;
 		visceralInjurySounds = false;
@@ -280,6 +304,7 @@ public final class ClientEffectsConfig {
 		fullBlackUnconscious = true;
 		cameraDriftIntensity = 1.0;
 		cameraSwayIntensityValue = 1.0;
+		cameraLagIntensityValue = 1.0;
 		desaturationIntensity = 1.0;
 		distortionIntensity = 1.0;
 		visceralInjurySounds = true;
@@ -307,7 +332,9 @@ public final class ClientEffectsConfig {
 		ringingVolume = 0.0;
 		heartbeatVolume = 0.0;
 		cameraDriftIntensity = 0.0;
+		cameraDriftSeeded = true;
 		cameraSwayIntensityValue = 0.0;
+		cameraLagIntensityValue = 0.0;
 		desaturationIntensity = 0.0;
 		distortionIntensity = 0.0;
 		mufflingIntensity = 0.0;
@@ -371,6 +398,18 @@ public final class ClientEffectsConfig {
 		if (cameraSwayIntensityValue == null) {
 			// Zero for a silenced config, a restrained default for anyone else.
 			cameraSwayIntensityValue = vignetteIntensity <= 0.0 ? 0.0 : 0.7 * Math.min(1.0, vignetteIntensity);
+		}
+		if (cameraLagIntensityValue == null) {
+			cameraLagIntensityValue = vignetteIntensity <= 0.0 ? 0.0 : 0.7 * Math.min(1.0, vignetteIntensity);
+		}
+		if (!cameraDriftSeeded) {
+			// One-time: a file from before 1.6.2 holds the old zero default. It
+			// is raised to the new default unless the layer was silenced, and
+			// never touched again — a later zero is the player's own.
+			if (cameraDriftIntensity <= 0.0 && vignetteIntensity > 0.0) {
+				cameraDriftIntensity = 0.35;
+			}
+			cameraDriftSeeded = true;
 		}
 	}
 

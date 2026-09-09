@@ -274,6 +274,32 @@ public final class Balance {
 	/** ...and the ceiling on that, so a gout does not fog a whole pool. */
 	public static final double DROP_DISSOLVE_SIZE_MAX = 0.34;
 
+	// The severed limb (1.6.2): a thrown, bleeding, burnable object.
+	/** Ticks the limb lies there before it is gone: a minute. */
+	public static final int LIMB_LIFETIME_TICKS = 1200;
+	/** Ticks over which its trickle runs dry; shorter than its life, so it lies still and dry at the end. */
+	public static final int LIMB_BLEED_TICKS = 900;
+	/** Ticks in fire or lava before it has burnt away. */
+	public static final int LIMB_BURN_TICKS = 24;
+	/** Blocks per tick along a blow (6 b/s), and along a blast (17 b/s). */
+	public static final double LIMB_THROW_SPEED = 0.30;
+	public static final double LIMB_BLAST_SPEED = 0.85;
+	/** Upward component so a throw arcs and a drop clears the body. */
+	public static final double LIMB_THROW_LIFT = 0.22;
+	public static final double LIMB_BLAST_LIFT = 0.30;
+	public static final double LIMB_DROP_LIFT = 0.06;
+	/** Deterministic sideways scatter, blocks per tick, so two limbs do not land in one spot. */
+	public static final double LIMB_THROW_SCATTER = 0.05;
+	public static final double LIMB_GRAVITY = 0.045;
+	public static final double LIMB_AIR_DRAG = 0.98;
+	/** Meat does not slide: most of the horizontal speed goes on contact. */
+	public static final double LIMB_GROUND_DRAG = 0.55;
+	/** One low bounce, and none below this landing speed. */
+	public static final double LIMB_BOUNCE = 0.35;
+	public static final double LIMB_BOUNCE_MIN_SPEED = 0.12;
+	public static final double LIMB_WATER_DRAG = 0.85;
+	public static final double LIMB_WATER_SINK = 0.004;
+
 	// Stains: what a drop leaves on the surface it hits.
 	/** Hard cap on tracked stains. Oldest are evicted first (spec §56: no unbounded state). */
 	public static final int STAIN_CAPACITY = 768;

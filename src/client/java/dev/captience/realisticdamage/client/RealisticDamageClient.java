@@ -36,6 +36,10 @@ public class RealisticDamageClient implements ClientModInitializer {
 					}
 				});
 
+		// The lost limb lying where it fell (1.6.2).
+		net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
+				dev.captience.realisticdamage.RDEntities.SEVERED_LIMB, SeveredLimbRenderer::new);
+
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.ImpactPayload.TYPE,
 				(payload, context) -> ImpactEffect.trigger(payload.magnitude(), payload.yaw(),

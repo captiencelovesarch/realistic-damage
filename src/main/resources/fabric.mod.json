@@ -50,7 +50,8 @@
 			"dev.captience.realisticdamage.gametest.ScarGameTest",
 			"dev.captience.realisticdamage.gametest.StumpGameTest",
 			"dev.captience.realisticdamage.gametest.ExplosiveDismembermentGameTest",
-			"dev.captience.realisticdamage.gametest.InjuryAggroGameTest"
+			"dev.captience.realisticdamage.gametest.InjuryAggroGameTest",
+			"dev.captience.realisticdamage.gametest.SeveredLimbGameTest"
 		]
 	},
 	"mixins": [

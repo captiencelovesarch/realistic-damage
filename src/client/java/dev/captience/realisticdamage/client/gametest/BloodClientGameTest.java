@@ -8,6 +8,9 @@ import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.client.BloodBody;
 import dev.captience.realisticdamage.client.BloodDrop;
+import dev.captience.realisticdamage.client.BloodEmitter;
+import dev.captience.realisticdamage.client.SeveredLimbRenderer;
+import dev.captience.realisticdamage.entity.SeveredLimb;
 import dev.captience.realisticdamage.client.BloodLens;
 import dev.captience.realisticdamage.client.BloodStains;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
@@ -483,6 +486,28 @@ public class BloodClientGameTest implements FabricClientGameTest {
 			}
 			context.takeScreenshot("rd_blood_13_severance");
 
+			// The limb itself (1.6.2). The loss above threw one along the blow;
+			// it has to exist on this client, be drawn, and bleed where it lies.
+			int limbs = context.computeOnClient(client -> client.level.getEntitiesOfClass(SeveredLimb.class,
+					client.player.getBoundingBox().inflate(24.0)).size());
+			if (limbs < 1) {
+				throw new AssertionError("a lost leg left no limb in the world");
+			}
+			context.runOnClient(client -> {
+				client.player.setXRot(30.0F);
+				client.player.setYRot(0.0F);
+			});
+			long limbSubmits = context.computeOnClient(client -> SeveredLimbRenderer.submits());
+			long limbBlood = context.computeOnClient(client -> BloodEmitter.limbDrops());
+			context.waitTicks(20);
+			if (context.computeOnClient(client -> SeveredLimbRenderer.submits()) <= limbSubmits) {
+				throw new AssertionError("the severed limb was never drawn");
+			}
+			if (context.computeOnClient(client -> BloodEmitter.limbDrops()) <= limbBlood) {
+				throw new AssertionError("the severed limb lay there without bleeding");
+			}
+			context.takeScreenshot("rd_blood_16_severed_limb");
+
 			// Water (1.6.1). A drop treated water as air: it fell through, stopped
 			// on the pool floor and marked it, blood sitting on the bottom like
 			// gravel. Wade into a shallow pool with an open wound and the drops
@@ -491,9 +516,14 @@ public class BloodClientGameTest implements FabricClientGameTest {
 				data.reset();
 				data.clearWounds();
 			});
-			context.runOnClient(client -> BloodStains.reset());
 			wadeIntoPool(singleplayer);
-			context.waitTicks(10);
+			// Order matters: the limb is discarded inside wadeIntoPool, but its
+			// last drops are still in the air for a few ticks and land wherever
+			// they were going. Let them, then clear the field, so the count below
+			// is the pool's alone. Two of those late drops failed this stage when
+			// the reset came first.
+			context.waitTicks(25);
+			context.runOnClient(client -> BloodStains.reset());
 			mutate(singleplayer, data -> data.addWound(BodyPart.TORSO, WoundSeverity.SEVERE));
 			long dissolvedBefore = context.computeOnClient(client -> BloodDrop.dissolvedCount());
 			context.waitTicks(60);
@@ -663,6 +693,12 @@ public class BloodClientGameTest implements FabricClientGameTest {
 		singleplayer.getServer().runOnServer(server -> {
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 				ServerLevel level = player.level();
+				// The severance stage left a limb bleeding onto dry floor within
+				// emitter range; its marks are not the pool's. Two of them failed
+				// this stage's zero-marks assertion the first time it ran after
+				// the limb existed.
+				level.getEntitiesOfClass(SeveredLimb.class,
+						player.getBoundingBox().inflate(64.0)).forEach(SeveredLimb::discard);
 				double px = player.getX() + 12.0;
 				int originX = Mth.floor(px);
 				int originY = Mth.floor(player.getY());

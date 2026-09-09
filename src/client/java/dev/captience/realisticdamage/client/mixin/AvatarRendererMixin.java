@@ -74,6 +74,25 @@ public abstract class AvatarRendererMixin {
 	}
 
 	/**
+	 * A destroyed arm in first person (1.6.2) is a stump, not an absence: the
+	 * whole-arm submit is cancelled and the raised stump drawn in its place.
+	 * {@code ItemInHandRendererMixin} is what lets this method be reached at all
+	 * for a destroyed arm — it used to cancel the hand path outright.
+	 */
+	@Inject(method = "renderHand", at = @At("HEAD"), cancellable = true)
+	private void realisticdamage$stumpInsteadOfArm(PoseStack poseStack, SubmitNodeCollector collector,
+			int lightCoords, Identifier skinTexture, ModelPart arm, boolean hasSleeve, CallbackInfo ci) {
+		PlayerModel model = ((AvatarRenderer<?>) (Object) this).getModel();
+		boolean rightArm = arm == model.rightArm;
+		if (FirstPersonBlood.armDestroyed(rightArm)) {
+			arm.resetPose();
+			arm.zRot = rightArm ? 0.1F : -0.1F;
+			FirstPersonBlood.submitStump(poseStack, collector, lightCoords, arm, rightArm, skinTexture);
+			ci.cancel();
+		}
+	}
+
+	/**
 	 * Vanilla carries held items in their own render states, outside the player
 	 * model. Hiding an arm therefore does not hide what it was holding unless the
 	 * matching physical hand is cleared here as well. This only edits the

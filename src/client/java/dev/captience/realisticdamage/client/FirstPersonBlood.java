@@ -40,11 +40,74 @@ public final class FirstPersonBlood {
 	private static @Nullable ModelPart[] wideScar;
 	private static @Nullable ModelPart[] slimScar;
 
+	private static @Nullable ModelPart[] wideStump;
+	private static @Nullable ModelPart[] slimStump;
+	private static @Nullable ModelPart[] wideCap;
+	private static @Nullable ModelPart[] slimCap;
+	private static @Nullable ModelPart[] wideStumpBlood;
+	private static @Nullable ModelPart[] slimStumpBlood;
+
 	/** Blood shells submitted onto the first-person arm this session; read by the client gametest. */
 	private static long bloodSubmits;
+	/** Stumps drawn in first person this session; read by the client gametest. */
+	private static long stumpSubmits;
 
 	public static long bloodSubmits() {
 		return bloodSubmits;
+	}
+
+	public static long stumpSubmits() {
+		return stumpSubmits;
+	}
+
+	/** True when the local player's arm on this side is gone, so the hand path draws a stump instead. */
+	public static boolean armDestroyed(boolean rightArm) {
+		LocalPlayer player = Minecraft.getInstance().player;
+		if (player == null) {
+			return false;
+		}
+		BodySnapshot snapshot = player.getAttached(RDAttachments.SNAPSHOT);
+		return snapshot != null && snapshot.destroyed(rightArm ? BodyPart.RIGHT_ARM : BodyPart.LEFT_ARM);
+	}
+
+	/**
+	 * The stump, in first person (1.6.2). Vanilla positions the arm so that the
+	 * hand fills the corner of the screen and the shoulder sits behind the
+	 * camera — which is exactly where a five-pixel stump would be, and so it was
+	 * invisible and the arm "just disappeared". It is raised by the length it
+	 * lost, so the cut end sits where the hand used to: the player holding what
+	 * is left of the arm up in front of them, which is what people do.
+	 */
+	public static void submitStump(PoseStack poseStack, SubmitNodeCollector collector, int lightCoords,
+			ModelPart arm, boolean rightArm, net.minecraft.resources.Identifier skin) {
+		LocalPlayer player = Minecraft.getInstance().player;
+		if (player == null) {
+			return;
+		}
+		BodyPart part = rightArm ? BodyPart.RIGHT_ARM : BodyPart.LEFT_ARM;
+		boolean slim = player.getSkin().model() == PlayerModelType.SLIM;
+		ModelPart[] stumps = slim ? (slimStump == null ? slimStump = LimbMeshes.stumps(true, 0.0F) : slimStump)
+				: (wideStump == null ? wideStump = LimbMeshes.stumps(false, 0.0F) : wideStump);
+		ModelPart[] caps = slim ? (slimCap == null ? slimCap = LimbMeshes.stumpCaps(true) : slimCap)
+				: (wideCap == null ? wideCap = LimbMeshes.stumpCaps(false) : wideCap);
+		ModelPart[] shells = slim
+				? (slimStumpBlood == null ? slimStumpBlood = LimbMeshes.stumps(true, BloodBodyLayer.SKIN_OFFSET) : slimStumpBlood)
+				: (wideStumpBlood == null ? wideStumpBlood = LimbMeshes.stumps(false, BloodBodyLayer.SKIN_OFFSET) : wideStumpBlood);
+		float[] stains = BloodBody.stains(player.getId());
+		float level = stains == null ? 0.0F : stains[part.ordinal()];
+		ClientEffectsConfig config = ClientEffectsConfig.get();
+		double strength = config.bloodIntensity() * config.bloodBodyIntensity;
+		poseStack.pushPose();
+		arm.translateAndRotate(poseStack);
+		// Raised by most of what it lost, along the arm (model units are
+		// sixteenths): the cut end sits three pixels short of where the hand
+		// ended, so the stump's own skin shows beside the cut instead of the cut
+		// alone filling the corner of the screen.
+		poseStack.translate(0.0F, (12.0F - LimbMeshes.STUMP_LENGTH - 3.0F) / 16.0F, 0.0F);
+		BloodBodyLayer.submitStump(collector, poseStack, skin, stumps[part.ordinal()], caps[part.ordinal()],
+				shells[part.ordinal()], level, strength, lightCoords, OverlayTexture.NO_OVERLAY);
+		poseStack.popPose();
+		stumpSubmits++;
 	}
 
 	/**

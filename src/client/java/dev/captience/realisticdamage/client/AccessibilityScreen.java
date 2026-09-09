@@ -160,6 +160,12 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						config::stumbleIntensity, value -> config.stumbleIntensityValue = value),
 				slider("realisticdamage.config.camera_sway",
 						config::cameraSway, value -> config.cameraSwayIntensityValue = value));
+		// The heavy head on its own row, alone: the one camera effect most likely
+		// to disagree with someone's stomach should not be hiding beside a sibling.
+		this.list.addSmall(
+				slider("realisticdamage.config.camera_lag",
+						config::cameraLag, value -> config.cameraLagIntensityValue = value),
+				null);
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.sound"));
 		this.list.addSmall(

@@ -4,6 +4,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import dev.captience.realisticdamage.config.Balance;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.util.Mth;
 
 /**
  * Camera movement that is <em>view</em>, not aim (1.6.1).
@@ -43,6 +45,14 @@ import net.minecraft.client.Minecraft;
  * without taking the camera away from them. The head sways; the hand still
  * points where it pointed.
  *
+ * <p><b>The heavy head and the drunk walk (1.6.2).</b> Two more answers to the
+ * same question, both approved from the brainstorm. A share of every fast turn
+ * goes into a spring that trails the aim and catches up late, so the world
+ * swings and settles behind the crosshair (its own slider, Heavy Head, because
+ * it is the most motion-sickness-prone thing here). And each footstep near
+ * collapse rolls and dips the view unevenly, riding the walk cycle vanilla
+ * already animates, under Head Sway.
+ *
  * <p>All deterministic (sines of a tick clock, no RNG), all frozen while dying
  * so death inherits the last living pose, and all behind two sliders: the
  * spring behind Impact Shock, the sway behind its own Head Sway control.
@@ -68,7 +78,13 @@ public final class CameraMotion {
 	 * overshoots, settled inside three quarters of a second.
 	 */
 	private static final double ROT_STIFFNESS = 0.80;
-	private static final double ROT_DAMPING = 0.50;
+	/**
+	 * 0.36 rather than the 0.50 of the first build (1.6.2): a damping ratio near
+	 * 0.20, so a blow visibly overshoots two or three times even on a clear head.
+	 * The author's call — the picture is allowed to be violent because none of
+	 * this touches the aim.
+	 */
+	private static final double ROT_DAMPING = 0.36;
 	/** The eye shove is snappier and better damped; a camera that slides about reads as a bug. */
 	private static final double SHOVE_STIFFNESS = 1.40;
 	private static final double SHOVE_DAMPING = 0.85;
@@ -76,10 +92,10 @@ public final class CameraMotion {
 	private static final double MAX_STEP = 0.25;
 
 	// Impulse sizes at full magnitude and full intensity.
-	private static final double BLOW_ROLL = 11.0;
-	private static final double BLOW_PITCH = 5.0;
-	private static final double BLOW_YAW = 4.5;
-	private static final double BLOW_SHOVE = 0.07;
+	private static final double BLOW_ROLL = 13.0;
+	private static final double BLOW_PITCH = 5.5;
+	private static final double BLOW_YAW = 5.5;
+	private static final double BLOW_SHOVE = 0.085;
 	private static final double CUT_ROLL = 5.0;
 	private static final double PIERCE_PITCH = 3.5;
 	private static final double BLAST_SHAKE = 1.0;
@@ -90,6 +106,29 @@ public final class CameraMotion {
 	private static double shake;
 	private static double shakePhase;
 	private static final double SHAKE_TICKS = 14.0;
+
+	// The heavy head (1.6.2): the picture trails the aim on fast turns.
+	private static final int LAG_YAW = 0;
+	private static final int LAG_PITCH = 1;
+	private static final double[] lagPos = new double[2];
+	private static final double[] lagVel = new double[2];
+	private static float lastAimYaw;
+	private static float lastAimPitch;
+	private static boolean aimKnown;
+	/** Snappier than the impact spring — a lag that lingers reads as broken mouse input. */
+	private static final double LAG_STIFFNESS = 1.10;
+	private static final double LAG_DAMPING = 0.75;
+	/** Share of a turn the picture initially misses, at full severity and intensity. */
+	private static final double LAG_SHARE_MAX = 0.55;
+	/** The lag never exceeds this, whatever the flick. */
+	private static final double LAG_CLAMP = 30.0;
+	/** A jump larger than this in one frame is a teleport or respawn, not a turn. */
+	private static final double LAG_TELEPORT = 60.0;
+
+	// The drunk walk (1.6.2): each footstep lurches the view.
+	private static final double LURCH_ROLL_MAX = 5.0;
+	private static final double LURCH_DIP_MAX = 1.6;
+	private static final double LURCH_X_MAX = 0.03;
 
 	// Sway.
 	private static double time;
@@ -215,8 +254,66 @@ public final class CameraMotion {
 			shakePhase += deltaTicks;
 			shake = Math.max(0.0, shake - deltaTicks / SHAKE_TICKS);
 		}
+		heavyHead(deltaTicks);
 		time += deltaTicks;
 		sway();
+	}
+
+	/**
+	 * The heavy head: as consciousness fails a fast turn is not followed by the
+	 * picture at once. A share of every turn is put into a spring pointing back
+	 * the way the aim came, which then catches up and overshoots — the world
+	 * swings late and settles, the way it does when you turn your head faster
+	 * than it wants to go. The aim itself is exact the whole time; this is the
+	 * view-only counterpart of Look Drift, and the two are separate sliders.
+	 */
+	private static void heavyHead(double deltaTicks) {
+		Minecraft client = Minecraft.getInstance();
+		LocalPlayer player = client.player;
+		if (player == null) {
+			aimKnown = false;
+			return;
+		}
+		float yaw = player.getYRot();
+		float pitch = player.getXRot();
+		if (!aimKnown) {
+			lastAimYaw = yaw;
+			lastAimPitch = pitch;
+			aimKnown = true;
+		}
+		double deltaYaw = Mth.wrapDegrees(yaw - lastAimYaw);
+		double deltaPitch = pitch - lastAimPitch;
+		lastAimYaw = yaw;
+		lastAimPitch = pitch;
+		double intensity = ClientEffectsConfig.get().cameraLag();
+		double severity = ClientState.active() ? ClientState.ramp(Balance.SYMPTOM_SENSITIVITY, 0.0) : 0.0;
+		double share = severity * Math.min(1.0, intensity) * LAG_SHARE_MAX;
+		if (share > 0.0 && client.gui.screen() == null
+				&& Math.abs(deltaYaw) < LAG_TELEPORT && Math.abs(deltaPitch) < LAG_TELEPORT) {
+			lagPos[LAG_YAW] = Math.clamp(lagPos[LAG_YAW] - deltaYaw * share, -LAG_CLAMP, LAG_CLAMP);
+			lagPos[LAG_PITCH] = Math.clamp(lagPos[LAG_PITCH] - deltaPitch * share, -LAG_CLAMP, LAG_CLAMP);
+		}
+		double remaining = deltaTicks;
+		while (remaining > 1.0e-6) {
+			double dt = Math.min(MAX_STEP, remaining);
+			remaining -= dt;
+			for (int i = 0; i < 2; i++) {
+				double acceleration = -LAG_STIFFNESS * lagPos[i] - LAG_DAMPING * lagVel[i];
+				lagVel[i] += acceleration * dt;
+				lagPos[i] += lagVel[i] * dt;
+			}
+		}
+		for (int i = 0; i < 2; i++) {
+			if (Math.abs(lagPos[i]) < 1.0e-4 && Math.abs(lagVel[i]) < 1.0e-4) {
+				lagPos[i] = 0.0;
+				lagVel[i] = 0.0;
+			}
+		}
+	}
+
+	/** The heavy head's current yaw trail, degrees; for the client gametest. */
+	public static double lastLagYaw() {
+		return lagPos[LAG_YAW];
 	}
 
 	/** Semi-implicit Euler on one channel; stable for these constants at MAX_STEP. */
@@ -246,13 +343,30 @@ public final class CameraMotion {
 		double pitch = Math.sin(time / 31.0) * SWAY_PITCH_MAX
 				+ (ClientState.breath() - 0.5) * 2.0 * SWAY_HEAVE_MAX;
 		double drift = Math.sin(time / 37.0) * SWAY_X_MAX;
+		// The drunk walk: each footstep rolls and dips the view, unevenly — a
+		// second harmonic offset in phase so one foot lands heavier than the
+		// other. Rides the walk cycle vanilla already animates, so it is in step
+		// with the view bob and the injured-leg pose rather than beside them.
+		LocalPlayer player = Minecraft.getInstance().player;
+		double lurchRoll = 0.0;
+		double lurchDip = 0.0;
+		double lurchX = 0.0;
+		if (player != null) {
+			float partial = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
+			double step = player.walkAnimation.position(partial);
+			double pace = Math.min(1.0, player.walkAnimation.speed(partial));
+			double stride = Math.sin(step * Math.PI) + 0.5 * Math.sin(step * Math.PI * 2.0 + 0.7);
+			lurchRoll = stride * LURCH_ROLL_MAX * pace;
+			lurchDip = Math.abs(Math.cos(step * Math.PI)) * LURCH_DIP_MAX * pace;
+			lurchX = Math.sin(step * Math.PI) * LURCH_X_MAX * pace;
+		}
 		// The nod and the slump ride the fades themselves, not the ramp: a
 		// microsleep is an event with edges, and the edges are the whole cue.
 		double nod = ClientState.microsleepFade() * NOD_PITCH;
 		double slump = ClientState.unconsciousFade();
-		swayRoll = s * roll + slump * SLUMP_ROLL * intensity;
-		swayPitch = s * pitch + (nod + slump * SLUMP_PITCH) * intensity;
-		swayX = s * drift;
+		swayRoll = s * (roll + lurchRoll) + slump * SLUMP_ROLL * intensity;
+		swayPitch = s * (pitch + lurchDip) + (nod + slump * SLUMP_PITCH) * intensity;
+		swayX = s * (drift + lurchX);
 	}
 
 	/**
@@ -272,8 +386,8 @@ public final class CameraMotion {
 			shakeYaw = Math.sin(shakePhase * 1.9 + 1.0) * a * 0.5;
 		}
 		double roll = pos[ROLL] + swayRoll + shakeRoll;
-		double pitch = pos[PITCH] + swayPitch + shakePitch;
-		double yaw = pos[YAW] + shakeYaw;
+		double pitch = pos[PITCH] + swayPitch + shakePitch + lagPos[LAG_PITCH];
+		double yaw = pos[YAW] + shakeYaw + lagPos[LAG_YAW];
 		double x = pos[SHOVE_X] + swayX;
 		double y = pos[SHOVE_Y];
 		if (Math.abs(roll) < 1.0e-4 && Math.abs(pitch) < 1.0e-4 && Math.abs(yaw) < 1.0e-4
@@ -297,5 +411,8 @@ public final class CameraMotion {
 		swayRoll = 0.0;
 		swayPitch = 0.0;
 		swayX = 0.0;
+		java.util.Arrays.fill(lagPos, 0.0);
+		java.util.Arrays.fill(lagVel, 0.0);
+		aimKnown = false;
 	}
 }

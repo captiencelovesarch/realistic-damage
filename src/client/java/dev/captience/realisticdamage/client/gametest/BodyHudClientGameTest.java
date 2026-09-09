@@ -3,7 +3,9 @@ package dev.captience.realisticdamage.client.gametest;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.client.Afterimage;
+import dev.captience.realisticdamage.client.BloodBodyLayer;
 import dev.captience.realisticdamage.client.BodyHud;
+import dev.captience.realisticdamage.client.FirstPersonBlood;
 import dev.captience.realisticdamage.client.CameraMotion;
 import dev.captience.realisticdamage.client.BodyInspector;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
@@ -232,7 +234,11 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 				data.reset();
 				data.drainConsciousness(88.0);   // about 12: deep in the sway band
 			});
+			// Camera Drift moves the aim on purpose and is on by default since
+			// 1.6.2, so it is switched off for this measurement: what is being
+			// asserted is that the sway itself never touches the aim.
 			context.runOnClient(client -> {
+				ClientEffectsConfig.get().cameraDriftIntensity = 0.0;
 				client.player.setXRot(10.0F);
 				client.player.setYRot(0.0F);
 			});
@@ -252,8 +258,8 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			if (context.computeOnClient(client -> CameraMotion.applications()) <= applied) {
 				throw new AssertionError("the head sway was computed but never applied to the view");
 			}
-			// Camera Drift is zero in a default config, so nothing else in the mod
-			// should be moving the aim here; the sway certainly must not be.
+			// With drift off nothing else in the mod moves the aim here; the sway
+			// certainly must not be.
 			if (Math.abs(aimAfterSway[0] - 10.0F) > 0.01F || Math.abs(aimAfterSway[1]) > 0.01F) {
 				throw new AssertionError("the head sway moved the aim: pitch " + aimAfterSway[0]
 						+ ", yaw " + aimAfterSway[1]);
@@ -290,9 +296,22 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.runOnClient(client -> client.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_BACK));
 			context.waitTicks(30);
 			context.takeScreenshot("rd_06_destroyed");
+			// A lost limb leaves a stump, not an absence (1.6.2): three destroyed
+			// limbs in view must be drawing stumps frame after frame.
+			long stumps = context.computeOnClient(client -> BloodBodyLayer.stumpSubmits());
+			context.waitTicks(3);
+			if (context.computeOnClient(client -> BloodBodyLayer.stumpSubmits()) <= stumps) {
+				throw new AssertionError("three destroyed limbs drew no stumps in third person");
+			}
 			context.runOnClient(client -> client.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON));
 			context.waitTicks(10);
-			// First person: the arm and anything it was holding must be gone too.
+			// First person: the hand and anything it was holding are gone, and the
+			// stump is raised into view where the hand was.
+			long handStumps = context.computeOnClient(client -> FirstPersonBlood.stumpSubmits());
+			context.waitTicks(3);
+			if (context.computeOnClient(client -> FirstPersonBlood.stumpSubmits()) <= handStumps) {
+				throw new AssertionError("a destroyed main arm drew no stump in first person");
+			}
 			context.takeScreenshot("rd_09_firstperson_armless");
 
 			// Inventory inspector: open the inventory with a battered body and check

@@ -114,6 +114,10 @@ with your pulse; blood soaks into the limb it came out of and dries there; and i
 the camera, which is the part you can't miss. Every layer of it has its own slider, and
 none of it is on the HUD.
 
+Losing a limb leaves a stump — on your model, and raised into view in first person — and
+the limb itself, thrown along the blow, lying where it lands and bleeding out for most of a
+minute before it's gone. You can walk through it, mobs ignore it, and fire burns it away.
+
 Breaking, losing a limb and going down each have their own synthesised audio, in a muted
 set that sits inside Minecraft's palette and a visceral set that doesn't. Your own
 injuries are close and loud; a teammate's carry from where they're standing, quieter —
@@ -156,6 +160,7 @@ mod is concerned, so it bleeds, breaks, concusses and goes down exactly as you w
 | `enableLimbDestruction` | true | Arcade preset: limbs can be destroyed permanently |
 | `enableExplosiveDismemberment` | true | Extreme TNT and creeper trauma can take the nearest limb outright; nested under limb destruction |
 | `enableLongTermInjuries` | false | Worst injuries permanently lower a region's healing ceiling by state band |
+| `spawnSeveredLimbs` | true | A lost limb is thrown into the world, lands, bleeds for a minute and is gone; nested under limb destruction |
 | `enableKnockdown` | true | Hard landings put you on the ground for a moment |
 | `enableMicrosleeps` | true | Consciousness cuts out in episodes on the way down |
 | `softenFallLethality` | true | Compresses vanilla's lethal fall tail so long drops maim rather than delete |
@@ -218,9 +223,8 @@ rule is enabled. Creative and Spectator are ignored entirely.
 
 ## What's next
 
-`ROADMAP.md` covers what comes after Consequence: anatomy for mobs, and the physical limb
-that 1.6 deliberately left as a mark rather than an entity. Medical items are explicitly
-not on it.
+`ROADMAP.md` covers what comes after Consequence: anatomy for mobs. Medical items are
+explicitly not on it.
 
 ## Design
 

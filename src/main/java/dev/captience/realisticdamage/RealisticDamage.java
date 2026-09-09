@@ -39,6 +39,7 @@ public class RealisticDamage implements ModInitializer {
 						.onPressureRequest(context.player(), payload.targetId()));
 		RDAttachments.init();
 		RDParticles.init();
+		RDEntities.init();
 		dev.captience.realisticdamage.systems.TickDispatcher.init();
 		dev.captience.realisticdamage.systems.ImpairmentSystem.init();
 		dev.captience.realisticdamage.systems.ConsciousnessSystem.init();

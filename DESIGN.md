@@ -1,4 +1,4 @@
-# Realistic Damage — Design (v1.6.1)
+# Realistic Damage — Design (v1.6.2)
 
 > "Minecraft, but damage is cooler." Vanilla hearts stay authoritative; this mod adds a
 > physical layer: locational body trauma, deterministic injuries (Broken / Bleeding /
@@ -459,10 +459,52 @@ was. Two things live there:
   feel the camera slipping without taking the camera away — and a player who cannot stand
   their aim being touched can still have this. Deterministic, frozen while dying.
 
+## Added in 1.6.2
+
+The camera brainstorm, answered in full; the stump the body was missing; and the limb the
+1.7 roadmap had promised, pulled forward the way limb destruction was pulled into 1.0.
+
+**Four more ways to lose the camera, all approved.** Camera Drift — the one effect that
+moves the *aim* — is now on at 35% by default rather than Grounded-only; an existing file's
+zero is raised once by a seeded migration unless the whole layer was silenced. The impact
+spring is under-damped (ratio near 0.20) with larger impulses, so a blow visibly overshoots
+two or three times at any health. A **heavy head** (its own slider, being the most
+motion-sickness-prone thing here) puts a share of every fast turn into a spring that trails
+the aim and catches up late, so the world swings and settles behind the crosshair — Look
+Drift's view-only twin. And a **drunk walk** under Head Sway rolls and dips the view on each
+footstep near collapse, unevenly, riding the walk cycle vanilla already animates.
+
+**Stumps.** A destroyed limb used to be an absence — `PlayerModelMixin` hid the part and
+nothing replaced it. `LimbMeshes` now bakes the upper five pixels of each limb from vanilla's
+cube definitions, a thin cut-face cube on a synthesised cross-section texture
+(`tools/generate_stump.py`), and a stump-length blood shell, and `BloodBodyLayer` submits
+the three posed off the hidden vanilla part, which `setupAnim` still rotates — so the stump
+swings with the walk. In first person vanilla positions the arm so the shoulder sits behind
+the camera, which is where a five-pixel stump would be, so it is raised by the length it
+lost: the cut end sits where the hand was, the player holding up what is left. The
+destroyed-arm hand path is no longer cancelled outright; it is routed down vanilla's own
+empty-hand branch, where the arm submit is swapped for the stump.
+
+**The limb itself.** `SeveredLimb` is an entity thrown from `DestructionLogic.destroy` — the
+same choke point as the wound, the scar and the sound, so no way of losing a limb can forget
+it. Not saved (`noSave`), not summonable, not pickable, pushable or collidable: you walk
+through it, no mob can see it (it is not a `LivingEntity`, and `PreyMath` reads bodies), and
+it holds nothing. Blasts throw it along the blast radial at 17 b/s, blows toss it along the
+swing at 6 b/s, a limb ground down or taken by command drops where it was; the scatter is
+`BloodFlow`'s hash seeded from victim, region and tick, so two clients see one flight. It
+falls, bounces once low, stops dead rather than sliding, sinks in water, and burns away in
+fire or lava over 24 ticks. It bleeds a critical wound's trickle from the client emitter,
+running dry over 45 s, and is gone at 60 s, fading over the last two. The wire carries the
+region, the owner's UUID (for the skin, resolved client-side because the server does not
+know an arm width), an age once a second so a late joiner fades it on time, and burn
+progress. `SeveredLimbRenderer` draws the region's cube in the owner's skin plus the skin's
+second layer, the cut face at the shoulder or hip end, and a drying blood shell — all from
+`LimbMeshes`, so the limb on the floor is the limb that was on the body. Server rule
+`spawnSeveredLimbs`, default on, nested under destruction by construction.
+
 ## Deliberate non-goals
 
-Visible severed-limb entities, persistent blood as block/world state, medical items, mob
-anatomy, and numeric HUD stats. The inventory panel may show condition figures on request;
+Persistent blood as block/world state, medical items, mob anatomy, and numeric HUD stats. The inventory panel may show condition figures on request;
 the HUD never does, and Blood/Consciousness are named by band and never numbered anywhere.
 TACZ integration is still deferred, but `DamageCategory` + `BodyHitResolver` accept
 externally supplied classification and hit points so an adapter can slot in later.

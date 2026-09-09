@@ -6,12 +6,6 @@ import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.ScarMask;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
-import net.minecraft.client.model.geom.builders.CubeDeformation;
-import net.minecraft.client.model.geom.builders.CubeListBuilder;
-import net.minecraft.client.model.geom.builders.LayerDefinition;
-import net.minecraft.client.model.geom.builders.MeshDefinition;
-import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
@@ -151,6 +145,29 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 	/** The same six regions again, worn closer to the skin, for the scar pass. */
 	private final ModelPart[] scarWide;
 	private final ModelPart[] scarSlim;
+	/**
+	 * The stump (1.6.2): what is left of a destroyed limb. Vanilla's part is
+	 * hidden by {@code PlayerModelMixin}, so until now a lost arm was simply an
+	 * absence — "the arm just disappears with nothing to show for it", in the
+	 * author's words. These are the upper {@link LimbMeshes#STUMP_LENGTH} pixels
+	 * of each limb on the player's own skin, a cut face over the end, and a
+	 * blood shell of the same length so the stump wound has something to soak.
+	 * Posed off the hidden vanilla part, whose rotations setupAnim still
+	 * computes, so the stump swings with the walk like the limb did.
+	 */
+	private final ModelPart[] stumpWide;
+	private final ModelPart[] stumpSlim;
+	private final ModelPart[] stumpCapWide;
+	private final ModelPart[] stumpCapSlim;
+	private final ModelPart[] stumpBloodWide;
+	private final ModelPart[] stumpBloodSlim;
+
+	/** Stumps drawn this session; read by the client gametest. */
+	private static long stumpSubmitCount;
+
+	public static long stumpSubmits() {
+		return stumpSubmitCount;
+	}
 
 	/** Indexed by {@code ScarLevel.ordinal()}; slot 0 is never written. */
 	private static final long[] scarSubmitCounts = new long[ScarLevel.values().length];
@@ -195,6 +212,12 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 		this.slim = bake(true, SKIN_OFFSET);
 		this.scarWide = bake(false, SCAR_OFFSET);
 		this.scarSlim = bake(true, SCAR_OFFSET);
+		this.stumpWide = LimbMeshes.stumps(false, 0.0F);
+		this.stumpSlim = LimbMeshes.stumps(true, 0.0F);
+		this.stumpCapWide = LimbMeshes.stumpCaps(false);
+		this.stumpCapSlim = LimbMeshes.stumpCaps(true);
+		this.stumpBloodWide = LimbMeshes.stumps(false, SKIN_OFFSET);
+		this.stumpBloodSlim = LimbMeshes.stumps(true, SKIN_OFFSET);
 	}
 
 	@Override
@@ -216,14 +239,16 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 		// The second cast, and the only one in this class: broken is limb state,
 		// not paint, and it rides with the destroyed mask. See LimbStateHolder.
 		int broken = ((LimbStateHolder) state).realisticdamage$brokenMask();
-		if (stains == null && scars == 0) {
-			return;   // a scarred but clean player still has to draw
+		int destroyed = ((LimbStateHolder) state).realisticdamage$destroyedMask();
+		if (stains == null && scars == 0 && destroyed == 0) {
+			return;   // a scarred but clean player still has to draw; so does a stump
 		}
 		HumanoidModel<?> model = getParentModel();
 		boolean slimArms = state.skin.model() == PlayerModelType.SLIM;
 		ModelPart[] bloodParts = slimArms ? slim : wide;
 		ModelPart[] scarParts = slimArms ? scarSlim : scarWide;
 		int overlay = LivingEntityRenderer.getOverlayCoords(state, 0.0F);
+		Identifier skin = state.skin.body().texturePath();
 
 		for (BodyPart part : BodyPart.values()) {
 			ScarLevel scar = ScarMask.level(scars, part);
@@ -234,12 +259,24 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 				scar = ScarLevel.NONE;
 			}
 			float level = stains == null ? 0.0F : stains[part.ordinal()];
+			ModelPart source = partFor(model, part);
+			if (source == null) {
+				continue;
+			}
+			if (isSet(destroyed, part) && part.isLimb()) {
+				// The stump. Vanilla's part is hidden but still posed; the stump
+				// rides that pose, so it hangs and swings where the limb did.
+				poseStack.pushPose();
+				source.translateAndRotate(poseStack);
+				submitStump(collector, poseStack, skin, part, slimArms, level, strength, lightCoords, overlay);
+				poseStack.popPose();
+				continue;
+			}
 			if (scar == ScarLevel.NONE && level < VISIBLE) {
 				continue;
 			}
-			ModelPart source = partFor(model, part);
-			if (source == null || !source.visible) {
-				continue;   // a destroyed limb is hidden: there is nothing to paint on
+			if (!source.visible) {
+				continue;   // hidden for a reason we do not own: nothing to paint on
 			}
 			poseStack.pushPose();
 			// The pose goes on the stack, which is copied per submit, rather than
@@ -248,6 +285,33 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 			paint(collector, poseStack, scarParts[part.ordinal()], bloodParts[part.ordinal()],
 					scar, level, strength, lightCoords, overlay);
 			poseStack.popPose();
+		}
+	}
+
+	/**
+	 * What is left of a lost limb, onto an already-posed stack: the short cube
+	 * on the player's skin, the cut face over its end, and the blood shell the
+	 * stump wound soaks into. Shared with {@link FirstPersonBlood}, which draws
+	 * the same three onto the raised first-person arm.
+	 */
+	void submitStump(SubmitNodeCollector collector, PoseStack poseStack, Identifier skin, BodyPart part,
+			boolean slimArms, float bloodLevel, double strength, int lightCoords, int overlay) {
+		ModelPart[] stumps = slimArms ? stumpSlim : stumpWide;
+		ModelPart[] caps = slimArms ? stumpCapSlim : stumpCapWide;
+		ModelPart[] shells = slimArms ? stumpBloodSlim : stumpBloodWide;
+		submitStump(collector, poseStack, skin, stumps[part.ordinal()], caps[part.ordinal()],
+				shells[part.ordinal()], bloodLevel, strength, lightCoords, overlay);
+	}
+
+	static void submitStump(SubmitNodeCollector collector, PoseStack poseStack, Identifier skin,
+			ModelPart stump, ModelPart cap, ModelPart shell, float bloodLevel, double strength,
+			int lightCoords, int overlay) {
+		collector.submitModelPart(stump, poseStack, RenderTypes.entityTranslucent(skin), lightCoords, overlay, null);
+		collector.submitModelPart(cap, poseStack, RenderTypes.entityCutout(LimbMeshes.CUT_TEXTURE),
+				lightCoords, overlay, null);
+		stumpSubmitCount++;
+		if (bloodLevel >= VISIBLE && strength > 0.0) {
+			paint(collector, poseStack, cap, shell, ScarLevel.NONE, bloodLevel, strength, lightCoords, overlay);
 		}
 	}
 
@@ -288,57 +352,13 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 	}
 
 	/**
-	 * Vanilla's own body cubes — same sizes, pivots and skin UVs as
-	 * {@code PlayerModel.createMesh} — with every overlay child left out and the
-	 * whole set worn {@code offset} proud of the skin. Indexed by
-	 * {@code BodyPart.ordinal()}.
-	 *
-	 * <p>The offset is a parameter rather than a constant so the blood and scar
-	 * shells can be the same mesh at two stand-offs: nothing else about the two
-	 * differs, and the moment they are described by two copies of this method
-	 * they can drift apart in a way no test would notice.
+	 * Vanilla's own body cubes with every overlay child left out, worn
+	 * {@code offset} proud of the skin. Since 1.6.2 the baking lives in
+	 * {@link LimbMeshes}, which also cuts stumps and caps from the same
+	 * definitions; this is the whole-body form.
 	 */
 	static ModelPart[] bake(boolean slimArms, float offset) {
-		CubeDeformation g = new CubeDeformation(offset);
-		MeshDefinition mesh = new MeshDefinition();
-		PartDefinition root = mesh.getRoot();
-		root.addOrReplaceChild("head",
-				CubeListBuilder.create().texOffs(0, 0).addBox(-4.0F, -8.0F, -4.0F, 8.0F, 8.0F, 8.0F, g),
-				PartPose.ZERO);
-		root.addOrReplaceChild("body",
-				CubeListBuilder.create().texOffs(16, 16).addBox(-4.0F, 0.0F, -2.0F, 8.0F, 12.0F, 4.0F, g),
-				PartPose.ZERO);
-		if (slimArms) {
-			root.addOrReplaceChild("left_arm",
-					CubeListBuilder.create().texOffs(32, 48).addBox(-1.0F, -2.0F, -2.0F, 3.0F, 12.0F, 4.0F, g),
-					PartPose.ZERO);
-			root.addOrReplaceChild("right_arm",
-					CubeListBuilder.create().texOffs(40, 16).addBox(-2.0F, -2.0F, -2.0F, 3.0F, 12.0F, 4.0F, g),
-					PartPose.ZERO);
-		} else {
-			root.addOrReplaceChild("left_arm",
-					CubeListBuilder.create().texOffs(32, 48).addBox(-1.0F, -2.0F, -2.0F, 4.0F, 12.0F, 4.0F, g),
-					PartPose.ZERO);
-			root.addOrReplaceChild("right_arm",
-					CubeListBuilder.create().texOffs(40, 16).addBox(-3.0F, -2.0F, -2.0F, 4.0F, 12.0F, 4.0F, g),
-					PartPose.ZERO);
-		}
-		root.addOrReplaceChild("left_leg",
-				CubeListBuilder.create().texOffs(16, 48).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 12.0F, 4.0F, g),
-				PartPose.ZERO);
-		root.addOrReplaceChild("right_leg",
-				CubeListBuilder.create().texOffs(0, 16).addBox(-2.0F, 0.0F, -2.0F, 4.0F, 12.0F, 4.0F, g),
-				PartPose.ZERO);
-
-		ModelPart baked = LayerDefinition.create(mesh, 64, 64).bakeRoot();
-		ModelPart[] byRegion = new ModelPart[BodyPart.values().length];
-		byRegion[BodyPart.HEAD.ordinal()] = baked.getChild("head");
-		byRegion[BodyPart.TORSO.ordinal()] = baked.getChild("body");
-		byRegion[BodyPart.LEFT_ARM.ordinal()] = baked.getChild("left_arm");
-		byRegion[BodyPart.RIGHT_ARM.ordinal()] = baked.getChild("right_arm");
-		byRegion[BodyPart.LEFT_LEG.ordinal()] = baked.getChild("left_leg");
-		byRegion[BodyPart.RIGHT_LEG.ordinal()] = baked.getChild("right_leg");
-		return byRegion;
+		return LimbMeshes.full(slimArms, offset);
 	}
 
 	/** One region's bit out of a {@code BodySnapshot} limb mask. */

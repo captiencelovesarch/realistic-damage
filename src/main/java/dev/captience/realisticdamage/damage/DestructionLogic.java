@@ -9,6 +9,7 @@ import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
+import dev.captience.realisticdamage.entity.SeveredLimb;
 import dev.captience.realisticdamage.systems.BleedingSystem;
 import dev.captience.realisticdamage.systems.WoundMath;
 import dev.captience.realisticdamage.util.Notifier;
@@ -157,6 +158,9 @@ public final class DestructionLogic {
 			data.addWound(part, stump);
 			BleedingSystem.spray(player, part, stump, blowDirection, true);
 		}
+		// The limb itself (1.6.2), thrown along the blow: here, at the choke
+		// point, so no way of losing a limb can forget to leave one behind.
+		SeveredLimb.throwFrom(player, part, blowDirection, cause == Cause.BLAST);
 		// Last, so the sentence the player reads is this one — and, when it is the
 		// stump wording, it only claims a bleeding stump when one was opened. The
 		// blast wording names a cause rather than a wound, so it needs no such

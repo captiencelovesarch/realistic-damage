@@ -9,6 +9,7 @@ import dev.captience.realisticdamage.body.Vitals;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.damage.BodyHitResolver;
+import dev.captience.realisticdamage.entity.SeveredLimb;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import dev.captience.realisticdamage.systems.BloodFlow;
 import dev.captience.realisticdamage.systems.Cardio;
@@ -16,6 +17,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
@@ -60,6 +62,15 @@ public final class BloodEmitter {
 
 	private static @Nullable SpriteSet sprites;
 	private static final Map<Integer, Bleeder> bleeders = new HashMap<>();
+	/** Fractional-drop carry per severed limb on the floor (1.6.2), by entity id. */
+	private static final Map<Integer, Double> limbCarry = new HashMap<>();
+	private static long limbEmitted;
+	private static long limbDrops;
+
+	/** Drops that have left a severed limb this session; read by the client gametest. */
+	public static long limbDrops() {
+		return limbDrops;
+	}
 
 	/** Per-player emission state: a fractional-drop carry per region, and a heart. */
 	private static final class Bleeder {
@@ -98,6 +109,49 @@ public final class BloodEmitter {
 			emitFor(player, snapshot, local);
 		}
 		bleeders.keySet().removeIf(id -> level.getEntity(id) == null);
+
+		// Limbs on the floor (1.6.2) bleed too: a steady trickle from the cut end
+		// that runs dry over the limb's life. No heart in a limb, so no spurts.
+		AABB reach = new AABB(here, here).inflate(EMIT_RANGE);
+		for (SeveredLimb limb : level.getEntitiesOfClass(SeveredLimb.class, reach)) {
+			double rate = limb.bleedRate();
+			if (rate <= 0.0) {
+				limbCarry.remove(limb.getId());
+				continue;
+			}
+			double perSecond = BloodFlow.dropsPerSecond(rate);
+			double carry = limbCarry.getOrDefault(limb.getId(), 0.0);
+			int drops = BloodFlow.dropsThisTick(carry, perSecond);
+			limbCarry.put(limb.getId(), BloodFlow.carryAfter(carry, perSecond));
+			for (int i = 0; i < drops; i++) {
+				spawnFromLimb(limb, rate, limbEmitted++);
+			}
+		}
+		limbCarry.keySet().removeIf(id -> level.getEntity(id) == null);
+	}
+
+	private static void spawnFromLimb(SeveredLimb limb, double bloodPerSecond, long index) {
+		Minecraft client = Minecraft.getInstance();
+		ClientLevel level = client.level;
+		if (level == null || sprites == null) {
+			return;
+		}
+		// Out of the middle of the thing, scattered across it: the cut end moves
+		// with the tumble and a drop that misses the limb by a centimetre is not
+		// worth resolving it for.
+		Vec3 at = limb.position().add(
+				BloodFlow.jitterSigned(index, 11) * 0.12,
+				limb.getBbHeight() * 0.5 + BloodFlow.jitterSigned(index, 12) * 0.08,
+				BloodFlow.jitterSigned(index, 13) * 0.12);
+		double speed = BloodFlow.dropSpeed(bloodPerSecond, false) / 20.0;
+		Vec3 direction = new Vec3(BloodFlow.jitterSigned(index, 14) * 0.3, -1.0,
+				BloodFlow.jitterSigned(index, 15) * 0.3).normalize();
+		BloodDrop drop = new BloodDrop(level, at.x, at.y, at.z,
+				direction.x * speed, direction.y * speed, direction.z * speed,
+				limb.getId(),
+				sprites.get((int) (BloodFlow.jitter(index, 16) * DROP_SPRITE_COUNT), SPRITE_COUNT - 1));
+		client.particleEngine.add(drop);
+		limbDrops++;
 	}
 
 	private static void emitFor(Player player, BodySnapshot snapshot, boolean local) {
@@ -222,5 +276,6 @@ public final class BloodEmitter {
 
 	public static void reset() {
 		bleeders.clear();
+		limbCarry.clear();
 	}
 }

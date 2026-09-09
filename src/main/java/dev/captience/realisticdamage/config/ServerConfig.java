@@ -71,6 +71,17 @@ public final class ServerConfig {
 	public boolean enableExplosiveDismemberment = true;
 
 	/**
+	 * A lost limb is a thing in the world (1.6.2): thrown from the loss, it
+	 * lands, bleeds for most of a minute and is gone. Nested under
+	 * {@link #enableLimbDestruction} by construction — no destruction, no limb —
+	 * and its own switch because a server may want the injury without the prop:
+	 * it is the only entity the mod spawns, and a server that counts entities
+	 * is entitled to say no. Never saved, so switching it off leaves nothing
+	 * behind.
+	 */
+	public boolean spawnSeveredLimbs = true;
+
+	/**
 	 * Hardcore mode: injuries leave a ceiling (1.6). A part driven to zero, a
 	 * limb broken, a limb lost — each costs that region one rung of how well it
 	 * can ever heal again, and food and time then take it that far and stop. The
