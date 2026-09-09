@@ -54,4 +54,12 @@ public interface LimbStateHolder {
 	int realisticdamage$limbRungs();
 
 	void realisticdamage$setLimbRungs(int rungs);
+
+	/**
+	 * Bit 1: unconscious; bit 2: knocked down (1.7). The client lays a mob out
+	 * on either; players carry their own prone pose from the server.
+	 */
+	int realisticdamage$downMask();
+
+	void realisticdamage$setDownMask(int mask);
 }

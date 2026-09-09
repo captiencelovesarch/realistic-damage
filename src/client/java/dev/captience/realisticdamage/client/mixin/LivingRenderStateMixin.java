@@ -2,17 +2,17 @@ package dev.captience.realisticdamage.client.mixin;
 
 import dev.captience.realisticdamage.client.BloodStainHolder;
 import dev.captience.realisticdamage.client.LimbStateHolder;
-import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 /**
  * Storage slots for the destroyed-limb mask, the broken-limb mask, the packed
- * limp rungs, blood staining and scars on every humanoid render state — the
- * player's, and since 1.7 every mob's that extends {@code HumanoidRenderState}.
+ * limp rungs, blood staining, scars and the down flags on every living render
+ * state — the player's, and since 1.7 every mob's, humanoid or not.
  */
-@Mixin(HumanoidRenderState.class)
-public abstract class HumanoidRenderStateMixin implements LimbStateHolder, BloodStainHolder {
+@Mixin(LivingEntityRenderState.class)
+public abstract class LivingRenderStateMixin implements LimbStateHolder, BloodStainHolder {
 	@Unique
 	private int realisticdamage$destroyedMask;
 	@Unique
@@ -72,5 +72,18 @@ public abstract class HumanoidRenderStateMixin implements LimbStateHolder, Blood
 	@Override
 	public void realisticdamage$setScarMask(int mask) {
 		this.realisticdamage$scarMask = mask;
+	}
+
+	@Unique
+	private int realisticdamage$downMask;
+
+	@Override
+	public int realisticdamage$downMask() {
+		return this.realisticdamage$downMask;
+	}
+
+	@Override
+	public void realisticdamage$setDownMask(int mask) {
+		this.realisticdamage$downMask = mask;
 	}
 }

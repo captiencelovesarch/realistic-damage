@@ -10,6 +10,7 @@ import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.entity.SeveredLimb;
+import dev.captience.realisticdamage.systems.MobAnatomy;
 import dev.captience.realisticdamage.systems.BleedingSystem;
 import dev.captience.realisticdamage.systems.WoundMath;
 import dev.captience.realisticdamage.util.Notifier;
@@ -154,7 +155,7 @@ public final class DestructionLogic {
 			player.hurtServer(level, RDDamageTypes.coreDestroyed(level, part), Float.MAX_VALUE);
 			return;
 		}
-		boolean bleeds = ServerConfig.get().enableBleeding;
+		boolean bleeds = ServerConfig.get().enableBleeding && MobAnatomy.bleeds(player);
 		if (bleeds) {
 			data.addWound(part, stump);
 			BleedingSystem.spray(player, part, stump, blowDirection, true);

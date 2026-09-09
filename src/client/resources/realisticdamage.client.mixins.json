@@ -10,8 +10,11 @@
 		"GameRendererAccessor",
 		"GameRendererFrameMixin",
 		"HumanoidMobRendererMixin",
+		"IllagerModelMixin",
+		"IllagerRendererMixin",
 		"HumanoidModelMixin",
-		"HumanoidRenderStateMixin",
+		"LivingEntityRendererMixin",
+		"LivingRenderStateMixin",
 		"InventoryLayoutAccessor",
 		"ItemInHandRendererMixin",
 		"MouseHandlerMixin",
@@ -19,6 +22,8 @@
 		"PostChainAccessor",
 		"PostPassAccessor",
 		"SoundEngineMuffleMixin",
+		"VillagerModelMixin",
+		"WitchModelMixin",
 		"WorldDistortionMixin"
 	],
 	"injectors": {

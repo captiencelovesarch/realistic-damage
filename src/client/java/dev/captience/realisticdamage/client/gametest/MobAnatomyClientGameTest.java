@@ -9,6 +9,8 @@ import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.client.BloodBody;
 import dev.captience.realisticdamage.client.BloodBodyLayer;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
+import dev.captience.realisticdamage.client.DownPose;
+import dev.captience.realisticdamage.client.FigureBloodLayer;
 import dev.captience.realisticdamage.client.LimbMeshes;
 import dev.captience.realisticdamage.client.SeveredLimbRenderer;
 import dev.captience.realisticdamage.damage.DestructionLogic;
@@ -122,6 +124,39 @@ public class MobAnatomyClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("the skeleton's missing arm drew no bone stump");
 			}
 			context.takeScreenshot("rd_mob_02_skeleton_stump");
+
+			// A pillager, a body that is not a HumanoidModel (1.7 slice two): its
+			// bleeding arm and missing leg go through the figure layer.
+			spawn(singleplayer, EntityTypes.PILLAGER, -2.0, 4.0, data -> {
+				data.addWound(BodyPart.RIGHT_ARM, WoundSeverity.CRITICAL);
+				data.part(BodyPart.LEFT_LEG).setDestroyed(true);
+			});
+			context.waitTicks(40);
+			long figure = context.computeOnClient(client -> FigureBloodLayer.submits());
+			context.waitTicks(5);
+			if (context.computeOnClient(client -> FigureBloodLayer.submits()) <= figure) {
+				throw new AssertionError("the pillager's wound and stump drew nothing");
+			}
+			context.takeScreenshot("rd_mob_03_pillager");
+
+			// Collapse lays a mob out: consciousness gone, the zombie lies where it
+			// stood, and the client's pose hook has to have fired to put it there.
+			singleplayer.getServer().runOnServer(server -> {
+				for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+					for (Zombie zombie : player.level().getEntitiesOfClass(Zombie.class, player.getBoundingBox().inflate(16.0))) {
+						RealisticDamageData data = RDAttachments.get(zombie);
+						data.drainConsciousness(dev.captience.realisticdamage.config.Balance.CONSCIOUSNESS_MAX);
+						MobAnatomy.tickBody(zombie, data);
+					}
+				}
+			});
+			context.waitTicks(10);
+			long down = context.computeOnClient(client -> DownPose.applications());
+			context.waitTicks(5);
+			if (context.computeOnClient(client -> DownPose.applications()) <= down) {
+				throw new AssertionError("a collapsed zombie was never laid out");
+			}
+			context.takeScreenshot("rd_mob_04_zombie_collapsed");
 		}
 	}
 

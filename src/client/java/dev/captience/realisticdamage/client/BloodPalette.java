@@ -15,28 +15,23 @@ package dev.captience.realisticdamage.client;
 public final class BloodPalette {
 	private BloodPalette() {}
 
-	/** Fresh, restrained: dark and desaturated enough to belong in the game's palette. */
-	private static final float[] FRESH_MUTED = {0.545F, 0.078F, 0.086F};
-	/** Fresh, visceral: brighter and more saturated, closer to arterial. */
-	private static final float[] FRESH_VISCERAL = {0.690F, 0.102F, 0.094F};
-	/** Dried, both styles: the brown-maroon of something that happened a while ago. */
-	private static final float[] DRIED = {0.282F, 0.125F, 0.094F};
-
-	private static float[] fresh() {
-		return ClientEffectsConfig.get().visceralBlood ? FRESH_VISCERAL : FRESH_MUTED;
-	}
-
 	/**
-	 * The colour of blood at a given wetness, 1 (just spilled) to 0 (long dry).
-	 * Returns a fresh array; callers are free to keep it.
+	 * The colour of a player's blood at a given wetness, 1 (just spilled) to 0
+	 * (long dry). Returns a fresh array; callers are free to keep it.
 	 */
 	public static float[] colour(double wetness) {
+		return colour(wetness, BloodTint.RED);
+	}
+
+	/** The same, in whatever colour the body bleeds (1.7). */
+	public static float[] colour(double wetness, BloodTint tint) {
 		float w = (float) Math.clamp(wetness, 0.0, 1.0);
-		float[] wet = fresh();
+		float[] wet = ClientEffectsConfig.get().visceralBlood ? tint.freshVisceral() : tint.fresh();
+		float[] dried = tint.dried();
 		return new float[] {
-				DRIED[0] + (wet[0] - DRIED[0]) * w,
-				DRIED[1] + (wet[1] - DRIED[1]) * w,
-				DRIED[2] + (wet[2] - DRIED[2]) * w,
+				dried[0] + (wet[0] - dried[0]) * w,
+				dried[1] + (wet[1] - dried[1]) * w,
+				dried[2] + (wet[2] - dried[2]) * w,
 		};
 	}
 

@@ -102,26 +102,42 @@ public final class InjuryPose {
 	 * follows the arm inside it.
 	 */
 	public static void apply(HumanoidRenderState state, HumanoidModel<?> model) {
+		float grounded = state.isPassenger ? 0.0F : 1.0F - Math.clamp(state.swimAmount, 0.0F, 1.0F);
+		applyParts((LimbStateHolder) state, model.leftArm, model.rightArm, model.leftLeg, model.rightLeg, grounded);
+	}
+
+	/**
+	 * The same limp on any model that has the four parts (1.7): illagers and
+	 * villagers hand theirs in by reference. {@code grounded} is how much of the
+	 * leg pose applies — zero for a passenger or a swimmer, one on foot. A null
+	 * part (a villager's arms are one crossed piece) is simply not posed.
+	 */
+	public static void applyParts(LimbStateHolder holder, ModelPart leftArm, ModelPart rightArm,
+			ModelPart leftLeg, ModelPart rightLeg, float grounded) {
 		// Its own switch, not the scars one and not the panic button. See the
 		// field's javadoc in ClientEffectsConfig for why.
 		if (!ClientEffectsConfig.get().showInjuryPose) {
 			return;
 		}
-		int rungs = ((LimbStateHolder) state).realisticdamage$limbRungs();
+		int rungs = holder.realisticdamage$limbRungs();
 		if (rungs == 0) {
 			return;   // by far the common case: nobody is hurt
 		}
-		poseArm(model.leftArm, LimpMath.rungAt(rungs, BodyPart.LEFT_ARM), true);
-		poseArm(model.rightArm, LimpMath.rungAt(rungs, BodyPart.RIGHT_ARM), false);
-		if (state.isPassenger) {
-			return;
+		if (leftArm != null) {
+			poseArm(leftArm, LimpMath.rungAt(rungs, BodyPart.LEFT_ARM), true);
 		}
-		float grounded = 1.0F - Math.clamp(state.swimAmount, 0.0F, 1.0F);
+		if (rightArm != null) {
+			poseArm(rightArm, LimpMath.rungAt(rungs, BodyPart.RIGHT_ARM), false);
+		}
 		if (grounded <= 0.0F) {
 			return;
 		}
-		poseLeg(model.leftLeg, LimpMath.rungAt(rungs, BodyPart.LEFT_LEG), true, grounded);
-		poseLeg(model.rightLeg, LimpMath.rungAt(rungs, BodyPart.RIGHT_LEG), false, grounded);
+		if (leftLeg != null) {
+			poseLeg(leftLeg, LimpMath.rungAt(rungs, BodyPart.LEFT_LEG), true, grounded);
+		}
+		if (rightLeg != null) {
+			poseLeg(rightLeg, LimpMath.rungAt(rungs, BodyPart.RIGHT_LEG), false, grounded);
+		}
 	}
 
 	private static void poseArm(ModelPart arm, int rung, boolean left) {

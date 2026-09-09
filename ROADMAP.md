@@ -341,7 +341,12 @@ crippled through the same attribute modifiers, refusing to swing with no arms
 or shoot with no drawing arm, dazed by concussion and dropped by collapse, and
 mending on time alone. On screen they stain, limp, lose limbs to stumps, and
 leave severed limbs in their own textures — bones for skeletons. Server rule
-`enableMobAnatomy`. Remaining below.
+`enableMobAnatomy`.
+
+**Slice two** (Sep 9 2026): illagers and witches, laid-out collapse and knockdown
+poses, mob falls, concussed and broken-armed skeletons shooting wide, and blood
+profiles by tag — the skeleton family is bloodless, the undead bleed dark, and
+endermen are wired for purple. Remaining below.
 
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here

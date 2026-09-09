@@ -244,8 +244,14 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 		if (state instanceof AvatarRenderState avatar) {
 			return avatar.skin.model() == PlayerModelType.SLIM ? LimbMeshes.Kind.SLIM : LimbMeshes.Kind.WIDE;
 		}
-		return getParentModel() instanceof net.minecraft.client.model.monster.skeleton.SkeletonModel<?>
-				? LimbMeshes.Kind.THIN : LimbMeshes.Kind.WIDE;
+		HumanoidModel<?> model = getParentModel();
+		if (model instanceof net.minecraft.client.model.monster.skeleton.SkeletonModel<?>) {
+			return LimbMeshes.Kind.THIN;
+		}
+		if (model instanceof net.minecraft.client.model.monster.zombie.ZombieVillagerModel<?>) {
+			return LimbMeshes.Kind.ZOMBIE_VILLAGER;
+		}
+		return LimbMeshes.Kind.WIDE;   // zombies, piglins: the player's own cubes
 	}
 
 	/** The texture the stump wears: the player's skin, or whatever the mob's renderer draws it with. */
@@ -290,6 +296,7 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 		ModelPart[] scarParts = meshes(scarByKind, kind, k -> LimbMeshes.full(k, SCAR_OFFSET));
 		int overlay = LivingEntityRenderer.getOverlayCoords(state, 0.0F);
 		Identifier skin = skinOf(state);
+		BloodTint tint = mob ? BloodTint.ofType(state.entityType) : BloodTint.RED;
 
 		for (BodyPart part : BodyPart.values()) {
 			ScarLevel scar = ScarMask.level(scars, part);
@@ -309,7 +316,7 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 				// rides that pose, so it hangs and swings where the limb did.
 				poseStack.pushPose();
 				source.translateAndRotate(poseStack);
-				submitStump(collector, poseStack, skin, part, kind, level, strength, lightCoords, overlay);
+				submitStump(collector, poseStack, skin, part, kind, level, strength, lightCoords, overlay, tint);
 				poseStack.popPose();
 				if (mob) {
 					mobSubmitCount++;
@@ -327,7 +334,7 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 			// onto our shared meshes, which are not.
 			source.translateAndRotate(poseStack);
 			paint(collector, poseStack, scarParts[part.ordinal()], bloodParts[part.ordinal()],
-					scar, level, strength, lightCoords, overlay);
+					scar, level, strength, lightCoords, overlay, tint);
 			poseStack.popPose();
 			if (mob) {
 				mobSubmitCount++;
@@ -342,24 +349,24 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 	 * the same three onto the raised first-person arm.
 	 */
 	void submitStump(SubmitNodeCollector collector, PoseStack poseStack, Identifier skin, BodyPart part,
-			LimbMeshes.Kind kind, float bloodLevel, double strength, int lightCoords, int overlay) {
+			LimbMeshes.Kind kind, float bloodLevel, double strength, int lightCoords, int overlay, BloodTint tint) {
 		ModelPart[] stumps = meshes(stumpByKind, kind, k -> LimbMeshes.stumps(k, 0.0F));
 		ModelPart[] caps = meshes(stumpCapByKind, kind, LimbMeshes::stumpCaps);
 		ModelPart[] shells = meshes(stumpBloodByKind, kind, k -> LimbMeshes.stumps(k, SKIN_OFFSET));
 		submitStump(collector, poseStack, skin, stumps[part.ordinal()], caps[part.ordinal()],
-				shells[part.ordinal()], bloodLevel, strength, lightCoords, overlay);
+				shells[part.ordinal()], bloodLevel, strength, lightCoords, overlay, tint);
 		stumpSubmitsByKind[kind.ordinal()]++;
 	}
 
 	static void submitStump(SubmitNodeCollector collector, PoseStack poseStack, Identifier skin,
 			ModelPart stump, ModelPart cap, ModelPart shell, float bloodLevel, double strength,
-			int lightCoords, int overlay) {
+			int lightCoords, int overlay, BloodTint tint) {
 		collector.submitModelPart(stump, poseStack, RenderTypes.entityTranslucent(skin), lightCoords, overlay, null);
 		collector.submitModelPart(cap, poseStack, RenderTypes.entityCutout(LimbMeshes.CUT_TEXTURE),
 				lightCoords, overlay, null);
 		stumpSubmitCount++;
 		if (bloodLevel >= VISIBLE && strength > 0.0) {
-			paint(collector, poseStack, cap, shell, ScarLevel.NONE, bloodLevel, strength, lightCoords, overlay);
+			paint(collector, poseStack, cap, shell, ScarLevel.NONE, bloodLevel, strength, lightCoords, overlay, tint);
 		}
 	}
 
@@ -373,7 +380,8 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 	 * else sees.
 	 */
 	static void paint(SubmitNodeCollector collector, PoseStack poseStack, ModelPart scarPart,
-			ModelPart bloodPart, ScarLevel scar, float level, double strength, int lightCoords, int overlay) {
+			ModelPart bloodPart, ScarLevel scar, float level, double strength, int lightCoords, int overlay,
+			BloodTint tint) {
 		if (scar != ScarLevel.NONE) {
 			boolean lost = scar == ScarLevel.DESTROYED;
 			float[] tone = lost ? SCAR_TONE_DESTROYED : SCAR_TONE_BROKEN;
@@ -389,7 +397,7 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 			// Blood on a body dries where it lands. Wetness trails the amount,
 			// so a limb that is actively bleeding looks fresh and one that
 			// stopped an hour ago looks like it stopped an hour ago.
-			float[] colour = BloodPalette.colour(Math.min(1.0, level * 1.4));
+			float[] colour = BloodPalette.colour(Math.min(1.0, level * 1.4), tint);
 			int alpha = (int) Math.clamp(level * strength * 235.0, 0.0, 235.0);
 			if (alpha > 2) {
 				collector.order(ORDER_BLOOD).submitModelPart(bloodPart, poseStack,

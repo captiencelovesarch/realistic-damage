@@ -9,15 +9,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * A humanoid mob's body onto its render state (1.7), the same way
- * {@link AvatarRendererMixin} does the player's: masks, rungs, blood, and an
- * emptied hand where the arm is gone. Mobs without a snapshot pay a null read.
- */
+/** A humanoid mob's destroyed arm holds nothing (1.7); emptied after vanilla fills the hands. */
 @Mixin(HumanoidMobRenderer.class)
 public abstract class HumanoidMobRendererMixin {
 	@Inject(method = "extractRenderState", at = @At("TAIL"))
-	private void realisticdamage$carryBody(Mob entity, HumanoidRenderState state, float partialTicks, CallbackInfo ci) {
-		LimbStateExtractor.extract(entity, state);
+	private void realisticdamage$emptyLostHands(Mob entity, HumanoidRenderState state, float partialTicks, CallbackInfo ci) {
+		LimbStateExtractor.hideDestroyedHands(entity, state);
 	}
 }

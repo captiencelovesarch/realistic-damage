@@ -56,6 +56,12 @@ public class BloodStain extends SingleQuadParticle {
 	private final Direction face;
 	/** Entity the blood came from, so a run down the wall does not splash back onto it. */
 	private final int sourceEntityId;
+	/** The colour this blood left the body as (1.7). */
+	private final BloodTint tint;
+
+	BloodTint tint() {
+		return tint;
+	}
 	private double radius;
 	/**
 	 * How many drops have been fed into this mark since it was laid. The pool tier
@@ -72,10 +78,11 @@ public class BloodStain extends SingleQuadParticle {
 	private double wallRunPhase;
 
 	BloodStain(ClientLevel level, double x, double y, double z, Direction face, double radius, long seed,
-			int sourceEntityId, TextureAtlasSprite sprite, TextureAtlasSprite poolSprite) {
+			int sourceEntityId, TextureAtlasSprite sprite, TextureAtlasSprite poolSprite, BloodTint tint) {
 		super(level, x, y, z, sprite);
 		this.face = face;
 		this.sourceEntityId = sourceEntityId;
+		this.tint = tint;
 		this.poolSprite = poolSprite;
 		this.radius = radius;
 		this.hasPhysics = false;
@@ -192,7 +199,7 @@ public class BloodStain extends SingleQuadParticle {
 
 	private void applyLook() {
 		double life = (double) age / lifetime;
-		float[] colour = BloodPalette.colour(BloodFlow.stainWetness(life));
+		float[] colour = BloodPalette.colour(BloodFlow.stainWetness(life), tint);
 		setColor(colour[0], colour[1], colour[2]);
 		setAlpha((float) (BloodFlow.stainAlpha(life)
 				* ClientEffectsConfig.get().bloodIntensity()

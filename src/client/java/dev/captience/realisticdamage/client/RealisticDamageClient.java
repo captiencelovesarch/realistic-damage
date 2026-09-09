@@ -42,6 +42,22 @@ public class RealisticDamageClient implements ClientModInitializer {
 								net.minecraft.client.renderer.entity.state.HumanoidRenderState,
 								net.minecraft.client.model.HumanoidModel<net.minecraft.client.renderer.entity.state.HumanoidRenderState>>) humanoid;
 						helper.register(new BloodBodyLayer<>(parent));
+					} else if (renderer instanceof net.minecraft.client.renderer.entity.LivingEntityRenderer<?, ?, ?> living
+							&& living.getModel() instanceof net.minecraft.client.model.monster.illager.IllagerModel<?>) {
+						// Illagers (1.7): their own cubes, found by name.
+						@SuppressWarnings("unchecked")
+						var parent = (net.minecraft.client.renderer.entity.RenderLayerParent<
+								net.minecraft.client.renderer.entity.state.LivingEntityRenderState,
+								net.minecraft.client.model.EntityModel<net.minecraft.client.renderer.entity.state.LivingEntityRenderState>>) living;
+						helper.register(new FigureBloodLayer<>(parent, LimbMeshes.Kind.ILLAGER));
+					} else if (renderer instanceof net.minecraft.client.renderer.entity.LivingEntityRenderer<?, ?, ?> living
+							&& (living.getModel() instanceof net.minecraft.client.model.monster.witch.WitchModel
+									|| living.getModel() instanceof net.minecraft.client.model.npc.VillagerModel)) {
+						@SuppressWarnings("unchecked")
+						var parent = (net.minecraft.client.renderer.entity.RenderLayerParent<
+								net.minecraft.client.renderer.entity.state.LivingEntityRenderState,
+								net.minecraft.client.model.EntityModel<net.minecraft.client.renderer.entity.state.LivingEntityRenderState>>) living;
+						helper.register(new FigureBloodLayer<>(parent, LimbMeshes.Kind.VILLAGER));
 					}
 				});
 

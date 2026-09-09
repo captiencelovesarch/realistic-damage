@@ -122,7 +122,9 @@ Mobs have bodies too. Zombies, skeletons, piglins and the rest of the humanoid f
 the same regional trauma you do: they bleed and bleed out, limp on a broken leg, lose limbs
 to a blow or a blast, stop swinging with no arms and stop shooting without a drawing arm,
 lose the thread when concussed, and go down at zero consciousness. They mend on time alone.
-Which mobs is a data tag, so a pack can add its own.
+Skeletons break and lose limbs but never bleed, the undead bleed dark, and a concussed
+skeleton shoots wide. Which mobs, and what colour they bleed, are data tags, so a pack can
+add its own.
 
 Breaking, losing a limb and going down each have their own synthesised audio, in a muted
 set that sits inside Minecraft's palette and a visceral set that doesn't. Your own

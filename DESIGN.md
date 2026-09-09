@@ -569,9 +569,29 @@ skin, thin from a skeleton's model. `LimbMeshes` gained the thin two-by-two buil
 iterate living entities with a snapshot rather than players. The severed limb syncs its
 owner's entity type, and `MobLooks` maps that to a texture and a build.
 
-**Still to come in 1.7.** Illagers, witches and villagers (non-humanoid models); mob
-falls and knockdown; a limb entity for the zombie villager and piglin texture layouts;
-tuning of the daze and collapse against real fights.
+**Slice two: everyone who is not a humanoid model, and blood that knows whose it is.** The
+carriers moved once more, from `HumanoidRenderState` up to `LivingEntityRenderState`, and
+extraction runs from `LivingEntityRenderer` itself, so every living thing carries its body
+onto its render state. Illagers hide lost limbs and limp through `IllagerModelMixin` (a
+crossed pair is retired for the surviving arm, since half of it is not a thing the model can
+draw); the villager-shaped witch loses legs but keeps her crossed arms. `FigureBloodLayer`
+paints these models by part name off the root, with `LimbMeshes` builds for the illager,
+villager and zombie-villager cubes (ten-pixel heads, six-deep bodies, their own arm UVs).
+A collapsed or knocked-down mob is laid out by the renderer with vanilla's own death roll
+about the feet, players excepted — they have the server's prone pose. Mobs fall like
+players: the fall mixin records height and surface for any body, and a hard landing knocks
+a mob down. A concussed skeleton's arrows spread three times as wide and a broken drawing
+arm doubles it, multiplying the inaccuracy vanilla already applies.
+
+Bodies now have blood profiles, by tag. `bloodless` (the skeleton family) opens no wound,
+sprays nothing, has no stump wound and throws a bone that never bleeds — a skeleton that
+bled was the first playtest report of the mob work. `blood_dark` (the undead) and
+`blood_purple` (endermen, against the day they get bodies) select a `BloodTint`, carried by
+every drop, stain, shell and severed limb from the moment it leaves the body, so a zombie's
+old dark blood stays dark on the floor after the zombie has walked off.
+
+**Still to come in 1.7.** Villagers by default (a pack can tag them now); endermen and the
+other non-humanoid hostiles; tuning of the daze and collapse against real fights.
 
 ## Deliberate non-goals
 

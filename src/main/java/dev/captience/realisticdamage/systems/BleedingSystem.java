@@ -90,7 +90,7 @@ public final class BleedingSystem {
 	 */
 	public static void spray(LivingEntity player, BodyPart part, WoundSeverity severity, Vec3 direction,
 			boolean severance) {
-		if (!ServerConfig.get().enableBleeding) {
+		if (!ServerConfig.get().enableBleeding || !MobAnatomy.bleeds(player)) {
 			return;
 		}
 		ServerLevel level = (ServerLevel) player.level();

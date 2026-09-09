@@ -254,11 +254,21 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 				client.player.setYRot(0.0F);
 			});
 			context.waitTicks(15);
-			double swayRoll = context.computeOnClient(client -> CameraMotion.lastRoll());
+			// The sway is two sines at different periods, so any single instant can
+			// sit near a zero crossing (one run measured -0.019). Sample a window
+			// and take the widest tilt seen in it.
+			double swayRoll = 0.0;
+			for (int sample = 0; sample < 12; sample++) {
+				double roll = context.computeOnClient(client -> CameraMotion.lastRoll());
+				if (Math.abs(roll) > Math.abs(swayRoll)) {
+					swayRoll = roll;
+				}
+				context.waitTicks(3);
+			}
 			float[] aimAfterSway = context.computeOnClient(client -> new float[] {
 					client.player.getXRot(), client.player.getYRot()});
-			if (Math.abs(swayRoll) < 0.05) {
-				throw new AssertionError("near collapse the horizon did not tilt: roll " + swayRoll);
+			if (Math.abs(swayRoll) < 0.2) {
+				throw new AssertionError("near collapse the horizon did not tilt: widest roll " + swayRoll);
 			}
 			// ...and the tilt has to reach the picture. The value above is what the
 			// motion asked for; this is whether the view hook carried it. The first

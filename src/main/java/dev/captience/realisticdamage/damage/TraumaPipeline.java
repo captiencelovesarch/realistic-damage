@@ -13,6 +13,7 @@ import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.damage.ClassifiedDamage.Routing;
 import dev.captience.realisticdamage.systems.ImpairmentMath;
+import dev.captience.realisticdamage.systems.MobAnatomy;
 import dev.captience.realisticdamage.util.Notifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
@@ -208,7 +209,7 @@ public final class TraumaPipeline {
 			// Ceilings are a life's history; a mob has one life and no history.
 			CeilingLogic.evaluate(player, data, result, brokenBefore, destroyedBefore);
 		}
-		if (config.enableBleeding) {
+		if (config.enableBleeding && MobAnatomy.bleeds(player)) {
 			createWounds(player, data, classified, profile, result, blow, limbLost);
 		}
 		// The impact term reads the same height-derived figure as the trauma, for
@@ -222,14 +223,12 @@ public final class TraumaPipeline {
 		// The concussion still happens — only the sentence yields.
 		dev.captience.realisticdamage.systems.ConsciousnessSystem.onTrauma(
 				player, data, classified, profile, result, traumaSource, limbLost);
-		if (player instanceof ServerPlayer serverPlayer) {
-			if (fall && fallHeight > 0.0) {
-				landed(serverPlayer, data, fallHeight, config);
-			} else {
-				// A landing gets its own cue below; firing the generic one as well
-				// would flash twice and kick the view sideways off a vertical impact.
-				sendImpact(serverPlayer, source, result, traumaSource, profile, classified.category());
-			}
+		if (fall && fallHeight > 0.0) {
+			landed(player, data, fallHeight, config);
+		} else if (player instanceof ServerPlayer serverPlayer) {
+			// A landing gets its own cue below; firing the generic one as well
+			// would flash twice and kick the view sideways off a vertical impact.
+			sendImpact(serverPlayer, source, result, traumaSource, profile, classified.category());
 		}
 		return result;
 	}
@@ -243,12 +242,14 @@ public final class TraumaPipeline {
 	 * <p>Cushioning applies to the knockdown as well as to the trauma: landing in
 	 * hay should not merely hurt less, it should leave you on your feet.
 	 */
-	private static void landed(ServerPlayer player, RealisticDamageData data, double fallHeight,
+	private static void landed(LivingEntity player, RealisticDamageData data, double fallHeight,
 			ServerConfig config) {
 		double effectiveHeight = fallHeight * data.pendingFallSurface();
 		if (config.enableKnockdown) {
 			int ticks = FallMath.knockdownTicks(effectiveHeight);
 			if (ticks > 0) {
+				// A mob goes down too (1.7): its attributes zero its movement for
+				// the window and the client lays it out; only the words are ours.
 				data.knockDown(ticks);
 				player.stopUsingItem();
 				if (player.isSprinting()) {
@@ -257,7 +258,9 @@ public final class TraumaPipeline {
 				Notifier.message(player, "realisticdamage.msg.knocked_down");
 			}
 		}
-		sendLanding(player, effectiveHeight, data.pendingFallSurface());
+		if (player instanceof ServerPlayer serverPlayer) {
+			sendLanding(serverPlayer, effectiveHeight, data.pendingFallSurface());
+		}
 	}
 
 	/** The thump, the dip and the crunch, on the frame the ground arrives. */

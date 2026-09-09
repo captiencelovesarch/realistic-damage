@@ -2,6 +2,7 @@ package dev.captience.realisticdamage.client.mixin;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.client.InjuryPose;
+import dev.captience.realisticdamage.client.LimbStateExtractor;
 import dev.captience.realisticdamage.client.LimbStateHolder;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
@@ -48,16 +49,16 @@ public abstract class HumanoidModelMixin {
 		// after this; here is the base part, which is all a mob has.
 		int destroyed = ((LimbStateHolder) state).realisticdamage$destroyedMask();
 		if (destroyed != 0) {
-			if ((destroyed & (1 << BodyPart.LEFT_ARM.ordinal())) != 0) {
+			if (LimbStateExtractor.gone(destroyed, BodyPart.LEFT_ARM)) {
 				model.leftArm.visible = false;
 			}
-			if ((destroyed & (1 << BodyPart.RIGHT_ARM.ordinal())) != 0) {
+			if (LimbStateExtractor.gone(destroyed, BodyPart.RIGHT_ARM)) {
 				model.rightArm.visible = false;
 			}
-			if ((destroyed & (1 << BodyPart.LEFT_LEG.ordinal())) != 0) {
+			if (LimbStateExtractor.gone(destroyed, BodyPart.LEFT_LEG)) {
 				model.leftLeg.visible = false;
 			}
-			if ((destroyed & (1 << BodyPart.RIGHT_LEG.ordinal())) != 0) {
+			if (LimbStateExtractor.gone(destroyed, BodyPart.RIGHT_LEG)) {
 				model.rightLeg.visible = false;
 			}
 		}

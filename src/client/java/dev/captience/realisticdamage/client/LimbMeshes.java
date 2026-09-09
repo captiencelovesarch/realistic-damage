@@ -49,12 +49,25 @@ public final class LimbMeshes {
 	private static final float OVERLAY_INFLATE = 0.25F;
 
 	/**
-	 * The three limb builds the mod draws (1.7): the player's wide and slim
-	 * arms, and the skeleton family's two-pixel bones. Every mesh here comes in
-	 * all three, so a stump on a stray is a stray's stump.
+	 * The limb builds the mod draws (1.7): the player's wide and slim arms (and
+	 * the zombie and piglin families, which use the player's cubes), the
+	 * skeleton family's two-pixel bones, the illagers, the villager-shaped
+	 * witch whose arms are one crossed piece, and the zombie villager. Each
+	 * carries its head height and body depth, which are the two dimensions the
+	 * families disagree on besides the limbs.
 	 */
 	public enum Kind {
-		WIDE, SLIM, THIN;
+		WIDE(8, 16, 4), SLIM(8, 16, 4), THIN(8, 16, 4), ILLAGER(10, 20, 6), VILLAGER(10, 20, 6), ZOMBIE_VILLAGER(10, 20, 6);
+
+		final float headHeight;
+		final int bodyV;
+		final float bodyDepth;
+
+		Kind(float headHeight, int bodyV, float bodyDepth) {
+			this.headHeight = headHeight;
+			this.bodyV = bodyV;
+			this.bodyDepth = bodyDepth;
+		}
 
 		public static Kind of(boolean slimArms) {
 			return slimArms ? SLIM : WIDE;
@@ -64,7 +77,8 @@ public final class LimbMeshes {
 	/**
 	 * Where each limb's cube sits and how wide it is, per build: x of the cube's
 	 * near edge, its width, and its depth (a bone is two by two). UVs are
-	 * vanilla's; the thin build mirrors its left limbs as SkeletonModel does.
+	 * vanilla's; a build mirrors its left limbs where vanilla does. Null for a
+	 * limb the build has no separate part for (a villager's crossed arms).
 	 */
 	private record Limb(int u, int v, float x, float width, float depth, boolean mirror) {}
 
@@ -153,11 +167,11 @@ public final class LimbMeshes {
 			if (!part.isLimb()) {
 				continue;
 			}
-			if (kind == Kind.THIN) {
+			Limb limb = limb(kind, part, true);
+			if (limb == null) {
 				root.addOrReplaceChild(name(part), CubeListBuilder.create(), PartPose.ZERO);
 				continue;
 			}
-			Limb limb = limb(kind, part, true);
 			root.addOrReplaceChild(name(part), CubeListBuilder.create().texOffs(limb.u(), limb.v())
 					.addBox(limb.x(), top(part), -limb.depth() / 2.0F, limb.width(), 12.0F, limb.depth(), g), PartPose.ZERO);
 		}
@@ -165,24 +179,60 @@ public final class LimbMeshes {
 	}
 
 	private static Limb limb(Kind kind, BodyPart part, boolean overlay) {
-		if (kind == Kind.THIN) {
-			// SkeletonModel: no second layer, both arms and both legs from one UV
-			// each, the left side mirrored.
-			return switch (part) {
-				case LEFT_ARM -> new Limb(40, 16, -1.0F, 2.0F, 2.0F, true);
-				case RIGHT_ARM -> new Limb(40, 16, -1.0F, 2.0F, 2.0F, false);
-				case LEFT_LEG -> new Limb(0, 16, -1.0F, 2.0F, 2.0F, true);
-				default -> new Limb(0, 16, -1.0F, 2.0F, 2.0F, false);
-			};
+		switch (kind) {
+			case THIN -> {
+				// SkeletonModel: no second layer, both arms and both legs from one UV
+				// each, the left side mirrored.
+				return switch (part) {
+					case LEFT_ARM -> new Limb(40, 16, -1.0F, 2.0F, 2.0F, true);
+					case RIGHT_ARM -> new Limb(40, 16, -1.0F, 2.0F, 2.0F, false);
+					case LEFT_LEG -> new Limb(0, 16, -1.0F, 2.0F, 2.0F, true);
+					default -> new Limb(0, 16, -1.0F, 2.0F, 2.0F, false);
+				};
+			}
+			case ILLAGER, ZOMBIE_VILLAGER, VILLAGER -> {
+				// IllagerModel / ZombieVillagerModel / VillagerModel: legs from one
+				// UV mirrored on the left; arms from (40,46) for illagers and (44,22)
+				// for zombie villagers; a villager's arms are one crossed piece.
+				if (overlay) {
+					return null;
+				}
+				if (part.isLeg()) {
+					return new Limb(0, 22, -2.0F, 4.0F, 4.0F, part == BodyPart.LEFT_LEG);
+				}
+				if (kind == Kind.VILLAGER) {
+					return null;
+				}
+				int u = kind == Kind.ILLAGER ? 40 : 44;
+				int v = kind == Kind.ILLAGER ? 46 : 22;
+				return part == BodyPart.LEFT_ARM ? new Limb(u, v, -1.0F, 4.0F, 4.0F, true) : new Limb(u, v, -3.0F, 4.0F, 4.0F, false);
+			}
+			default -> {
+				float armWidth = kind == Kind.SLIM ? 3.0F : 4.0F;
+				float rightArmX = kind == Kind.SLIM ? -2.0F : -3.0F;
+				return switch (part) {
+					case LEFT_ARM -> new Limb(overlay ? 48 : 32, 48, -1.0F, armWidth, 4.0F, false);
+					case RIGHT_ARM -> new Limb(40, overlay ? 32 : 16, rightArmX, armWidth, 4.0F, false);
+					case LEFT_LEG -> new Limb(overlay ? 0 : 16, 48, -2.0F, 4.0F, 4.0F, false);
+					default -> new Limb(0, overlay ? 32 : 16, -2.0F, 4.0F, 4.0F, false);
+				};
+			}
 		}
-		float armWidth = kind == Kind.SLIM ? 3.0F : 4.0F;
-		float rightArmX = kind == Kind.SLIM ? -2.0F : -3.0F;
-		return switch (part) {
-			case LEFT_ARM -> new Limb(overlay ? 48 : 32, 48, -1.0F, armWidth, 4.0F, false);
-			case RIGHT_ARM -> new Limb(40, overlay ? 32 : 16, rightArmX, armWidth, 4.0F, false);
-			case LEFT_LEG -> new Limb(overlay ? 0 : 16, 48, -2.0F, 4.0F, 4.0F, false);
-			default -> new Limb(0, overlay ? 32 : 16, -2.0F, 4.0F, 4.0F, false);
-		};
+	}
+
+	/**
+	 * The villager build's arms: one crossed piece, as VillagerModel has them,
+	 * worn {@code offset} proud so a shell of blood can sit on it. Posed by the
+	 * model's own {@code arms} part.
+	 */
+	public static ModelPart crossedArms(float offset) {
+		CubeDeformation g = new CubeDeformation(offset);
+		MeshDefinition mesh = new MeshDefinition();
+		mesh.getRoot().addOrReplaceChild("arms", CubeListBuilder.create()
+				.texOffs(44, 22).addBox(-8.0F, -2.0F, -2.0F, 4.0F, 8.0F, 4.0F, g)
+				.texOffs(44, 22).mirror().addBox(4.0F, -2.0F, -2.0F, 4.0F, 8.0F, 4.0F, g).mirror(false)
+				.texOffs(40, 38).addBox(-4.0F, 2.0F, -2.0F, 8.0F, 4.0F, 4.0F, g), PartPose.ZERO);
+		return LayerDefinition.create(mesh, 64, 64).bakeRoot().getChild("arms");
 	}
 
 	/** Arms hang from -2, legs from 0, in vanilla's model space. */
@@ -214,15 +264,22 @@ public final class LimbMeshes {
 			root.addOrReplaceChild("body", CubeListBuilder.create(), PartPose.ZERO);
 		} else {
 			root.addOrReplaceChild("head",
-					CubeListBuilder.create().texOffs(0, 0).addBox(-4.0F, -8.0F, -4.0F, 8.0F, 8.0F, 8.0F, g),
+					CubeListBuilder.create().texOffs(0, 0).addBox(-4.0F, -kind.headHeight, -4.0F, 8.0F, kind.headHeight, 8.0F, g),
 					PartPose.ZERO);
 			root.addOrReplaceChild("body",
-					CubeListBuilder.create().texOffs(16, 16).addBox(-4.0F, 0.0F, -2.0F, 8.0F, 12.0F, 4.0F, g),
+					CubeListBuilder.create().texOffs(16, kind.bodyV)
+							.addBox(-4.0F, 0.0F, -kind.bodyDepth / 2.0F, 8.0F, 12.0F, kind.bodyDepth, g),
 					PartPose.ZERO);
 		}
 		for (BodyPart part : BodyPart.values()) {
-			if (part.isLimb()) {
-				limb(root, name(part), limb(kind, part, false), top(part), length, cap, g);
+			if (!part.isLimb()) {
+				continue;
+			}
+			Limb limb = limb(kind, part, false);
+			if (limb == null) {
+				root.addOrReplaceChild(name(part), CubeListBuilder.create(), PartPose.ZERO);
+			} else {
+				limb(root, name(part), limb, top(part), length, cap, g);
 			}
 		}
 		int size = cap ? 16 : 64;
@@ -257,11 +314,12 @@ public final class LimbMeshes {
 			if (!part.isLimb()) {
 				continue;
 			}
-			if (overlay && kind == Kind.THIN) {
+			Limb limb = limb(kind, part, overlay);
+			if (limb == null) {
 				root.addOrReplaceChild(name(part), CubeListBuilder.create(), PartPose.ZERO);
 				continue;
 			}
-			lower(root, name(part), limb(kind, part, overlay), top(part), offset);
+			lower(root, name(part), limb, top(part), offset);
 		}
 		return index(LayerDefinition.create(mesh, 64, 64).bakeRoot());
 	}

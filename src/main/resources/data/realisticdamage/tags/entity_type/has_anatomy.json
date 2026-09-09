@@ -9,8 +9,16 @@
 		"minecraft:stray",
 		"minecraft:wither_skeleton",
 		"minecraft:bogged",
-		{ "id": "minecraft:parched", "required": false },
+		{
+			"id": "minecraft:parched",
+			"required": false
+		},
 		"minecraft:piglin",
-		"minecraft:piglin_brute"
+		"minecraft:piglin_brute",
+		"minecraft:pillager",
+		"minecraft:vindicator",
+		"minecraft:evoker",
+		"minecraft:illusioner",
+		"minecraft:witch"
 	]
 }

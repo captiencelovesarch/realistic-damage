@@ -54,6 +54,19 @@ public final class MobAnatomy {
 	/** Types whose severed limb the client can draw; the rest keep the stump only. */
 	public static final TagKey<EntityType<?>> THROWS_LIMBS =
 			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("throws_limbs"));
+	/**
+	 * Bodies with nothing in them to spill (1.7): the skeleton family. They
+	 * break and lose limbs like anyone, but no wound is ever opened on them and
+	 * nothing they lose bleeds — a skeleton that bled was the first playtest
+	 * report of the mob work.
+	 */
+	public static final TagKey<EntityType<?>> BLOODLESS =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("bloodless"));
+	/** What colour a body bleeds; the client reads these. Red is the default. */
+	public static final TagKey<EntityType<?>> BLOOD_DARK =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_dark"));
+	public static final TagKey<EntityType<?>> BLOOD_PURPLE =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_purple"));
 
 	private static final Set<Mob> injured = Collections.newSetFromMap(new IdentityHashMap<>());
 	/** Mobs whose AI this class switched off, so waking switches on only those. */
@@ -77,6 +90,16 @@ public final class MobAnatomy {
 
 	public static boolean throwsLimbs(LivingEntity entity) {
 		return entity.is(THROWS_LIMBS);
+	}
+
+	/** Whether this body has blood to lose: every player, and every mob not tagged bloodless. */
+	public static boolean bleeds(LivingEntity entity) {
+		return entity instanceof Player || !entity.is(BLOODLESS);
+	}
+
+	/** The same question about a type alone, for a limb whose owner is gone. */
+	public static boolean bleeds(EntityType<?> type) {
+		return !type.builtInRegistryHolder().is(BLOODLESS);
 	}
 
 	/** Begins ticking this body; a no-op for players and untagged mobs. */
@@ -126,6 +149,7 @@ public final class MobAnatomy {
 			part.tickStrain();
 		}
 		data.tickUnconscious();
+		data.tickKnockdown(Balance.KNOCKDOWN_RECOVERY_TICKS);
 		BleedingSystem.tick(mob, data);
 		ConsciousnessSystem.tick(mob, data);
 		HealingSystem.tick(mob, data);
@@ -141,7 +165,7 @@ public final class MobAnatomy {
 	 * has to keep being asserted.
 	 */
 	public static boolean settled(RealisticDamageData data) {
-		if (data.bleeding() || data.unconscious() || data.concussion()
+		if (data.bleeding() || data.unconscious() || data.concussion() || data.knockedDown()
 				|| data.blood() < Balance.BLOOD_MAX - Balance.CONDITION_EPSILON
 				|| data.consciousness() < data.consciousnessCap() - Balance.CONDITION_EPSILON) {
 			return false;
@@ -194,6 +218,26 @@ public final class MobAnatomy {
 		}
 		RealisticDamageData data = RDAttachments.get(mob);
 		return !data.part(ImpairmentSystem.armFor(mob, true)).destroyed();
+	}
+
+	/**
+	 * How much wider a ranged mob's shots spread (1.7): a concussed head cannot
+	 * aim, and a broken drawing arm cannot hold the draw steady. Multiplies the
+	 * inaccuracy vanilla already applies, so difficulty still counts.
+	 */
+	public static double aimSpread(Mob mob) {
+		if (!isMobWithBody(mob)) {
+			return 1.0;
+		}
+		RealisticDamageData data = RDAttachments.get(mob);
+		double spread = 1.0;
+		if (data.concussion()) {
+			spread *= Balance.MOB_DAZE_AIM_SPREAD;
+		}
+		if (data.part(ImpairmentSystem.armFor(mob, true)).broken()) {
+			spread *= Balance.MOB_BROKEN_ARM_AIM_SPREAD;
+		}
+		return spread;
 	}
 
 	/** Server stop or world unload: forget everything. */

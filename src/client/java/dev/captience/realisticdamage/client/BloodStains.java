@@ -110,12 +110,12 @@ public final class BloodStains {
 	 * away from where they stood would leave no trail until they were clear of it.
 	 */
 	public static void land(double x, double y, double z, Direction face, double dropScale) {
-		land(x, y, z, face, dropScale, -1);
+		land(x, y, z, face, dropScale, -1, BloodTint.RED);
 	}
 
-	/** As {@link #land(double, double, double, Direction, double)}, retaining the blood's owner. */
+	/** As {@link #land(double, double, double, Direction, double)}, retaining the blood's owner and colour. */
 	public static void land(double x, double y, double z, Direction face, double dropScale,
-			int sourceEntityId) {
+			int sourceEntityId, BloodTint tint) {
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		double strength = config.bloodIntensity() * config.bloodStainIntensity;
 		if (strength <= 0.0 || sprites == null) {
@@ -158,7 +158,7 @@ public final class BloodStains {
 		int variant = Math.min(SPRITE_VARIANTS - 1, (int) (BloodFlow.jitter(seed, 3) * SPRITE_VARIANTS));
 		BloodStain stain = new BloodStain(level, sx, sy, sz, face, radius, seed, sourceEntityId,
 				sprites.get(variant + SPLAT_SPRITE_OFFSET, BloodEmitter.SPRITE_COUNT - 1),
-				sprites.get(variant + POOL_SPRITE_OFFSET, BloodEmitter.SPRITE_COUNT - 1));
+				sprites.get(variant + POOL_SPRITE_OFFSET, BloodEmitter.SPRITE_COUNT - 1), tint);
 		client.particleEngine.add(stain);
 		register(stain, sx, sy, sz);
 	}
@@ -179,7 +179,7 @@ public final class BloodStains {
 		if (contact == null) {
 			return false;
 		}
-		land(contact.x(), contact.y(), contact.z(), contact.face(), dropScale, player.getId());
+		land(contact.x(), contact.y(), contact.z(), contact.face(), dropScale, player.getId(), BloodTint.of(player));
 		contactTransfers++;
 		return true;
 	}
@@ -480,7 +480,7 @@ public final class BloodStains {
 			BloodDrop drop = new BloodDrop(level, stain.px(),
 					stain.py() - stain.radius() - Balance.STAIN_SURFACE_OFFSET, stain.pz(),
 					0.0, -0.02, 0.0, stain.sourceEntityId(),
-					sprites.get(variant, BloodEmitter.SPRITE_COUNT - 1));
+					sprites.get(variant, BloodEmitter.SPRITE_COUNT - 1), stain.tint());
 			client.particleEngine.add(drop);
 			wallRuns++;
 		}

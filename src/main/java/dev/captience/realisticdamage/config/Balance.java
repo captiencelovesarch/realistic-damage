@@ -309,6 +309,9 @@ public final class Balance {
 	public static final double MOB_MEND_PER_CYCLE = 0.5;
 	/** A concussed mob loses its target this often, in ticks. */
 	public static final int MOB_DAZE_FORGET_TICKS = 40;
+	/** Multipliers on a ranged mob's shot inaccuracy: a dazed head, a broken drawing arm. */
+	public static final double MOB_DAZE_AIM_SPREAD = 3.0;
+	public static final double MOB_BROKEN_ARM_AIM_SPREAD = 2.0;
 
 	// Stains: what a drop leaves on the surface it hits.
 	/** Hard cap on tracked stains. Oldest are evicted first (spec §56: no unbounded state). */

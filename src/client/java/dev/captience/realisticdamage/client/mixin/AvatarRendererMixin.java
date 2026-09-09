@@ -42,8 +42,10 @@ public abstract class AvatarRendererMixin {
 	@Inject(method = "extractRenderState", at = @At("TAIL"))
 	private void realisticdamage$carryDestroyedLimbs(Avatar entity, AvatarRenderState state, float partialTicks,
 			CallbackInfo ci) {
-		// Shared with every humanoid mob renderer since 1.7; see LimbStateExtractor.
-		LimbStateExtractor.extract(entity, state);
+		// The body itself is carried by LivingEntityRendererMixin for every
+		// living thing (1.7); the hands have to be emptied here, after vanilla
+		// has filled them, and then the player-only remainder follows.
+		LimbStateExtractor.hideDestroyedHands(entity, state);
 		BodySnapshot snapshot = entity.getAttached(RDAttachments.SNAPSHOT);
 		int destroyedMask = snapshot == null ? 0 : snapshot.destroyedMask();
 		// The player-only part: an item being used from a hand that is gone.

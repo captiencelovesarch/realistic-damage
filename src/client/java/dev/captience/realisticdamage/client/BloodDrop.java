@@ -45,6 +45,8 @@ public class BloodDrop extends SingleQuadParticle {
 	 */
 	private final int sourceEntityId;
 	private final double scale;
+	/** The colour this blood left the body as (1.7). */
+	private final BloodTint tint;
 
 	/**
 	 * Set the tick the drop finds itself in water, after which it is a cloud
@@ -76,9 +78,10 @@ public class BloodDrop extends SingleQuadParticle {
 	}
 
 	BloodDrop(ClientLevel level, double x, double y, double z, double xd, double yd, double zd,
-			int sourceEntityId, net.minecraft.client.renderer.texture.TextureAtlasSprite sprite) {
+			int sourceEntityId, net.minecraft.client.renderer.texture.TextureAtlasSprite sprite, BloodTint tint) {
 		super(level, x, y, z, xd, yd, zd, sprite);
 		this.sourceEntityId = sourceEntityId;
+		this.tint = tint;
 		// Velocity is the severity channel: read it once, here, before drag and
 		// gravity start changing it.
 		this.scale = BloodFlow.dropScale(Math.sqrt(xd * xd + yd * yd + zd * zd));
@@ -90,7 +93,7 @@ public class BloodDrop extends SingleQuadParticle {
 		this.lifetime = Balance.DROP_MAX_AGE_TICKS;
 		this.quadSize = (float) (0.028 + 0.062 * scale);
 		this.oQuadSize = this.quadSize;
-		float[] colour = BloodPalette.colour(1.0);
+		float[] colour = BloodPalette.colour(1.0, tint);
 		setColor(colour[0], colour[1], colour[2]);
 		setAlpha((float) Math.clamp(ClientEffectsConfig.get().bloodIntensity(), 0.0, 1.0));
 	}
@@ -181,7 +184,7 @@ public class BloodDrop extends SingleQuadParticle {
 		}
 		// Blood in water reads darker than blood on a surface: the water takes
 		// the highlights off it.
-		float[] colour = BloodPalette.colour(1.0);
+		float[] colour = BloodPalette.colour(1.0, tint);
 		setColor(colour[0] * 0.80F, colour[1] * 0.80F, colour[2] * 0.80F);
 	}
 
@@ -248,7 +251,7 @@ public class BloodDrop extends SingleQuadParticle {
 			case SOUTH -> sz = box.minZ;
 			case NORTH -> sz = box.maxZ;
 		}
-		BloodStains.land(sx, sy, sz, face, scale, sourceEntityId);
+		BloodStains.land(sx, sy, sz, face, scale, sourceEntityId, tint);
 		remove();
 	}
 
@@ -291,9 +294,11 @@ public class BloodDrop extends SingleQuadParticle {
 			if (ClientEffectsConfig.get().bloodIntensity() <= 0.0) {
 				return null;
 			}
-			return new BloodDrop(level, x, y, z, xd, yd, zd, occupantAt(level, x, y, z),
+			int occupant = occupantAt(level, x, y, z);
+			return new BloodDrop(level, x, y, z, xd, yd, zd, occupant,
 					sprites.get(random.nextInt(BloodEmitter.DROP_SPRITE_COUNT),
-							BloodEmitter.SPRITE_COUNT - 1));
+							BloodEmitter.SPRITE_COUNT - 1),
+					BloodTint.of(occupant < 0 ? null : level.getEntity(occupant)));
 		}
 
 		/**
@@ -335,14 +340,18 @@ public class BloodDrop extends SingleQuadParticle {
 		private static int occupantAt(ClientLevel level, double x, double y, double z) {
 			int found = -1;
 			double best = Double.MAX_VALUE;
-			for (Player player : level.players()) {
-				if (player.isSpectator() || !player.getBoundingBox().contains(x, y, z)) {
+			// Players and, since 1.7, any living thing with a body: the spray of a
+			// zombie's wound is the zombie's, in the zombie's colour.
+			for (net.minecraft.world.entity.LivingEntity living : level.getEntitiesOfClass(
+					net.minecraft.world.entity.LivingEntity.class, new AABB(x, y, z, x, y, z).inflate(2.0))) {
+				if (living.isSpectator() || living.getAttached(dev.captience.realisticdamage.RDAttachments.SNAPSHOT) == null
+						|| !living.getBoundingBox().contains(x, y, z)) {
 					continue;
 				}
-				double distance = player.position().distanceToSqr(x, y, z);
+				double distance = living.position().distanceToSqr(x, y, z);
 				if (distance < best) {
 					best = distance;
-					found = player.getId();
+					found = living.getId();
 				}
 			}
 			return found;

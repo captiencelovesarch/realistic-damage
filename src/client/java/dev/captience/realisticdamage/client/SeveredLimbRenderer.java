@@ -95,7 +95,9 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 		// Wet while it bleeds, drying as the trickle runs out; never fully clean,
 		// because blood dries on rather than rinsing off.
 		double flow = entity.bleedRate() / WoundSeverity.CRITICAL.bloodPerSecond();
-		state.blood = (float) Math.clamp(0.35 + 0.65 * flow, 0.0, 1.0);
+		// A bone off a skeleton (1.7) carries no blood at all.
+		state.blood = entity.bloodless() ? 0.0F : (float) Math.clamp(0.35 + 0.65 * flow, 0.0, 1.0);
+		state.tint = BloodTint.ofType(ownerType);
 	}
 
 	private static PlayerSkin skinOf(SeveredLimb entity) {
@@ -149,7 +151,7 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 		double strength = config.bloodIntensity() * config.bloodBodyIntensity * state.alpha;
 		if (strength > 0.0) {
 			BloodBodyLayer.paint(collector, poseStack, caps[part.ordinal()], shells[part.ordinal()],
-					ScarLevel.NONE, state.blood, strength, light, overlay);
+					ScarLevel.NONE, state.blood, strength, light, overlay, state.tint);
 		}
 		poseStack.popPose();
 		submitCount++;
@@ -160,6 +162,9 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 	private static float centreX(BodyPart part, LimbMeshes.Kind kind) {
 		if (kind == LimbMeshes.Kind.THIN) {
 			return 0.0F;   // a bone is -1..1 whichever limb it is
+		}
+		if (part.isLeg() && kind != LimbMeshes.Kind.WIDE && kind != LimbMeshes.Kind.SLIM) {
+			return 0.0F;   // illager and villager legs are centred on their pivot
 		}
 		float width = kind == LimbMeshes.Kind.SLIM ? 3.0F : 4.0F;
 		return switch (part) {

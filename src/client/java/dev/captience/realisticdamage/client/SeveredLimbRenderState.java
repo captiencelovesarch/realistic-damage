@@ -20,4 +20,6 @@ public class SeveredLimbRenderState extends EntityRenderState {
 	public float burn;
 	/** How wet the blood on it still is, 0 to 1. */
 	public float blood;
+	/** What colour that blood is (1.7). */
+	public BloodTint tint = BloodTint.RED;
 }

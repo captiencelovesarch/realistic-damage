@@ -150,7 +150,8 @@ public final class BloodEmitter {
 		BloodDrop drop = new BloodDrop(level, at.x, at.y, at.z,
 				direction.x * speed, direction.y * speed, direction.z * speed,
 				limb.getId(),
-				sprites.get((int) (BloodFlow.jitter(index, 16) * DROP_SPRITE_COUNT), SPRITE_COUNT - 1));
+				sprites.get((int) (BloodFlow.jitter(index, 16) * DROP_SPRITE_COUNT), SPRITE_COUNT - 1),
+				BloodTint.ofType(limb.ownerType()));
 		client.particleEngine.add(drop);
 		limbDrops++;
 	}
@@ -258,7 +259,8 @@ public final class BloodEmitter {
 				at.x + spreadX, at.y + spreadY, at.z + spreadZ,
 				direction.x * speed, direction.y * speed, direction.z * speed,
 				player.getId(),
-				sprites.get((int) (BloodFlow.jitter(index, 6) * DROP_SPRITE_COUNT), SPRITE_COUNT - 1));
+				sprites.get((int) (BloodFlow.jitter(index, 6) * DROP_SPRITE_COUNT), SPRITE_COUNT - 1),
+				BloodTint.of(player));
 		client.particleEngine.add(drop);
 	}
 

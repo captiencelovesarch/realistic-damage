@@ -7,6 +7,17 @@
 		"minecraft:stray",
 		"minecraft:wither_skeleton",
 		"minecraft:bogged",
-		{ "id": "minecraft:parched", "required": false }
+		{
+			"id": "minecraft:parched",
+			"required": false
+		},
+		"minecraft:pillager",
+		"minecraft:vindicator",
+		"minecraft:evoker",
+		"minecraft:illusioner",
+		"minecraft:piglin",
+		"minecraft:piglin_brute",
+		"minecraft:zombified_piglin",
+		"minecraft:zombie_villager"
 	]
 }

@@ -72,6 +72,8 @@ public class SeveredLimb extends Entity {
 	private static final EntityDataAccessor<String> OWNER_TYPE = SynchedEntityData.defineId(SeveredLimb.class, EntityDataSerializers.STRING);
 	private static final EntityDataAccessor<Integer> AGE = SynchedEntityData.defineId(SeveredLimb.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> BURN = SynchedEntityData.defineId(SeveredLimb.class, EntityDataSerializers.INT);
+	/** A bone off a skeleton (1.7) has nothing to bleed. */
+	private static final EntityDataAccessor<Boolean> BLOODLESS = SynchedEntityData.defineId(SeveredLimb.class, EntityDataSerializers.BOOLEAN);
 
 	/** How often the server re-sends the age, in ticks. */
 	private static final int AGE_SYNC_INTERVAL = 20;
@@ -111,6 +113,7 @@ public class SeveredLimb extends Entity {
 		limb.entityData.set(OWNER, player.getUUID().toString());
 		limb.entityData.set(OWNER_TYPE, player instanceof ServerPlayer ? ""
 				: net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(player.getType()).toString());
+		limb.entityData.set(BLOODLESS, !MobAnatomy.bleeds(player));
 		limb.setYRot(player.getYRot());
 		// The side the limb was on: a left leg with nowhere to be thrown falls
 		// off to the left, clear of the body, rather than dropping inside it.
@@ -153,6 +156,7 @@ public class SeveredLimb extends Entity {
 		builder.define(OWNER_TYPE, "");
 		builder.define(AGE, 0);
 		builder.define(BURN, 0);
+		builder.define(BLOODLESS, false);
 	}
 
 	@Override
@@ -272,6 +276,11 @@ public class SeveredLimb extends Entity {
 		return entityData.get(AGE) + Math.max(0, tickCount - ageSyncTick);
 	}
 
+	/** True for a limb off a body that never bleeds; the renderer paints no blood on it. */
+	public boolean bloodless() {
+		return entityData.get(BLOODLESS);
+	}
+
 	/** How far along burning away, 0 (not) to 1 (gone). */
 	public double burn() {
 		return Math.min(1.0, entityData.get(BURN) / (double) Balance.LIMB_BURN_TICKS);
@@ -283,6 +292,9 @@ public class SeveredLimb extends Entity {
 	 * client emitter; there is no heart in a limb, so it never spurts.
 	 */
 	public double bleedRate() {
+		if (entityData.get(BLOODLESS)) {
+			return 0.0;
+		}
 		double left = 1.0 - age() / (double) Balance.LIMB_BLEED_TICKS;
 		return left <= 0.0 ? 0.0 : WoundSeverity.CRITICAL.bloodPerSecond() * left;
 	}
