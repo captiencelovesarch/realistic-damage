@@ -84,9 +84,14 @@ public final class LimbMeshes {
 		return bakeLower(slimArms, OVERLAY_INFLATE, true);
 	}
 
-	/** The cut face at the top of the piece that came off: the same cut plane the stump's cap sits on. */
+	/**
+	 * The cut face at the top of the piece that came off: the very same cap as
+	 * the stump's, straddling the cut plane. The first build pushed it a cap's
+	 * thickness lower, which put it inside the piece — where the piece's own
+	 * skin-textured end face hid it, and the arm on the ground showed its top.
+	 */
 	public static ModelPart[] severedCaps(boolean slimArms) {
-		return bake(slimArms, 0.0F, STUMP_LENGTH + CAP_THICKNESS, true);
+		return stumpCaps(slimArms);
 	}
 
 	private static ModelPart[] bakeLower(boolean slimArms, float offset, boolean overlay) {
@@ -116,9 +121,10 @@ public final class LimbMeshes {
 		float cut = top + STUMP_LENGTH;
 		CubeListBuilder cubes = CubeListBuilder.create();
 		if (offset == 0.0F) {
-			// Sides and top from the rows below the cut; the sole from where it was.
+			// Sides from the rows below the cut, the sole from where it was, and no
+			// end face at the cut at all: the cap is what is seen there.
 			cubes.texOffs(u, v + (int) STUMP_LENGTH).addBox(x, cut, -2.0F, width, length, 4.0F,
-					EnumSet.of(Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST, Direction.UP));
+					EnumSet.of(Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST));
 			cubes.texOffs(u, v).addBox(x, top, -2.0F, width, 12.0F, 4.0F, EnumSet.of(Direction.DOWN));
 		} else {
 			cubes.texOffs(u, v + (int) STUMP_LENGTH).addBox(x, cut, -2.0F, width, length, 4.0F,
@@ -186,10 +192,9 @@ public final class LimbMeshes {
 			float width, float length, boolean cap, CubeDeformation g) {
 		CubeListBuilder cubes = CubeListBuilder.create();
 		if (cap) {
-			// A hair inside the piece's own extent on the cut plane, so the cap
-			// and the piece's end face cannot share a surface. A stump's cap sits
-			// just above its cut; the severed piece passes STUMP_LENGTH plus the
-			// cap thickness so its cap sits just below the same plane.
+			// Straddling the cut plane: half inside the stump, half inside the
+			// piece that came off, so whichever of the two is drawn, the cap's
+			// outer face is the one past its end.
 			float y = top + length - CAP_THICKNESS * 0.5F;
 			cubes.texOffs(0, 0).addBox(x, y, -2.0F, width, CAP_THICKNESS, 4.0F);
 		} else {
