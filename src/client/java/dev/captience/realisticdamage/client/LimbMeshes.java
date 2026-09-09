@@ -1,5 +1,7 @@
 package dev.captience.realisticdamage.client;
 
+import java.util.EnumSet;
+
 import dev.captience.realisticdamage.body.BodyPart;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
@@ -8,12 +10,13 @@ import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.Identifier;
 
 /**
  * The player's six regions as bare cubes, in every form the mod draws them
- * (1.6.2): whole, cut short into a stump, the cut face itself, and the skin's
- * second layer for a limb lying on the ground.
+ * (1.6.2): whole, cut short into a stump, the piece below the cut that came
+ * off, the cut face itself, and the skin's second layer for that piece.
  *
  * <p>All of it is baked from vanilla's own cube definitions in
  * {@code PlayerModel.createMesh} with the overlay children left out — the same
@@ -60,9 +63,68 @@ public final class LimbMeshes {
 		return bake(slimArms, 0.0F, STUMP_LENGTH, true);
 	}
 
-	/** The cut face at the top (shoulder or hip end) of a whole limb lying on the floor. */
+	/**
+	 * The piece that came off: the lower {@code 12 - STUMP_LENGTH} pixels of
+	 * each limb, so the stump on the body and the limb on the floor add up to
+	 * one limb. The first build threw a whole twelve-pixel leg while the body
+	 * kept five of them — "the entire leg is visible", as reported.
+	 *
+	 * <p>Two cubes per limb when unoffset: the sides and top with their texture
+	 * rows shifted down by the stump's length, and a full-height cube showing
+	 * only its bottom face, so the sole and the palm keep the texture rows they
+	 * had. An offset shell (the blood) is one cube, since it has no sole worth
+	 * the second.
+	 */
+	public static ModelPart[] severed(boolean slimArms, float offset) {
+		return bakeLower(slimArms, offset, false);
+	}
+
+	/** The skin's second layer on the piece that came off, inflated as vanilla inflates it. */
+	public static ModelPart[] severedOverlays(boolean slimArms) {
+		return bakeLower(slimArms, OVERLAY_INFLATE, true);
+	}
+
+	/** The cut face at the top of the piece that came off: the same cut plane the stump's cap sits on. */
 	public static ModelPart[] severedCaps(boolean slimArms) {
-		return bake(slimArms, 0.0F, 0.0F, true);
+		return bake(slimArms, 0.0F, STUMP_LENGTH + CAP_THICKNESS, true);
+	}
+
+	private static ModelPart[] bakeLower(boolean slimArms, float offset, boolean overlay) {
+		MeshDefinition mesh = new MeshDefinition();
+		PartDefinition root = mesh.getRoot();
+		root.addOrReplaceChild("head", CubeListBuilder.create(), PartPose.ZERO);
+		root.addOrReplaceChild("body", CubeListBuilder.create(), PartPose.ZERO);
+		float armWidth = slimArms ? 3.0F : 4.0F;
+		float rightArmX = slimArms ? -2.0F : -3.0F;
+		if (overlay) {
+			lower(root, "left_arm", 48, 48, -1.0F, -2.0F, armWidth, offset);
+			lower(root, "right_arm", 40, 32, rightArmX, -2.0F, armWidth, offset);
+			lower(root, "left_leg", 0, 48, -2.0F, 0.0F, 4.0F, offset);
+			lower(root, "right_leg", 0, 32, -2.0F, 0.0F, 4.0F, offset);
+		} else {
+			lower(root, "left_arm", 32, 48, -1.0F, -2.0F, armWidth, offset);
+			lower(root, "right_arm", 40, 16, rightArmX, -2.0F, armWidth, offset);
+			lower(root, "left_leg", 16, 48, -2.0F, 0.0F, 4.0F, offset);
+			lower(root, "right_leg", 0, 16, -2.0F, 0.0F, 4.0F, offset);
+		}
+		return index(LayerDefinition.create(mesh, 64, 64).bakeRoot());
+	}
+
+	private static void lower(PartDefinition root, String name, int u, int v, float x, float top,
+			float width, float offset) {
+		float length = 12.0F - STUMP_LENGTH;
+		float cut = top + STUMP_LENGTH;
+		CubeListBuilder cubes = CubeListBuilder.create();
+		if (offset == 0.0F) {
+			// Sides and top from the rows below the cut; the sole from where it was.
+			cubes.texOffs(u, v + (int) STUMP_LENGTH).addBox(x, cut, -2.0F, width, length, 4.0F,
+					EnumSet.of(Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST, Direction.UP));
+			cubes.texOffs(u, v).addBox(x, top, -2.0F, width, 12.0F, 4.0F, EnumSet.of(Direction.DOWN));
+		} else {
+			cubes.texOffs(u, v + (int) STUMP_LENGTH).addBox(x, cut, -2.0F, width, length, 4.0F,
+					new CubeDeformation(offset));
+		}
+		root.addOrReplaceChild(name, cubes, PartPose.ZERO);
 	}
 
 	/** The skin's second layer for each limb, inflated as vanilla inflates it; core regions empty. */
@@ -124,9 +186,11 @@ public final class LimbMeshes {
 			float width, float length, boolean cap, CubeDeformation g) {
 		CubeListBuilder cubes = CubeListBuilder.create();
 		if (cap) {
-			// A hair inside the limb's extent on the cut plane so the cap and the
-			// stump's own bottom face cannot share a surface.
-			float y = length <= 0.0F ? top - CAP_THICKNESS * 0.5F : top + length - CAP_THICKNESS * 0.5F;
+			// A hair inside the piece's own extent on the cut plane, so the cap
+			// and the piece's end face cannot share a surface. A stump's cap sits
+			// just above its cut; the severed piece passes STUMP_LENGTH plus the
+			// cap thickness so its cap sits just below the same plane.
+			float y = top + length - CAP_THICKNESS * 0.5F;
 			cubes.texOffs(0, 0).addBox(x, y, -2.0F, width, CAP_THICKNESS, 4.0F);
 		} else {
 			cubes.texOffs(u, v).addBox(x, top, -2.0F, width, length, 4.0F, g);

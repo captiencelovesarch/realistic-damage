@@ -286,6 +286,14 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			context.waitTicks(20);
 			context.takeScreenshot("rd_07_near_death");
 
+			// One leg gone, still standing (1.6.2 playtest): the model must show a
+			// stump and not the leg. Shot from the front so both legs are in
+			// frame, before the crawl below folds the body over them.
+			mutate(singleplayer, data -> data.part(BodyPart.LEFT_LEG).setDestroyed(true));
+			context.runOnClient(client -> client.options.setCameraType(net.minecraft.client.CameraType.THIRD_PERSON_FRONT));
+			context.waitTicks(20);
+			context.takeScreenshot("rd_06a_leg_stump_standing");
+
 			// Limb destruction: the arm and both legs must vanish from the model,
 			// and the player drops to a crawl.
 			mutate(singleplayer, data -> {

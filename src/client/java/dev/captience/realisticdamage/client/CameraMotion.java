@@ -353,12 +353,16 @@ public final class CameraMotion {
 		double lurchX = 0.0;
 		if (player != null) {
 			float partial = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
-			double step = player.walkAnimation.position(partial);
+			// The walk counter advances about 0.9 a tick at a walk; the model
+			// turns it into a leg swing with the 0.6662 below, one stride every
+			// eleven ticks or so. The first build used pi here and shook the view
+			// nine times a second — "violently", in the playtest report.
+			double phase = player.walkAnimation.position(partial) * 0.6662;
 			double pace = Math.min(1.0, player.walkAnimation.speed(partial));
-			double stride = Math.sin(step * Math.PI) + 0.5 * Math.sin(step * Math.PI * 2.0 + 0.7);
+			double stride = Math.sin(phase) + 0.5 * Math.sin(phase * 2.0 + 0.7);
 			lurchRoll = stride * LURCH_ROLL_MAX * pace;
-			lurchDip = Math.abs(Math.cos(step * Math.PI)) * LURCH_DIP_MAX * pace;
-			lurchX = Math.sin(step * Math.PI) * LURCH_X_MAX * pace;
+			lurchDip = Math.abs(Math.cos(phase)) * LURCH_DIP_MAX * pace;
+			lurchX = Math.sin(phase) * LURCH_X_MAX * pace;
 		}
 		// The nod and the slump ride the fades themselves, not the ramp: a
 		// microsleep is an event with edges, and the edges are the whole cue.

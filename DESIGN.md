@@ -490,16 +490,21 @@ same choke point as the wound, the scar and the sound, so no way of losing a lim
 it. Not saved (`noSave`), not summonable, not pickable, pushable or collidable: you walk
 through it, no mob can see it (it is not a `LivingEntity`, and `PreyMath` reads bodies), and
 it holds nothing. Blasts throw it along the blast radial at 17 b/s, blows toss it along the
-swing at 6 b/s, a limb ground down or taken by command drops where it was; the scatter is
+swing at 6 b/s, a limb ground down or taken by command tips off to the side it was on and
+drops there (straight down put it inside the player's own hitbox, where it read as the leg
+still being there); the scatter is
 `BloodFlow`'s hash seeded from victim, region and tick, so two clients see one flight. It
 falls, bounces once low, stops dead rather than sliding, sinks in water, and burns away in
 fire or lava over 24 ticks. It bleeds a critical wound's trickle from the client emitter,
 running dry over 45 s, and is gone at 60 s, fading over the last two. The wire carries the
 region, the owner's UUID (for the skin, resolved client-side because the server does not
 know an arm width), an age once a second so a late joiner fades it on time, and burn
-progress. `SeveredLimbRenderer` draws the region's cube in the owner's skin plus the skin's
-second layer, the cut face at the shoulder or hip end, and a drying blood shell — all from
-`LimbMeshes`, so the limb on the floor is the limb that was on the body. Server rule
+progress. `SeveredLimbRenderer` draws the piece below the cut — the lower seven pixels, so the
+stump on the body and the limb on the floor add up to one limb — in the owner's skin plus
+the skin's second layer, the cut face at the cut end, and a drying blood shell — all from
+`LimbMeshes`, so the limb on the floor is the limb that was on the body. The drunk walk's
+phase is the model's own `0.6662` scaling of the walk counter; the first build used pi and
+shook the view nine times a second. Server rule
 `spawnSeveredLimbs`, default on, nested under destruction by construction.
 
 ## Deliberate non-goals

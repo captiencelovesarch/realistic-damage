@@ -105,14 +105,16 @@ public class SeveredLimbGameTest {
 	@GameTest(environment = "realisticdamage:isolated")
 	public void aBlastThrowsHarderAndNoDirectionDrops(GameTestHelper helper) {
 		Vec3 along = new Vec3(1.0, 0.0, 0.0);
-		Vec3 blow = SeveredLimb.throwVelocity(along, false, 7L);
-		Vec3 blast = SeveredLimb.throwVelocity(along, true, 7L);
-		Vec3 drop = SeveredLimb.throwVelocity(Vec3.ZERO, false, 7L);
+		Vec3 left = new Vec3(0.0, 0.0, 1.0);
+		Vec3 blow = SeveredLimb.throwVelocity(along, false, left, 7L);
+		Vec3 blast = SeveredLimb.throwVelocity(along, true, left, 7L);
+		Vec3 drop = SeveredLimb.throwVelocity(Vec3.ZERO, false, left, 7L);
 		helper.assertTrue(blast.horizontalDistance() > blow.horizontalDistance() * 2.0,
 				"a blast throws far harder than a blow: " + blast + " vs " + blow);
 		helper.assertTrue(blow.x > 0.2 && blast.x > 0.7, "both along the blow");
-		helper.assertTrue(drop.horizontalDistance() <= Balance.LIMB_THROW_SCATTER * 1.5,
-				"no direction means the limb drops where it was, got " + drop);
+		helper.assertTrue(drop.horizontalDistance() <= Balance.LIMB_DROP_SIDE_SPEED + Balance.LIMB_THROW_SCATTER * 1.5,
+				"no direction means the limb only tips off to the side, got " + drop);
+		helper.assertTrue(drop.z > Balance.LIMB_DROP_SIDE_SPEED * 0.5, "to the side it was on, got " + drop);
 		helper.assertTrue(Math.abs(drop.y - Balance.LIMB_DROP_LIFT) < 1.0e-9, "with only the small clearing lift");
 		helper.succeed();
 	}
@@ -120,9 +122,10 @@ public class SeveredLimbGameTest {
 	@GameTest(environment = "realisticdamage:isolated")
 	public void theThrowIsDeterministic(GameTestHelper helper) {
 		Vec3 along = new Vec3(0.0, 0.0, -1.0);
-		helper.assertTrue(SeveredLimb.throwVelocity(along, true, 42L).equals(SeveredLimb.throwVelocity(along, true, 42L)),
+		Vec3 side = new Vec3(1.0, 0.0, 0.0);
+		helper.assertTrue(SeveredLimb.throwVelocity(along, true, side, 42L).equals(SeveredLimb.throwVelocity(along, true, side, 42L)),
 				"the same event throws the same way twice");
-		helper.assertTrue(!SeveredLimb.throwVelocity(along, true, 42L).equals(SeveredLimb.throwVelocity(along, true, 43L)),
+		helper.assertTrue(!SeveredLimb.throwVelocity(along, true, side, 42L).equals(SeveredLimb.throwVelocity(along, true, side, 43L)),
 				"and two limbs from one blast do not land in the same spot");
 		helper.succeed();
 	}

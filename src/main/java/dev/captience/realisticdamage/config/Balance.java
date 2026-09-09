@@ -287,7 +287,9 @@ public final class Balance {
 	/** Upward component so a throw arcs and a drop clears the body. */
 	public static final double LIMB_THROW_LIFT = 0.22;
 	public static final double LIMB_BLAST_LIFT = 0.30;
-	public static final double LIMB_DROP_LIFT = 0.06;
+	public static final double LIMB_DROP_LIFT = 0.12;
+	/** Sideways speed of a limb that merely drops, so it clears the body it fell off. */
+	public static final double LIMB_DROP_SIDE_SPEED = 0.10;
 	/** Deterministic sideways scatter, blocks per tick, so two limbs do not land in one spot. */
 	public static final double LIMB_THROW_SCATTER = 0.05;
 	public static final double LIMB_GRAVITY = 0.045;

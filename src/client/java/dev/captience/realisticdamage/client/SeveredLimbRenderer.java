@@ -24,9 +24,9 @@ import net.minecraft.world.entity.player.PlayerModelType;
 import net.minecraft.world.entity.player.PlayerSkin;
 
 /**
- * Draws a lost limb where it fell (1.6.2): the region's own cube in its
- * owner's skin with the skin's second layer over it, a cut face at the
- * shoulder or hip end, and a blood shell that dries as the trickle runs out.
+ * Draws a lost limb where it fell (1.6.2): the part of the region below the
+ * cut, in its owner's skin with the skin's second layer over it, a cut face
+ * at the cut end, and a blood shell that dries as the trickle runs out.
  * All four come from {@link LimbMeshes}, so the limb on the floor is the same
  * limb that was on the body a moment ago.
  *
@@ -59,14 +59,16 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 	public SeveredLimbRenderer(EntityRendererProvider.Context context) {
 		super(context);
 		this.shadowRadius = 0.2F;
-		this.wide = LimbMeshes.full(false, 0.0F);
-		this.slim = LimbMeshes.full(true, 0.0F);
-		this.wideOverlay = LimbMeshes.overlays(false);
-		this.slimOverlay = LimbMeshes.overlays(true);
+		// The piece below the cut, not the whole limb: the body keeps the top
+		// five pixels as its stump, so what lies on the floor is the other seven.
+		this.wide = LimbMeshes.severed(false, 0.0F);
+		this.slim = LimbMeshes.severed(true, 0.0F);
+		this.wideOverlay = LimbMeshes.severedOverlays(false);
+		this.slimOverlay = LimbMeshes.severedOverlays(true);
 		this.wideCap = LimbMeshes.severedCaps(false);
 		this.slimCap = LimbMeshes.severedCaps(true);
-		this.wideBlood = LimbMeshes.full(false, BloodBodyLayer.SKIN_OFFSET);
-		this.slimBlood = LimbMeshes.full(true, BloodBodyLayer.SKIN_OFFSET);
+		this.wideBlood = LimbMeshes.severed(false, BloodBodyLayer.SKIN_OFFSET);
+		this.slimBlood = LimbMeshes.severed(true, BloodBodyLayer.SKIN_OFFSET);
 	}
 
 	@Override
@@ -160,8 +162,9 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 		};
 	}
 
-	/** Vertical centre: arms run -2..10, legs 0..12. */
+	/** Vertical centre of the piece below the cut: arms run -2..10, legs 0..12, the cut at five. */
 	private static float centreY(BodyPart part) {
-		return part.isArm() ? 4.0F : 6.0F;
+		float top = part.isArm() ? -2.0F : 0.0F;
+		return top + LimbMeshes.STUMP_LENGTH + (12.0F - LimbMeshes.STUMP_LENGTH) / 2.0F;
 	}
 }

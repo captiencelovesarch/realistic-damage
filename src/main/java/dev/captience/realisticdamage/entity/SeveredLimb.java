@@ -101,7 +101,12 @@ public class SeveredLimb extends Entity {
 		limb.entityData.set(PART, (byte) part.ordinal());
 		limb.entityData.set(OWNER, player.getUUID().toString());
 		limb.setYRot(player.getYRot());
-		limb.setDeltaMovement(throwVelocity(blowDirection, blast,
+		// The side the limb was on: a left leg with nowhere to be thrown falls
+		// off to the left, clear of the body, rather than dropping inside it.
+		double yaw = Math.toRadians(player.getYRot());
+		Vec3 left = new Vec3(Math.cos(yaw), 0.0, Math.sin(yaw));
+		Vec3 side = part == BodyPart.LEFT_ARM || part == BodyPart.LEFT_LEG ? left : left.scale(-1.0);
+		limb.setDeltaMovement(throwVelocity(blowDirection, blast, side,
 				player.getId() * 31L + part.ordinal() * 7L + player.tickCount));
 		level.addFreshEntity(limb);
 		return limb;
@@ -111,16 +116,20 @@ public class SeveredLimb extends Entity {
 	 * Where the limb goes. Along the blow — a swing carries what it takes off
 	 * and a blast throws what it tears off — with a lift so it arcs rather than
 	 * skids, and a small deterministic scatter so two limbs from one creeper do
-	 * not land in the same spot. No direction means no throw: the limb drops.
+	 * not land in the same spot. No direction means no throw: the limb tips
+	 * off to {@code side} — the side of the body it was on — and drops there.
+	 * Straight down was the first build, and a limb lying inside the player's
+	 * own hitbox read as the leg still being there.
 	 */
-	public static Vec3 throwVelocity(Vec3 blowDirection, boolean blast, long seed) {
+	public static Vec3 throwVelocity(Vec3 blowDirection, boolean blast, Vec3 side, long seed) {
 		Vec3 velocity;
 		if (blowDirection.lengthSqr() > 1.0e-6) {
 			double speed = blast ? Balance.LIMB_BLAST_SPEED : Balance.LIMB_THROW_SPEED;
 			double lift = blast ? Balance.LIMB_BLAST_LIFT : Balance.LIMB_THROW_LIFT;
 			velocity = blowDirection.normalize().scale(speed).add(0.0, lift, 0.0);
 		} else {
-			velocity = new Vec3(0.0, Balance.LIMB_DROP_LIFT, 0.0);
+			Vec3 tip = side.lengthSqr() > 1.0e-6 ? side.normalize() : Vec3.ZERO;
+			velocity = tip.scale(Balance.LIMB_DROP_SIDE_SPEED).add(0.0, Balance.LIMB_DROP_LIFT, 0.0);
 		}
 		return velocity.add(BloodFlow.jitterSigned(seed, 61) * Balance.LIMB_THROW_SCATTER, 0.0,
 				BloodFlow.jitterSigned(seed, 62) * Balance.LIMB_THROW_SCATTER);
