@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.damage;
 
+import net.minecraft.world.entity.LivingEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +71,7 @@ public final class ExplosiveDismemberment {
 	 *               the biggest share is the region that can go
 	 * @return the limbs taken, in {@link BodyPart} order; empty when none
 	 */
-	public static List<BodyPart> evaluate(ServerPlayer player, RealisticDamageData data, ServerConfig config,
+	public static List<BodyPart> evaluate(LivingEntity player, RealisticDamageData data, ServerConfig config,
 			ClassifiedDamage classified, DamageSource source, PendingExplosion blast,
 			Map<BodyPart, Double> shares, List<TraumaPipeline.AppliedTrauma> result) {
 		// The same product baseTrauma builds a few lines away in the pipeline, kept
@@ -129,7 +130,7 @@ public final class ExplosiveDismemberment {
 	}
 
 	/** From the blast centre toward the victim, so the stump sprays away from the explosion. */
-	private static Vec3 blowDirection(ServerPlayer player, PendingExplosion blast) {
+	private static Vec3 blowDirection(LivingEntity player, PendingExplosion blast) {
 		Vec3 delta = player.position().subtract(blast.x(), blast.y(), blast.z());
 		return delta.lengthSqr() < 1.0e-6 ? Vec3.ZERO : delta;
 	}

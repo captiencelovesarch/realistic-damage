@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.systems;
 
+import net.minecraft.world.entity.LivingEntity;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.RealisticDamage;
 import dev.captience.realisticdamage.body.BodyPart;
@@ -49,7 +50,7 @@ public final class ImpairmentSystem {
 		PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) -> strainIfSevere(player));
 	}
 
-	public static void tick(ServerPlayer player, RealisticDamageData data) {
+	public static void tick(LivingEntity player, RealisticDamageData data) {
 		double leftLeg = legPenalty(data.part(BodyPart.LEFT_LEG));
 		double rightLeg = legPenalty(data.part(BodyPart.RIGHT_LEG));
 		double movement = ImpairmentMath.combinedLegPenalty(leftLeg, rightLeg);
@@ -138,7 +139,7 @@ public final class ImpairmentSystem {
 	}
 
 	/** Removes every impairment modifier (creative/spectator switch, spec §46). */
-	public static void clear(ServerPlayer player) {
+	public static void clear(LivingEntity player) {
 		remove(player, Attributes.MOVEMENT_SPEED, LEG_SPEED_ID);
 		remove(player, Attributes.JUMP_STRENGTH, LEG_JUMP_ID);
 		remove(player, Attributes.ATTACK_SPEED, ARM_ATTACK_SPEED_ID);
@@ -165,7 +166,7 @@ public final class ImpairmentSystem {
 				ImpairmentMath.armPenalty(off.fraction(), off.broken()));
 	}
 
-	public static BodyPart armFor(Player player, boolean mainHand) {
+	public static BodyPart armFor(LivingEntity player, boolean mainHand) {
 		HumanoidArm arm = mainHand ? player.getMainArm() : player.getMainArm().getOpposite();
 		return arm == HumanoidArm.RIGHT ? BodyPart.RIGHT_ARM : BodyPart.LEFT_ARM;
 	}
@@ -209,7 +210,7 @@ public final class ImpairmentSystem {
 		}
 	}
 
-	private static void apply(ServerPlayer player, Holder<Attribute> attribute, Identifier id, double value) {
+	private static void apply(LivingEntity player, Holder<Attribute> attribute, Identifier id, double value) {
 		AttributeInstance instance = player.getAttribute(attribute);
 		if (instance == null) {
 			return;
@@ -226,7 +227,7 @@ public final class ImpairmentSystem {
 				new AttributeModifier(id, value, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
 	}
 
-	private static void remove(ServerPlayer player, Holder<Attribute> attribute, Identifier id) {
+	private static void remove(LivingEntity player, Holder<Attribute> attribute, Identifier id) {
 		AttributeInstance instance = player.getAttribute(attribute);
 		if (instance != null) {
 			instance.removeModifier(id);

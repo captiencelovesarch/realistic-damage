@@ -27,7 +27,7 @@ public final class DamageClassifier {
 
 	/** Returns null when the event should produce no Realistic Damage consequences. */
 	@Nullable
-	public static ClassifiedDamage classify(ServerPlayer victim, DamageSource source) {
+	public static ClassifiedDamage classify(LivingEntity victim, DamageSource source) {
 		// Recursion safety (spec §51) and vanilla-behavior passthroughs.
 		if (source.is(RDDamageTypes.INTERNAL)
 				|| source.is(DamageTypes.FELL_OUT_OF_WORLD)
@@ -41,9 +41,12 @@ public final class DamageClassifier {
 		// what its own weapon did, then whatever a datapack has declared, then
 		// the built-in table. Both layers can override vanilla, which is the
 		// point — a server should be able to decide a trident punctures.
-		if (dev.captience.realisticdamage.api.RealisticDamageApi.hasClassifiers()) {
+		// The public API is typed against players (1.3) and stays so; a mob
+		// victim skips the external hooks and goes straight to the tags.
+		if (victim instanceof ServerPlayer player
+				&& dev.captience.realisticdamage.api.RealisticDamageApi.hasClassifiers()) {
 			var external = dev.captience.realisticdamage.api.RealisticDamageApi
-					.classifyExternally(victim, source);
+					.classifyExternally(player, source);
 			if (external != null) {
 				return external.toClassified();
 			}

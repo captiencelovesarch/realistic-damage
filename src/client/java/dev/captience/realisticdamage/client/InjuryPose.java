@@ -4,7 +4,7 @@ import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.systems.LimpMath;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 
 /**
  * How an injured limb is carried (1.6) — the first thing the player model has
@@ -101,7 +101,7 @@ public final class InjuryPose {
 	 * model and, separately, each armour model rendered over it, so the sleeve
 	 * follows the arm inside it.
 	 */
-	public static void apply(AvatarRenderState state, HumanoidModel<?> model) {
+	public static void apply(HumanoidRenderState state, HumanoidModel<?> model) {
 		// Its own switch, not the scars one and not the panic button. See the
 		// field's javadoc in ClientEffectsConfig for why.
 		if (!ClientEffectsConfig.get().showInjuryPose) {

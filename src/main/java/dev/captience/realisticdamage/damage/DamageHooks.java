@@ -2,6 +2,7 @@ package dev.captience.realisticdamage.damage;
 
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.systems.MobAnatomy;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -17,23 +18,26 @@ public final class DamageHooks {
 
 	public static void init() {
 		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
-			if (entity instanceof ServerPlayer player && participates(player) && !isInternal(source)) {
-				RDAttachments.get(player).capturePreHurt(player.getHealth());
+			if (MobAnatomy.participates(entity) && !isInternal(source)) {
+				RDAttachments.get(entity).capturePreHurt(entity.getHealth());
 			}
 			return true;
 		});
 
+		// Players, and since 1.7 every mob in the has_anatomy tag: one pipeline,
+		// two kinds of body. The player-only consequences gate themselves inside.
 		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamageTaken, damageTaken, blocked) -> {
-			if (!(entity instanceof ServerPlayer player) || !participates(player) || isInternal(source)) {
+			if (!MobAnatomy.participates(entity) || isInternal(source)) {
 				return;
 			}
-			RealisticDamageData data = RDAttachments.get(player);
-			double applied = data.consumePreHurt(player.getHealth());
+			RealisticDamageData data = RDAttachments.get(entity);
+			double applied = data.consumePreHurt(entity.getHealth());
 			if (applied < 0) {
 				applied = damageTaken; // no capture (shouldn't happen) — degrade to the pre-armor amount
 			}
-			TraumaPipeline.handle(player, data, source, baseDamageTaken, damageTaken, applied, blocked);
-			RDAttachments.pushSnapshot(player);
+			TraumaPipeline.handle(entity, data, source, baseDamageTaken, damageTaken, applied, blocked);
+			RDAttachments.pushSnapshot(entity);
+			MobAnatomy.track(entity);
 		});
 
 		// The killing blow is invisible to AFTER_DAMAGE — Fabric's contract says

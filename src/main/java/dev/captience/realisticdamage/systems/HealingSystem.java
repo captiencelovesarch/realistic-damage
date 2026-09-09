@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.systems;
 
+import net.minecraft.world.entity.LivingEntity;
 import java.util.Map;
 
 import dev.captience.realisticdamage.RDAttachments;
@@ -41,29 +42,40 @@ public final class HealingSystem {
 		});
 	}
 
-	public static void tick(ServerPlayer player, RealisticDamageData data) {
+	public static void tick(LivingEntity entity, RealisticDamageData data) {
+		ServerPlayer player = entity instanceof ServerPlayer p ? p : null;
 		// Passive Blood regeneration (spec §18): slow, faster while well fed, never while bleeding.
 		if (!data.bleeding()) {
 			double perSecond = Balance.BLOOD_PASSIVE_PER_SEC;
-			if (player.getFoodData().getFoodLevel() >= 18) {
+			if (player != null && player.getFoodData().getFoodLevel() >= 18) {
 				perSecond += Balance.BLOOD_WELLFED_PER_SEC;
 			}
 			data.restoreBlood(perSecond * ServerConfig.get().healingMultiplier / 20.0);
 		}
 
-		// Full-HP players keep repairing — otherwise a full-heart player with a
-		// broken leg would never recover (spec §37). Deliberately the slow vanilla
-		// cadence, not the saturation-boosted one: body repair should take tens of
-		// seconds for a real injury, and hearts already got the fast path.
-		if (!player.isHurt() && naturalRegenAllowed(player)) {
-			FoodData food = player.getFoodData();
-			if (food.getFoodLevel() >= 18 && player.tickCount % NORMAL_CYCLE_TICKS == 0 && hasAnythingToHeal(data)) {
-				grantRecovery(player, data, 1.0);
-				food.addExhaustion(Balance.HEAL_EXHAUSTION_PER_CYCLE);
+		if (player != null) {
+			// Full-HP players keep repairing — otherwise a full-heart player with a
+			// broken leg would never recover (spec §37). Deliberately the slow vanilla
+			// cadence, not the saturation-boosted one: body repair should take tens of
+			// seconds for a real injury, and hearts already got the fast path.
+			if (!player.isHurt() && naturalRegenAllowed(player)) {
+				FoodData food = player.getFoodData();
+				if (food.getFoodLevel() >= 18 && player.tickCount % NORMAL_CYCLE_TICKS == 0 && hasAnythingToHeal(data)) {
+					grantRecovery(player, data, 1.0);
+					food.addExhaustion(Balance.HEAL_EXHAUSTION_PER_CYCLE);
+				}
 			}
+		} else if (entity.hurtTime == 0 && entity.tickCount % NORMAL_CYCLE_TICKS == 0
+				&& entity.getLastHurtByMobTimestamp() + Balance.MOB_MEND_CALM_TICKS < entity.tickCount
+				&& hasAnythingToHeal(data)) {
+			// A mob mends on time alone (1.7): no food, no sleep, and nothing to
+			// spend, so a fraction of a regen-HP every cycle once nothing has hurt
+			// it for a while. Enough that a zombie that walks away from a fight is
+			// whole in a couple of minutes, and a minor wound is not a slow death.
+			grantRecovery(entity, data, Balance.MOB_MEND_PER_CYCLE);
 		}
 
-		clearRecoveredStatuses(player, data);
+		clearRecoveredStatuses(entity, data);
 	}
 
 	/** Called from the heal mixin: any real vanilla heal (natural regen, Regeneration, Instant Health). */
@@ -115,7 +127,7 @@ public final class HealingSystem {
 	}
 
 	/** One unit of recovery = what a single vanilla regen HP grants (spec §37). */
-	private static void grantRecovery(ServerPlayer player, RealisticDamageData data, double healedHp) {
+	private static void grantRecovery(LivingEntity player, RealisticDamageData data, double healedHp) {
 		double multiplier = ServerConfig.get().healingMultiplier;
 		if (data.burned()) {
 			multiplier *= Balance.BURNED_HEALING_FACTOR;
@@ -126,7 +138,7 @@ public final class HealingSystem {
 	}
 
 	/** Budgeted body repair, worst-first with severe-part attention (spec §37). */
-	private static void distributeRepair(ServerPlayer player, RealisticDamageData data, double budget) {
+	private static void distributeRepair(LivingEntity player, RealisticDamageData data, double budget) {
 		Map<BodyPart, Double> allocation = HealingMath.distributeBudget(data, budget);
 		for (Map.Entry<BodyPart, Double> entry : allocation.entrySet()) {
 			trackBrokenHeal(player, data.part(entry.getKey()), entry.getValue());
@@ -134,7 +146,7 @@ public final class HealingSystem {
 	}
 
 	/** Heals a part and announces a Broken limb mending (spec §15, §43). */
-	private static void trackBrokenHeal(ServerPlayer player, BodyPartData part, double amount) {
+	private static void trackBrokenHeal(LivingEntity player, BodyPartData part, double amount) {
 		boolean wasBroken = part.broken();
 		part.heal(amount);
 		if (wasBroken && !part.broken()) {
@@ -155,7 +167,7 @@ public final class HealingSystem {
 		data.wounds().removeIf(wound -> wound.decay(steps));
 	}
 
-	private static void clearRecoveredStatuses(ServerPlayer player, RealisticDamageData data) {
+	private static void clearRecoveredStatuses(LivingEntity player, RealisticDamageData data) {
 		if (data.concussion()) {
 			// Stable means: head mended, consciousness sitting at its ceiling, not
 			// bleeding. Only then does the clock toward recovery run, and it has to
@@ -214,7 +226,7 @@ public final class HealingSystem {
 		return data.bleeding() || data.blood() < Balance.BLOOD_MAX;
 	}
 
-	private static boolean naturalRegenAllowed(ServerPlayer player) {
-		return player.level().getGameRules().get(GameRules.NATURAL_HEALTH_REGENERATION);
+	private static boolean naturalRegenAllowed(LivingEntity player) {
+		return ((net.minecraft.server.level.ServerLevel) player.level()).getGameRules().get(GameRules.NATURAL_HEALTH_REGENERATION);
 	}
 }

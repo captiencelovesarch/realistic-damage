@@ -8,10 +8,12 @@
 		"LivingEntityFallMixin",
 		"LivingEntityHealMixin",
 		"LivingEntityUseItemMixin",
+		"MobStrikeMixin",
 		"MobTargetMixin",
 		"OffhandSwapMixin",
 		"PlayerPoseMixin",
 		"ServerExplosionMixin",
+		"SkeletonShootMixin",
 		"TotemDeathProtectionMixin"
 	],
 	"injectors": {

@@ -6,7 +6,7 @@ import dev.captience.realisticdamage.persist.RDCodecs;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentSyncPredicate;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 
 /**
  * Two attachments (spec §46-48):
@@ -50,13 +50,17 @@ public final class RDAttachments {
 					.initializer(BodySnapshot::healthy)
 					.syncWith(BodySnapshot.STREAM_CODEC, AttachmentSyncPredicate.all()));
 
-	public static RealisticDamageData get(ServerPlayer player) {
-		return player.getAttachedOrCreate(DATA);
+	/**
+	 * The body of any living thing the mod tracks (1.7): players, and mobs in
+	 * the {@code has_anatomy} tag. Created on first request.
+	 */
+	public static RealisticDamageData get(LivingEntity entity) {
+		return entity.getAttachedOrCreate(DATA);
 	}
 
 	/** Recomputes and publishes the client snapshot; equal snapshots are not re-sent. */
-	public static void pushSnapshot(ServerPlayer player) {
-		player.setAttached(SNAPSHOT, BodySnapshot.of(get(player)));
+	public static void pushSnapshot(LivingEntity entity) {
+		entity.setAttached(SNAPSHOT, BodySnapshot.of(get(entity)));
 	}
 
 	/** Called from mod init to force classloading/registration. */

@@ -16,7 +16,7 @@ import dev.captience.realisticdamage.systems.Cardio;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.SpriteSet;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
@@ -97,15 +97,16 @@ public final class BloodEmitter {
 			return;
 		}
 		Vec3 here = client.player == null ? Vec3.ZERO : client.player.position();
-		for (Player player : level.players()) {
+		// Every living thing with a body (1.7): players, and the mobs the server
+		// gave snapshots to. The range box does the culling; the null read does
+		// the rest.
+		for (LivingEntity player : level.getEntitiesOfClass(LivingEntity.class,
+				new AABB(here, here).inflate(EMIT_RANGE))) {
 			BodySnapshot snapshot = player.getAttached(RDAttachments.SNAPSHOT);
 			if (snapshot == null || !player.isAlive() || player.isSpectator()) {
 				continue;
 			}
 			boolean local = player == client.player;
-			if (!local && player.position().distanceToSqr(here) > EMIT_RANGE * EMIT_RANGE) {
-				continue;
-			}
 			emitFor(player, snapshot, local);
 		}
 		bleeders.keySet().removeIf(id -> level.getEntity(id) == null);
@@ -154,7 +155,7 @@ public final class BloodEmitter {
 		limbDrops++;
 	}
 
-	private static void emitFor(Player player, BodySnapshot snapshot, boolean local) {
+	private static void emitFor(LivingEntity player, BodySnapshot snapshot, boolean local) {
 		Bleeder bleeder = bleeders.computeIfAbsent(player.getId(), id -> new Bleeder());
 
 		// The local player's spurts have to land on the heart the player is
@@ -222,7 +223,7 @@ public final class BloodEmitter {
 	 * rather than in yours. Computed from their synced vitals, which every client
 	 * has, so two people watching the same casualty see the same thing.
 	 */
-	private static Cardio advanceRemoteHeart(Player player, BodySnapshot snapshot, Bleeder bleeder) {
+	private static Cardio advanceRemoteHeart(LivingEntity player, BodySnapshot snapshot, Bleeder bleeder) {
 		double effective = Vitals.effectiveConsciousness(snapshot.consciousness(), snapshot.concussion());
 		double maxHealth = player.getMaxHealth();
 		double healthFraction = maxHealth <= 0.0 ? 1.0 : player.getHealth() / maxHealth;
@@ -234,7 +235,7 @@ public final class BloodEmitter {
 		return bleeder.heart;
 	}
 
-	private static void spawn(Player player, BodyPart part, double bloodPerSecond, boolean onBeat, long index) {
+	private static void spawn(LivingEntity player, BodyPart part, double bloodPerSecond, boolean onBeat, long index) {
 		Minecraft client = Minecraft.getInstance();
 		ClientLevel level = client.level;
 		if (level == null || sprites == null) {
@@ -266,7 +267,7 @@ public final class BloodEmitter {
 	 * tilted slightly up so it arcs. Narrow because this is pressure escaping a
 	 * hole, not an aerosol — a wide cone reads as a spray can.
 	 */
-	private static Vec3 spurtDirection(Player player, long index) {
+	private static Vec3 spurtDirection(LivingEntity player, long index) {
 		double yaw = Math.toRadians(player.yBodyRot)
 				+ Math.toRadians(BloodFlow.jitterSigned(index, 8) * Balance.ARTERIAL_SPURT_SPREAD);
 		double pitch = Math.toRadians(-18.0 + BloodFlow.jitterSigned(index, 9) * Balance.ARTERIAL_SPURT_SPREAD);

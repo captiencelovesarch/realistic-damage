@@ -302,6 +302,14 @@ public final class Balance {
 	public static final double LIMB_WATER_DRAG = 0.85;
 	public static final double LIMB_WATER_SINK = 0.004;
 
+	// Mob bodies (1.7).
+	/** Ticks since a mob was last hurt before it starts mending on its own. */
+	public static final int MOB_MEND_CALM_TICKS = 100;
+	/** Regen-HP-equivalents of recovery a calm mob is granted per healing cycle. */
+	public static final double MOB_MEND_PER_CYCLE = 0.5;
+	/** A concussed mob loses its target this often, in ticks. */
+	public static final int MOB_DAZE_FORGET_TICKS = 40;
+
 	// Stains: what a drop leaves on the surface it hits.
 	/** Hard cap on tracked stains. Oldest are evicted first (spec §56: no unbounded state). */
 	public static final int STAIN_CAPACITY = 768;

@@ -14,6 +14,8 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import dev.captience.realisticdamage.systems.MobAnatomy;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -66,6 +68,8 @@ import org.jspecify.annotations.Nullable;
 public class SeveredLimb extends Entity {
 	private static final EntityDataAccessor<Byte> PART = SynchedEntityData.defineId(SeveredLimb.class, EntityDataSerializers.BYTE);
 	private static final EntityDataAccessor<String> OWNER = SynchedEntityData.defineId(SeveredLimb.class, EntityDataSerializers.STRING);
+	/** The owner's entity type id when it was a mob (1.7), or empty for a player. */
+	private static final EntityDataAccessor<String> OWNER_TYPE = SynchedEntityData.defineId(SeveredLimb.class, EntityDataSerializers.STRING);
 	private static final EntityDataAccessor<Integer> AGE = SynchedEntityData.defineId(SeveredLimb.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> BURN = SynchedEntityData.defineId(SeveredLimb.class, EntityDataSerializers.INT);
 
@@ -90,16 +94,23 @@ public class SeveredLimb extends Entity {
 	 * none; {@code blast} selects the harder throw. Returns null when the rule is
 	 * off or the part is not a limb.
 	 */
-	public static @Nullable SeveredLimb throwFrom(ServerPlayer player, BodyPart part, Vec3 blowDirection, boolean blast) {
+	public static @Nullable SeveredLimb throwFrom(LivingEntity player, BodyPart part, Vec3 blowDirection, boolean blast) {
 		if (!part.isLimb() || !ServerConfig.get().spawnSeveredLimbs) {
 			return null;
 		}
-		ServerLevel level = player.level();
+		// A mob's limb is thrown only when the client can draw it (1.7): the
+		// throws_limbs tag names the types whose texture layout is known.
+		if (!(player instanceof ServerPlayer) && !MobAnatomy.throwsLimbs(player)) {
+			return null;
+		}
+		ServerLevel level = (ServerLevel) player.level();
 		SeveredLimb limb = new SeveredLimb(RDEntities.SEVERED_LIMB, level);
 		Vec3 at = BodyHitResolver.regionCenter(player, part);
 		limb.setPos(at.x, at.y, at.z);
 		limb.entityData.set(PART, (byte) part.ordinal());
 		limb.entityData.set(OWNER, player.getUUID().toString());
+		limb.entityData.set(OWNER_TYPE, player instanceof ServerPlayer ? ""
+				: net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(player.getType()).toString());
 		limb.setYRot(player.getYRot());
 		// The side the limb was on: a left leg with nowhere to be thrown falls
 		// off to the left, clear of the body, rather than dropping inside it.
@@ -139,6 +150,7 @@ public class SeveredLimb extends Entity {
 	protected void defineSynchedData(SynchedEntityData.Builder builder) {
 		builder.define(PART, (byte) BodyPart.LEFT_LEG.ordinal());
 		builder.define(OWNER, "");
+		builder.define(OWNER_TYPE, "");
 		builder.define(AGE, 0);
 		builder.define(BURN, 0);
 	}
@@ -227,6 +239,16 @@ public class SeveredLimb extends Entity {
 		int ordinal = entityData.get(PART);
 		BodyPart[] parts = BodyPart.values();
 		return parts[Math.clamp(ordinal, 0, parts.length - 1)];
+	}
+
+	/** The mob type this came off, or null for a player's limb (1.7). */
+	public net.minecraft.world.entity.@Nullable EntityType<?> ownerType() {
+		String id = entityData.get(OWNER_TYPE);
+		if (id.isEmpty()) {
+			return null;
+		}
+		return net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+				.getOptional(net.minecraft.resources.Identifier.tryParse(id)).orElse(null);
 	}
 
 	/** Whose limb, or null when unknown. */

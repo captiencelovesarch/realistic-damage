@@ -71,6 +71,15 @@ public final class ServerConfig {
 	public boolean enableExplosiveDismemberment = true;
 
 	/**
+	 * Mobs have bodies too (1.7): every entity type in the
+	 * {@code realisticdamage:has_anatomy} tag takes regional trauma, bleeds,
+	 * breaks, loses limbs, is concussed and collapses through the same pipeline
+	 * a player does — humanoids out of the box, anything a datapack adds. Off,
+	 * mobs are vanilla and no mob ever carries an attachment.
+	 */
+	public boolean enableMobAnatomy = true;
+
+	/**
 	 * A lost limb is a thing in the world (1.6.2): thrown from the loss, it
 	 * lands, bleeds for most of a minute and is gone. Nested under
 	 * {@link #enableLimbDestruction} by construction — no destruction, no limb —

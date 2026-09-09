@@ -13,7 +13,8 @@ import dev.captience.realisticdamage.entity.SeveredLimb;
 import dev.captience.realisticdamage.systems.BleedingSystem;
 import dev.captience.realisticdamage.systems.WoundMath;
 import dev.captience.realisticdamage.util.Notifier;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -65,7 +66,7 @@ public final class DestructionLogic {
 	 * frame — {@code sendOverlayMessage} means the last line is the only one the
 	 * player reads.
 	 */
-	public static boolean evaluate(ServerPlayer player, RealisticDamageData data,
+	public static boolean evaluate(LivingEntity player, RealisticDamageData data,
 			List<TraumaPipeline.AppliedTrauma> traumas, Vec3 blowDirection) {
 		boolean destroyed = false;
 		for (TraumaPipeline.AppliedTrauma trauma : traumas) {
@@ -108,12 +109,12 @@ public final class DestructionLogic {
 	 * by fiat most resembles, and the spray goes straight up for want of a
 	 * direction.
 	 */
-	public static void destroy(ServerPlayer player, RealisticDamageData data, BodyPart part) {
+	public static void destroy(LivingEntity player, RealisticDamageData data, BodyPart part) {
 		destroy(player, data, part, WoundSeverity.CRITICAL, Vec3.ZERO, Cause.LOST);
 	}
 
 	/** The ordinary loss: something wore the limb down and something finished it. */
-	public static void destroy(ServerPlayer player, RealisticDamageData data, BodyPart part,
+	public static void destroy(LivingEntity player, RealisticDamageData data, BodyPart part,
 			WoundSeverity stump, Vec3 blowDirection) {
 		destroy(player, data, part, stump, blowDirection, Cause.LOST);
 	}
@@ -141,7 +142,7 @@ public final class DestructionLogic {
 	 *                      when there was none
 	 * @param cause         which sentence the moment gets; see {@link Cause}
 	 */
-	public static void destroy(ServerPlayer player, RealisticDamageData data, BodyPart part,
+	public static void destroy(LivingEntity player, RealisticDamageData data, BodyPart part,
 			WoundSeverity stump, Vec3 blowDirection, Cause cause) {
 		data.part(part).setDestroyed(true);
 		if (part.isCore()) {
@@ -149,8 +150,8 @@ public final class DestructionLogic {
 			// different deaths in chat. No stump: a wound on a corpse is noise, and
 			// no blast can reach here — ExplosiveDismemberment is limbs only.
 			Notifier.destroyed(player, part, false);
-			player.hurtServer(player.level(),
-					RDDamageTypes.coreDestroyed(player.level(), part), Float.MAX_VALUE);
+			ServerLevel level = (ServerLevel) player.level();
+			player.hurtServer(level, RDDamageTypes.coreDestroyed(level, part), Float.MAX_VALUE);
 			return;
 		}
 		boolean bleeds = ServerConfig.get().enableBleeding;

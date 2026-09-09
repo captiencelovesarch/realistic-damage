@@ -43,14 +43,10 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 	/** Limbs submitted this session; read by the client gametest. */
 	private static long submitCount;
 
-	private final ModelPart[] wide;
-	private final ModelPart[] slim;
-	private final ModelPart[] wideOverlay;
-	private final ModelPart[] slimOverlay;
-	private final ModelPart[] wideCap;
-	private final ModelPart[] slimCap;
-	private final ModelPart[] wideBlood;
-	private final ModelPart[] slimBlood;
+	private final ModelPart[][] pieces = new ModelPart[LimbMeshes.Kind.values().length][];
+	private final ModelPart[][] overlays = new ModelPart[LimbMeshes.Kind.values().length][];
+	private final ModelPart[][] caps = new ModelPart[LimbMeshes.Kind.values().length][];
+	private final ModelPart[][] blood = new ModelPart[LimbMeshes.Kind.values().length][];
 
 	public static long submits() {
 		return submitCount;
@@ -61,14 +57,13 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 		this.shadowRadius = 0.2F;
 		// The piece below the cut, not the whole limb: the body keeps the top
 		// five pixels as its stump, so what lies on the floor is the other seven.
-		this.wide = LimbMeshes.severed(false, 0.0F);
-		this.slim = LimbMeshes.severed(true, 0.0F);
-		this.wideOverlay = LimbMeshes.severedOverlays(false);
-		this.slimOverlay = LimbMeshes.severedOverlays(true);
-		this.wideCap = LimbMeshes.severedCaps(false);
-		this.slimCap = LimbMeshes.severedCaps(true);
-		this.wideBlood = LimbMeshes.severed(false, BloodBodyLayer.SKIN_OFFSET);
-		this.slimBlood = LimbMeshes.severed(true, BloodBodyLayer.SKIN_OFFSET);
+		// One set per limb build (1.7): a player's wide or slim arm, a skeleton's bone.
+		for (LimbMeshes.Kind kind : LimbMeshes.Kind.values()) {
+			pieces[kind.ordinal()] = LimbMeshes.severed(kind, 0.0F);
+			overlays[kind.ordinal()] = LimbMeshes.severedOverlays(kind);
+			caps[kind.ordinal()] = LimbMeshes.severedCaps(kind);
+			blood[kind.ordinal()] = LimbMeshes.severed(kind, BloodBodyLayer.SKIN_OFFSET);
+		}
 	}
 
 	@Override
@@ -80,9 +75,17 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 	public void extractRenderState(SeveredLimb entity, SeveredLimbRenderState state, float partialTicks) {
 		super.extractRenderState(entity, state, partialTicks);
 		state.part = entity.part();
-		PlayerSkin skin = skinOf(entity);
-		state.skin = skin.body().texturePath();
-		state.slim = skin.model() == PlayerModelType.SLIM;
+		net.minecraft.world.entity.EntityType<?> ownerType = entity.ownerType();
+		if (ownerType != null) {
+			// A mob's limb (1.7): its renderer's texture and its limb build.
+			MobLooks.Look look = MobLooks.lookFor(ownerType);
+			state.skin = look.texture();
+			state.kind = look.kind();
+		} else {
+			PlayerSkin skin = skinOf(entity);
+			state.skin = skin.body().texturePath();
+			state.kind = skin.model() == PlayerModelType.SLIM ? LimbMeshes.Kind.SLIM : LimbMeshes.Kind.WIDE;
+		}
 		state.yaw = entity.getYRot();
 		state.tumble = entity.tumble(partialTicks);
 		state.lying = entity.lying(partialTicks);
@@ -111,10 +114,11 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 	public void submit(SeveredLimbRenderState state, PoseStack poseStack, SubmitNodeCollector collector,
 			CameraRenderState camera) {
 		BodyPart part = state.part;
-		ModelPart[] skinParts = state.slim ? slim : wide;
-		ModelPart[] overlayParts = state.slim ? slimOverlay : wideOverlay;
-		ModelPart[] caps = state.slim ? slimCap : wideCap;
-		ModelPart[] shells = state.slim ? slimBlood : wideBlood;
+		int kind = state.kind.ordinal();
+		ModelPart[] skinParts = pieces[kind];
+		ModelPart[] overlayParts = overlays[kind];
+		ModelPart[] caps = this.caps[kind];
+		ModelPart[] shells = blood[kind];
 		poseStack.pushPose();
 		// About the middle of its own hitbox, spinning while it flies and lying
 		// down once it has stopped, shrinking as it burns.
@@ -128,7 +132,7 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 		poseStack.scale(-1.0F, -1.0F, 1.0F);
 		// The cube's own centre to the origin, so the rotations above are about
 		// the limb and not about its shoulder.
-		poseStack.translate(-centreX(part, state.slim) / 16.0F, -centreY(part) / 16.0F, 0.0F);
+		poseStack.translate(-centreX(part, state.kind) / 16.0F, -centreY(part) / 16.0F, 0.0F);
 
 		int light = state.lightCoords;
 		int overlay = OverlayTexture.NO_OVERLAY;
@@ -152,12 +156,15 @@ public class SeveredLimbRenderer extends EntityRenderer<SeveredLimb, SeveredLimb
 		super.submit(state, poseStack, collector, camera);
 	}
 
-	/** Horizontal centre of the region's cube, model pixels, from PlayerModel.createMesh. */
-	private static float centreX(BodyPart part, boolean slim) {
-		float width = slim ? 3.0F : 4.0F;
+	/** Horizontal centre of the region's cube, model pixels, from the vanilla mesh of each build. */
+	private static float centreX(BodyPart part, LimbMeshes.Kind kind) {
+		if (kind == LimbMeshes.Kind.THIN) {
+			return 0.0F;   // a bone is -1..1 whichever limb it is
+		}
+		float width = kind == LimbMeshes.Kind.SLIM ? 3.0F : 4.0F;
 		return switch (part) {
 			case LEFT_ARM -> -1.0F + width / 2.0F;
-			case RIGHT_ARM -> (slim ? -2.0F : -3.0F) + width / 2.0F;
+			case RIGHT_ARM -> (kind == LimbMeshes.Kind.SLIM ? -2.0F : -3.0F) + width / 2.0F;
 			default -> 0.0F;
 		};
 	}

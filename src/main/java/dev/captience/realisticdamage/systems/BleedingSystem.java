@@ -8,7 +8,7 @@ import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.damage.BodyHitResolver;
 import dev.captience.realisticdamage.damage.RDDamageTypes;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -20,7 +20,7 @@ import net.minecraft.world.phys.Vec3;
 public final class BleedingSystem {
 	private BleedingSystem() {}
 
-	public static void tick(ServerPlayer player, RealisticDamageData data) {
+	public static void tick(LivingEntity player, RealisticDamageData data) {
 		ServerConfig config = ServerConfig.get();
 		if (!config.enableBleeding) {
 			return;
@@ -43,7 +43,7 @@ public final class BleedingSystem {
 		if (hpPerSecond > 0.0) {
 			// Whole-point hurts from an accumulator: no sub-half-heart spam.
 			if (data.advanceBleedHpDrain(hpPerSecond / 20.0)) {
-				ServerLevel level = player.level();
+				ServerLevel level = (ServerLevel) player.level();
 				if (!player.hurtServer(level, RDDamageTypes.bleedOut(level), 1.0F)) {
 					// Refused (invulnerable, already dying): keep the point rather
 					// than silently destroying accrued bleed damage.
@@ -79,7 +79,7 @@ public final class BleedingSystem {
 	 * direction and the snapshot carries neither — so it stays a broadcast, seen
 	 * by everyone who can see the victim.
 	 */
-	public static void spray(ServerPlayer player, BodyPart part, WoundSeverity severity, Vec3 direction) {
+	public static void spray(LivingEntity player, BodyPart part, WoundSeverity severity, Vec3 direction) {
 		spray(player, part, severity, direction, false);
 	}
 
@@ -88,12 +88,12 @@ public final class BleedingSystem {
 	 * wound is a stump. Kept in one path so the 1.5 cone cannot drift away from the
 	 * severance variant and every particle still carries severity in its velocity.
 	 */
-	public static void spray(ServerPlayer player, BodyPart part, WoundSeverity severity, Vec3 direction,
+	public static void spray(LivingEntity player, BodyPart part, WoundSeverity severity, Vec3 direction,
 			boolean severance) {
 		if (!ServerConfig.get().enableBleeding) {
 			return;
 		}
-		ServerLevel level = player.level();
+		ServerLevel level = (ServerLevel) player.level();
 		Vec3 at = BodyHitResolver.regionCenter(player, part);
 		// Straight up for want of a direction. Unit length, because `away` is a
 		// direction and the throw speed is applied to it two lines below: the 0.35

@@ -329,10 +329,19 @@ author had answered every design question and the mark alone had stopped being e
   was none; lands, bounces once, bleeds for most of a minute, burns away in fire or lava,
   and is gone. Walk-through, ignored by mobs, never saved. Server rule `spawnSeveredLimbs`.
 
-## 1.7: Anatomy for everyone
+## 1.7: Anatomy for everyone (in progress)
 
 Mobs get bodies. Deliberately last, because it doubles the surface area of
 every system and needs everything before it to be stable first.
+
+**Slice one is in** (Sep 8 2026): the whole server pipeline generalised from
+`ServerPlayer` to `LivingEntity`, humanoid mobs (the `has_anatomy` tag) taking
+regional trauma, bleeding out, breaking, losing limbs to blows and blasts,
+crippled through the same attribute modifiers, refusing to swing with no arms
+or shoot with no drawing arm, dazed by concussion and dropped by collapse, and
+mending on time alone. On screen they stain, limp, lose limbs to stumps, and
+leave severed limbs in their own textures — bones for skeletons. Server rule
+`enableMobAnatomy`. Remaining below.
 
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here

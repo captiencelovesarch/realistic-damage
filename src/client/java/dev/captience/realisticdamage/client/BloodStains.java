@@ -17,6 +17,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -169,7 +170,7 @@ public final class BloodStains {
 	 * being attempted, so a body that has gone still against stone would stop
 	 * leaving the very mark this method exists to show.
 	 */
-	public static boolean transfer(Player player, BodyPart part, double dropScale, long seed) {
+	public static boolean transfer(LivingEntity player, BodyPart part, double dropScale, long seed) {
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		if (sprites == null || config.bloodIntensity() * config.bloodStainIntensity <= 0.0) {
 			return false;
@@ -183,7 +184,7 @@ public final class BloodStains {
 		return true;
 	}
 
-	private static @Nullable Contact contact(Player player, BodyPart part, long seed) {
+	private static @Nullable Contact contact(LivingEntity player, BodyPart part, long seed) {
 		AABB body = player.getBoundingBox();
 		Vec3 region = BodyHitResolver.regionCenter(player, part);
 		double y = Math.clamp(region.y + BloodFlow.jitterSigned(seed, 42) * 0.08,

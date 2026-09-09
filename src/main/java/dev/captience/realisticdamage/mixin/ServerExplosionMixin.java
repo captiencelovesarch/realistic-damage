@@ -45,10 +45,11 @@ public abstract class ServerExplosionMixin implements Explosion {
 					target = "Lnet/minecraft/world/entity/Entity;hurtServer(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/damagesource/DamageSource;F)Z"))
 	private boolean realisticdamage$recordBlast(Entity entity, ServerLevel level, DamageSource source,
 			float amount, Operation<Boolean> original) {
-		if (!(entity instanceof ServerPlayer player) || !(amount > 0.0F)) {
+		if (!(entity instanceof net.minecraft.world.entity.LivingEntity living)
+				|| !dev.captience.realisticdamage.systems.MobAnatomy.participates(living) || !(amount > 0.0F)) {
 			return original.call(entity, level, source, amount);
 		}
-		RealisticDamageData data = RDAttachments.get(player);
+		RealisticDamageData data = RDAttachments.get(living);
 		Vec3 center = this.center();
 		data.setPendingExplosion(new PendingExplosion(amount, center.x, center.y, center.z));
 		try {

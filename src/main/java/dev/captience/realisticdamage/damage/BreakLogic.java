@@ -7,7 +7,7 @@ import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.util.Notifier;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 
 /**
  * Deterministic limb breaking (spec §15): a single qualifying heavy impact can
@@ -20,7 +20,7 @@ public final class BreakLogic {
 	/** A hit must itself be meaningful to break via accumulation — weak spam never snaps bones. */
 	private static final double MEANINGFUL_HIT = 1.0;
 
-	public static void evaluate(ServerPlayer player, RealisticDamageData data, DamageProfile profile,
+	public static void evaluate(LivingEntity player, RealisticDamageData data, DamageProfile profile,
 			List<TraumaPipeline.AppliedTrauma> traumas) {
 		for (TraumaPipeline.AppliedTrauma trauma : traumas) {
 			if (!trauma.part().isLimb() || !trauma.primary()) {

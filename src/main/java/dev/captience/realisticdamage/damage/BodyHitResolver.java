@@ -29,13 +29,14 @@ public final class BodyHitResolver {
 	/** Ray length for reconstructed melee rays: creative reach + vanilla leniency, with margin. */
 	private static final double MELEE_RAY_LENGTH = 8.0;
 
-	public static BodyPart resolve(ServerPlayer target, DamageSource source) {
+	public static BodyPart resolve(LivingEntity target, DamageSource source) {
 		// A firearm mod has already raycast and knows exactly where it hit —
 		// better than anything reconstructed here, and for a hitscan weapon
 		// there is no projectile to reconstruct from at all (1.3).
-		if (dev.captience.realisticdamage.api.RealisticDamageApi.hasImpactPoints()) {
+		if (target instanceof ServerPlayer player
+				&& dev.captience.realisticdamage.api.RealisticDamageApi.hasImpactPoints()) {
 			Vec3 supplied = dev.captience.realisticdamage.api.RealisticDamageApi
-					.externalImpactPoint(target, source);
+					.externalImpactPoint(player, source);
 			if (supplied != null) {
 				AABB box = target.getBoundingBox();
 				// Clipped, so a point slightly off the model still lands sanely
@@ -59,7 +60,7 @@ public final class BodyHitResolver {
 		return BodyPart.TORSO;
 	}
 
-	private static BodyPart resolveProjectile(ServerPlayer target, Projectile projectile) {
+	private static BodyPart resolveProjectile(LivingEntity target, Projectile projectile) {
 		Vec3 position = projectile.position();
 		Vec3 velocity = projectile.getDeltaMovement();
 		if (velocity.lengthSqr() < 1.0e-6) {
@@ -73,7 +74,7 @@ public final class BodyHitResolver {
 		return classifyPoint(target, point);
 	}
 
-	private static BodyPart resolveMelee(ServerPlayer target, LivingEntity attacker) {
+	private static BodyPart resolveMelee(LivingEntity target, LivingEntity attacker) {
 		Vec3 from = attacker.getEyePosition();
 		// Players aim; mobs lunge at the body (their look angle is unreliable mid-swing).
 		Vec3 direction = attacker instanceof Player
@@ -98,7 +99,7 @@ public final class BodyHitResolver {
 	 * upright poses; horizontal (facing-axis) bands while swimming/crawling/
 	 * elytra so prone bodies still resolve head/torso/legs sensibly.
 	 */
-	public static BodyPart classifyPoint(ServerPlayer target, Vec3 point) {
+	public static BodyPart classifyPoint(LivingEntity target, Vec3 point) {
 		AABB box = target.getBoundingBox();
 		Vec3 center = box.getCenter();
 		Vec3 forward = Vec3.directionFromRotation(0.0F, target.yBodyRot);
@@ -147,7 +148,7 @@ public final class BodyHitResolver {
 	 * Explosion trauma shares (spec §29): the region nearest the blast center is
 	 * primary, the core takes secondary shock, the rest a small remainder.
 	 */
-	public static Map<BodyPart, Double> explosionShares(ServerPlayer target, Vec3 center) {
+	public static Map<BodyPart, Double> explosionShares(LivingEntity target, Vec3 center) {
 		BodyPart primary = nearestRegion(target, center);
 		Map<BodyPart, Double> shares = new EnumMap<>(BodyPart.class);
 		BodyPart secondary = primary == BodyPart.TORSO ? BodyPart.HEAD : BodyPart.TORSO;
@@ -182,7 +183,7 @@ public final class BodyHitResolver {
 		return regionCenter(part, box, box.getCenter(), right, halfWidth, box.getYsize());
 	}
 
-	private static BodyPart nearestRegion(ServerPlayer target, Vec3 center) {
+	private static BodyPart nearestRegion(LivingEntity target, Vec3 center) {
 		AABB box = target.getBoundingBox();
 		Vec3 boxCenter = box.getCenter();
 		Vec3 forward = Vec3.directionFromRotation(0.0F, target.yBodyRot);

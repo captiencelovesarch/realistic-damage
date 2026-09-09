@@ -10,7 +10,10 @@ import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Blood on the body itself (1.5), tracked per region per player.
@@ -109,7 +112,11 @@ public final class BloodBody {
 			}
 			return;
 		}
-		for (Player player : level.players()) {
+		// Players and, since 1.7, every mob near enough to matter that carries a
+		// body snapshot. Sixty-four blocks is well past where a stain is visible.
+		Vec3 here = client.player == null ? Vec3.ZERO : client.player.position();
+		for (LivingEntity player : level.getEntitiesOfClass(LivingEntity.class,
+				new AABB(here, here).inflate(64.0))) {
 			BodySnapshot snapshot = player.getAttached(RDAttachments.SNAPSHOT);
 			if (snapshot == null) {
 				continue;

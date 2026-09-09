@@ -20,6 +20,8 @@ public final class TickDispatcher {
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 				tickPlayer(player);
 			}
+			// Mobs with bodies (1.7): only the injured set, nothing else is touched.
+			MobAnatomy.tick();
 		});
 	}
 

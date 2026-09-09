@@ -2,16 +2,17 @@ package dev.captience.realisticdamage.client.mixin;
 
 import dev.captience.realisticdamage.client.BloodStainHolder;
 import dev.captience.realisticdamage.client.LimbStateHolder;
-import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 /**
  * Storage slots for the destroyed-limb mask, the broken-limb mask, the packed
- * limp rungs, blood staining and scars on the player's render state.
+ * limp rungs, blood staining and scars on every humanoid render state — the
+ * player's, and since 1.7 every mob's that extends {@code HumanoidRenderState}.
  */
-@Mixin(AvatarRenderState.class)
-public abstract class AvatarRenderStateMixin implements LimbStateHolder, BloodStainHolder {
+@Mixin(HumanoidRenderState.class)
+public abstract class HumanoidRenderStateMixin implements LimbStateHolder, BloodStainHolder {
 	@Unique
 	private int realisticdamage$destroyedMask;
 	@Unique

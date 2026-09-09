@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.util;
 
+import net.minecraft.world.entity.LivingEntity;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.net.InjurySound;
@@ -17,7 +18,7 @@ import org.jspecify.annotations.Nullable;
 public final class Notifier {
 	private Notifier() {}
 
-	public static void limbBreaks(ServerPlayer player, BodyPart part) {
+	public static void limbBreaks(LivingEntity player, BodyPart part) {
 		message(player, "realisticdamage.msg.break." + part.id());
 		injurySound(player, InjurySound.FRACTURE);
 	}
@@ -33,7 +34,7 @@ public final class Notifier {
 	 * <p>Still one sound. {@code DESTRUCTION} is the loudest cue in the mod and
 	 * it already owns this frame; a second cue in the same tick only muddies it.
 	 */
-	public static void destroyed(ServerPlayer player, BodyPart part, boolean stump) {
+	public static void destroyed(LivingEntity player, BodyPart part, boolean stump) {
 		message(player, (stump ? "realisticdamage.msg.stump." : "realisticdamage.msg.destroyed.") + part.id());
 		injurySound(player, InjurySound.DESTRUCTION);
 	}
@@ -48,7 +49,7 @@ public final class Notifier {
 	 * in the mod, the victim's client is inside the BLAST whiteout with its ears
 	 * ringing, and a bespoke amputation sound would play into deafness.
 	 */
-	public static void dismembered(ServerPlayer player, BodyPart part) {
+	public static void dismembered(LivingEntity player, BodyPart part) {
 		message(player, "realisticdamage.msg.dismembered." + part.id());
 		injurySound(player, InjurySound.DESTRUCTION);
 	}
@@ -60,7 +61,7 @@ public final class Notifier {
 	 * overwriting the other. Losing the part outright says nothing here — the
 	 * destruction line owns that moment.
 	 */
-	public static void ceilingLowered(ServerPlayer player, BodyPart part, CeilingMath.Event event) {
+	public static void ceilingLowered(LivingEntity player, BodyPart part, CeilingMath.Event event) {
 		switch (event) {
 			case BROKEN -> message(player, "realisticdamage.msg.ceiling.broken." + part.id());
 			case DISABLED -> message(player, "realisticdamage.msg.ceiling.gave." + part.id());
@@ -86,7 +87,12 @@ public final class Notifier {
 		lastMessageKey = null;
 	}
 
-	public static void message(ServerPlayer player, String key) {
+	public static void message(LivingEntity victim, String key) {
+		// Words are for players. A mob's body (1.7) goes through every other
+		// consequence in silence; nothing reads the action bar on its behalf.
+		if (!(victim instanceof ServerPlayer player)) {
+			return;
+		}
 		lastMessageKey = key;   // before the guard, or the hook sees nothing in a gametest
 		// Mock players (gametests) have no connection; skip the cosmetic packet.
 		if (player.connection != null) {
@@ -111,16 +117,18 @@ public final class Notifier {
 	 * that each client picks its own style variant, and so the injured player
 	 * hears it non-positionally instead of as a noise coming from their feet.
 	 */
-	public static void injurySound(ServerPlayer player, InjurySound sound) {
-		if (canHear(player)) {
+	public static void injurySound(LivingEntity victim, InjurySound sound) {
+		if (victim instanceof ServerPlayer player && canHear(player)) {
 			ServerPlayNetworking.send(player, new InjurySoundPayload(
 					sound, true, player.getX(), player.getY(), player.getZ()));
 		}
-		for (ServerPlayer other : player.level().getEntitiesOfClass(ServerPlayer.class,
-				player.getBoundingBox().inflate(Balance.INJURY_SOUND_RADIUS),
-				candidate -> candidate != player && canHear(candidate))) {
+		// Everyone nearby hears it from where it happened — a zombie's leg going
+		// (1.7) is a cue across the cave exactly as a teammate's is.
+		for (ServerPlayer other : victim.level().getEntitiesOfClass(ServerPlayer.class,
+				victim.getBoundingBox().inflate(Balance.INJURY_SOUND_RADIUS),
+				candidate -> candidate != victim && canHear(candidate))) {
 			ServerPlayNetworking.send(other, new InjurySoundPayload(
-					sound, false, player.getX(), player.getY(), player.getZ()));
+					sound, false, victim.getX(), victim.getY(), victim.getZ()));
 		}
 	}
 }

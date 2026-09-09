@@ -9,7 +9,7 @@ import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.systems.CeilingMath;
 import dev.captience.realisticdamage.util.Notifier;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 
 /**
  * Long-term injuries (1.6, hardcore). A part driven to zero, a limb broken, a
@@ -38,7 +38,7 @@ public final class CeilingLogic {
 	 * ranked destroyed, then broken, then zeroed: the rung is the same either way,
 	 * and the ranking decides which sentence the player reads.
 	 */
-	public static void evaluate(ServerPlayer player, RealisticDamageData data,
+	public static void evaluate(LivingEntity player, RealisticDamageData data,
 			List<TraumaPipeline.AppliedTrauma> traumas, int brokenBefore, int destroyedBefore) {
 		int handled = 0;
 		for (TraumaPipeline.AppliedTrauma trauma : traumas) {

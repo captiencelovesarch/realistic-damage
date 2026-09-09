@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.damage;
 
+import net.minecraft.world.entity.LivingEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,7 @@ public final class TraumaPipeline {
 	 * @param appliedDamage   health actually lost (post ALL vanilla mitigation, absorption excluded)
 	 * @return the localized traumas dealt this event (empty when routed to nothing)
 	 */
-	public static List<AppliedTrauma> handle(ServerPlayer player, RealisticDamageData data, DamageSource source,
+	public static List<AppliedTrauma> handle(LivingEntity player, RealisticDamageData data, DamageSource source,
 			double baseDamageTaken, double damageTaken, double appliedDamage, boolean blocked) {
 		ClassifiedDamage classified = DamageClassifier.classify(player, source);
 		if (classified == null) {
@@ -61,12 +62,12 @@ public final class TraumaPipeline {
 
 		// A fully successful block prevents body injury, but extremely heavy
 		// blunt/explosive hits transfer reduced shock to the shield arm (spec §32).
-		if (blocked) {
+		if (blocked && player instanceof Player blocker) {
 			double blockedAmount = Math.max(0.0, baseDamageTaken - damageTaken);
 			boolean heavy = classified.category() == DamageCategory.HEAVY_BLUNT
 					|| classified.category() == DamageCategory.EXPLOSION;
 			if (heavy && blockedAmount >= Balance.SHIELD_SHOCK_MIN_DAMAGE) {
-				BodyPart shieldArm = shieldArm(player);
+				BodyPart shieldArm = shieldArm(blocker);
 				double shock = blockedAmount * profile.traumaMultiplier()
 						* Balance.SHIELD_HEAVY_SHOCK_FRACTION * config.bodyDamageMultiplier;
 				double dealt = data.part(shieldArm).damage(shock);
@@ -127,7 +128,7 @@ public final class TraumaPipeline {
 		}
 		double baseTrauma = traumaSource * profile.traumaMultiplier()
 				* classified.extraMultiplier() * config.bodyDamageMultiplier;
-		if (source.getEntity() instanceof ServerPlayer) {
+		if (player instanceof ServerPlayer && source.getEntity() instanceof ServerPlayer) {
 			baseTrauma *= config.pvpTraumaMultiplier;
 		}
 		if (fall) {
@@ -203,7 +204,8 @@ public final class TraumaPipeline {
 		if (config.enableLimbDestruction && DestructionLogic.evaluate(player, data, result, blow)) {
 			limbLost = true;
 		}
-		if (config.enableLongTermInjuries) {
+		if (config.enableLongTermInjuries && player instanceof ServerPlayer) {
+			// Ceilings are a life's history; a mob has one life and no history.
 			CeilingLogic.evaluate(player, data, result, brokenBefore, destroyedBefore);
 		}
 		if (config.enableBleeding) {
@@ -220,12 +222,14 @@ public final class TraumaPipeline {
 		// The concussion still happens — only the sentence yields.
 		dev.captience.realisticdamage.systems.ConsciousnessSystem.onTrauma(
 				player, data, classified, profile, result, traumaSource, limbLost);
-		if (fall && fallHeight > 0.0) {
-			landed(player, data, fallHeight, config);
-		} else {
-			// A landing gets its own cue below; firing the generic one as well
-			// would flash twice and kick the view sideways off a vertical impact.
-			sendImpact(player, source, result, traumaSource, profile, classified.category());
+		if (player instanceof ServerPlayer serverPlayer) {
+			if (fall && fallHeight > 0.0) {
+				landed(serverPlayer, data, fallHeight, config);
+			} else {
+				// A landing gets its own cue below; firing the generic one as well
+				// would flash twice and kick the view sideways off a vertical impact.
+				sendImpact(serverPlayer, source, result, traumaSource, profile, classified.category());
+			}
 		}
 		return result;
 	}
@@ -325,7 +329,7 @@ public final class TraumaPipeline {
 	 *                 this only bites when some other region is cut worse in the
 	 *                 same blow, which today no single event can manage.
 	 */
-	private static void createWounds(ServerPlayer player, RealisticDamageData data, ClassifiedDamage classified,
+	private static void createWounds(LivingEntity player, RealisticDamageData data, ClassifiedDamage classified,
 			DamageProfile profile, List<AppliedTrauma> traumas, Vec3 blow, boolean limbLost) {
 		DamageProfile woundProfile = classified.woundAs() != null
 				? DamageProfiles.of(classified.woundAs())
@@ -361,7 +365,7 @@ public final class TraumaPipeline {
 		}
 	}
 
-	private static void applyShares(ServerPlayer player, RealisticDamageData data, ClassifiedDamage classified,
+	private static void applyShares(LivingEntity player, RealisticDamageData data, ClassifiedDamage classified,
 			double baseTrauma, Map<BodyPart, Double> shares, List<AppliedTrauma> result) {
 		double primaryShare = shares.values().stream().mapToDouble(Double::doubleValue).max().orElse(0.0);
 		for (Map.Entry<BodyPart, Double> entry : shares.entrySet()) {
@@ -385,7 +389,7 @@ public final class TraumaPipeline {
 	 * spray falls back to going straight up, which is the honest answer for a
 	 * wound that nothing threw anything at.
 	 */
-	private static Vec3 blowDirection(ServerPlayer player, DamageSource source) {
+	private static Vec3 blowDirection(LivingEntity player, DamageSource source) {
 		Vec3 from = source == null ? null : source.getSourcePosition();
 		if (from == null) {
 			return Vec3.ZERO;

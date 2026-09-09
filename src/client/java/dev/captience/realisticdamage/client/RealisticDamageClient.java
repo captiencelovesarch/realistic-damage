@@ -32,7 +32,16 @@ public class RealisticDamageClient implements ClientModInitializer {
 						var parent = (net.minecraft.client.renderer.entity.RenderLayerParent<
 								net.minecraft.client.renderer.entity.state.AvatarRenderState,
 								net.minecraft.client.model.player.PlayerModel>) avatar;
-						helper.register(new BloodBodyLayer(parent));
+						helper.register(new BloodBodyLayer<>(parent));
+					} else if (renderer instanceof net.minecraft.client.renderer.entity.HumanoidMobRenderer<?, ?, ?> humanoid) {
+						// Every humanoid mob renderer (1.7): the layer returns at once
+						// for a body with nothing on it, so the cost is one null read
+						// per frame for the mobs the server never tagged.
+						@SuppressWarnings("unchecked")
+						var parent = (net.minecraft.client.renderer.entity.RenderLayerParent<
+								net.minecraft.client.renderer.entity.state.HumanoidRenderState,
+								net.minecraft.client.model.HumanoidModel<net.minecraft.client.renderer.entity.state.HumanoidRenderState>>) humanoid;
+						helper.register(new BloodBodyLayer<>(parent));
 					}
 				});
 

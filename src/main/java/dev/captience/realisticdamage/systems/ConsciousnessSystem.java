@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.systems;
 
+import net.minecraft.world.entity.LivingEntity;
 import java.util.List;
 
 import dev.captience.realisticdamage.RDAttachments;
@@ -111,7 +112,7 @@ public final class ConsciousnessSystem {
 				&& RDAttachments.get(serverPlayer).unconscious();
 	}
 
-	public static void tick(ServerPlayer player, RealisticDamageData data) {
+	public static void tick(LivingEntity player, RealisticDamageData data) {
 		ServerConfig config = ServerConfig.get();
 		if (!config.enableConsciousness) {
 			if (data.unconscious()) {
@@ -146,11 +147,16 @@ public final class ConsciousnessSystem {
 			data.restoreConsciousness(recovery * bloodFactor / 20.0);
 		}
 
-		if (data.unconscious()) {
-			keepMobsInterested(player);
+		if (player instanceof ServerPlayer serverPlayer) {
+			// The two that only make sense for a player: mobs noticing a body,
+			// and the stutter before the stop. A mob that is out is simply out.
+			if (data.unconscious()) {
+				keepMobsInterested(serverPlayer);
+			}
+			tickMicrosleep(serverPlayer, data);
+		} else {
+			data.clearMicrosleep();
 		}
-
-		tickMicrosleep(player, data);
 
 		if (data.unconscious()
 				&& data.unconsciousTicks() >= Balance.MIN_UNCONSCIOUS_TICKS
@@ -270,7 +276,7 @@ public final class ConsciousnessSystem {
 	 *                 distance, cover and Blast Protection learnable reaches the
 	 *                 player essentially never.
 	 */
-	public static void onTrauma(ServerPlayer player, RealisticDamageData data, ClassifiedDamage classified,
+	public static void onTrauma(LivingEntity player, RealisticDamageData data, ClassifiedDamage classified,
 			DamageProfile profile, List<TraumaPipeline.AppliedTrauma> traumas, double appliedDamage,
 			boolean limbLost) {
 		ServerConfig config = ServerConfig.get();
@@ -326,7 +332,7 @@ public final class ConsciousnessSystem {
 	 *                 way the mod can express except the one sentence the frame
 	 *                 has room for.
 	 */
-	private static void maybeConcuss(ServerPlayer player, RealisticDamageData data, DamageProfile profile,
+	private static void maybeConcuss(LivingEntity player, RealisticDamageData data, DamageProfile profile,
 			double headTrauma, boolean limbLost) {
 		if (data.concussion() || !profile.concussionCapable()) {
 			return;
@@ -358,7 +364,7 @@ public final class ConsciousnessSystem {
 		return 0.0;
 	}
 
-	private static void collapse(ServerPlayer player, RealisticDamageData data) {
+	private static void collapse(LivingEntity player, RealisticDamageData data) {
 		data.setUnconscious(true);
 		if (player.isSprinting()) {
 			player.setSprinting(false);
@@ -367,12 +373,15 @@ public final class ConsciousnessSystem {
 		// Going all the way out supersedes blinking out: leaving the flag set
 		// would have the client fading a blackout in underneath a blackout.
 		data.clearMicrosleep();
+		// A mob that is out stops thinking (1.7); its AI comes back with it.
+		MobAnatomy.collapse(player);
 		Notifier.message(player, "realisticdamage.msg.unconscious");
 		Notifier.injurySound(player, dev.captience.realisticdamage.net.InjurySound.COLLAPSE);
 	}
 
-	private static void wake(ServerPlayer player, RealisticDamageData data) {
+	private static void wake(LivingEntity player, RealisticDamageData data) {
 		data.setUnconscious(false);
+		MobAnatomy.wake(player);
 		// You come round at WAKE_THRESHOLD, which is below the microsleep line —
 		// so without clearing the phase you would blink straight back out on the
 		// strength of time spent unconscious.

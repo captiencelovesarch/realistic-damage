@@ -6,7 +6,7 @@ import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.ScarMask;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.player.PlayerModel;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
@@ -92,6 +92,11 @@ import net.minecraft.world.entity.player.PlayerModelType;
  * belongs to the injury pose instead, which is deferred so that it and the
  * injury-aware mob AI can be built off one definition of a limp.
  *
+ * <p>Since 1.7 the layer is generic over every humanoid render state: it sits
+ * on the player renderer and on every {@code HumanoidMobRenderer}, reads the
+ * texture from whichever renderer it belongs to, and picks its limb build from
+ * the body — slim or wide from a player's skin, thin from a skeleton's model.
+ *
  * <p>The parts are also no longer posed in place. A layer instance is shared by
  * every player using the renderer, and a submit stores the {@code ModelPart} by
  * reference while the frame's prepare phase reads it back later, after every
@@ -102,7 +107,7 @@ import net.minecraft.world.entity.player.PlayerModelType;
  * pose-copy did: {@code translateAndRotate} is exactly what {@code
  * ModelPart.render} applies internally before compiling its cubes.
  */
-public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
+public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidModel<S>> extends RenderLayer<S, M> {
 	static final Identifier TEXTURE =
 			Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/blood_body.png");
 	/** Old injuries, in the same vanilla skin UV layout as the blood overlay. */
@@ -139,12 +144,12 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 	private static final float[] SCAR_TONE_BROKEN = {0.86F, 0.68F, 0.62F};
 	private static final float[] SCAR_TONE_DESTROYED = {0.62F, 0.42F, 0.40F};
 
-	/** Overlay-free body parts, one set per arm width. Posed via the matrix stack. */
-	private final ModelPart[] wide;
-	private final ModelPart[] slim;
+	/** The renderer this layer belongs to, for the texture a mob wears (1.7). */
+	private final RenderLayerParent<S, M> parent;
+	/** Overlay-free body parts, one set per limb build. Posed via the matrix stack. */
+	private final ModelPart[][] fullByKind = new ModelPart[LimbMeshes.Kind.values().length][];
 	/** The same six regions again, worn closer to the skin, for the scar pass. */
-	private final ModelPart[] scarWide;
-	private final ModelPart[] scarSlim;
+	private final ModelPart[][] scarByKind = new ModelPart[LimbMeshes.Kind.values().length][];
 	/**
 	 * The stump (1.6.2): what is left of a destroyed limb. Vanilla's part is
 	 * hidden by {@code PlayerModelMixin}, so until now a lost arm was simply an
@@ -155,18 +160,21 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 	 * Posed off the hidden vanilla part, whose rotations setupAnim still
 	 * computes, so the stump swings with the walk like the limb did.
 	 */
-	private final ModelPart[] stumpWide;
-	private final ModelPart[] stumpSlim;
-	private final ModelPart[] stumpCapWide;
-	private final ModelPart[] stumpCapSlim;
-	private final ModelPart[] stumpBloodWide;
-	private final ModelPart[] stumpBloodSlim;
+	private final ModelPart[][] stumpByKind = new ModelPart[LimbMeshes.Kind.values().length][];
+	private final ModelPart[][] stumpCapByKind = new ModelPart[LimbMeshes.Kind.values().length][];
+	private final ModelPart[][] stumpBloodByKind = new ModelPart[LimbMeshes.Kind.values().length][];
 
 	/** Stumps drawn this session; read by the client gametest. */
 	private static long stumpSubmitCount;
+	/** Blood or scar shells drawn on something that is not a player (1.7); read by the client gametest. */
+	private static long mobSubmitCount;
 
 	public static long stumpSubmits() {
 		return stumpSubmitCount;
+	}
+
+	public static long mobSubmits() {
+		return mobSubmitCount;
 	}
 
 	/** Indexed by {@code ScarLevel.ordinal()}; slot 0 is never written. */
@@ -206,23 +214,49 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 				: level == ScarLevel.BROKEN ? SCAR_ALPHA_BROKEN : 0.0F;
 	}
 
-	public BloodBodyLayer(RenderLayerParent<AvatarRenderState, PlayerModel> renderer) {
+	public BloodBodyLayer(RenderLayerParent<S, M> renderer) {
 		super(renderer);
-		this.wide = bake(false, SKIN_OFFSET);
-		this.slim = bake(true, SKIN_OFFSET);
-		this.scarWide = bake(false, SCAR_OFFSET);
-		this.scarSlim = bake(true, SCAR_OFFSET);
-		this.stumpWide = LimbMeshes.stumps(false, 0.0F);
-		this.stumpSlim = LimbMeshes.stumps(true, 0.0F);
-		this.stumpCapWide = LimbMeshes.stumpCaps(false);
-		this.stumpCapSlim = LimbMeshes.stumpCaps(true);
-		this.stumpBloodWide = LimbMeshes.stumps(false, SKIN_OFFSET);
-		this.stumpBloodSlim = LimbMeshes.stumps(true, SKIN_OFFSET);
+		this.parent = renderer;
+		// Baked lazily per build: a zombie renderer never needs slim arms, a
+		// skeleton renderer never needs wide ones.
+	}
+
+	private ModelPart[] meshes(ModelPart[][] cache, LimbMeshes.Kind kind, java.util.function.Function<LimbMeshes.Kind, ModelPart[]> bake) {
+		ModelPart[] parts = cache[kind.ordinal()];
+		if (parts == null) {
+			parts = bake.apply(kind);
+			cache[kind.ordinal()] = parts;
+		}
+		return parts;
+	}
+
+	/**
+	 * Which build this body is: a player's skin says wide or slim; a skeleton's
+	 * model says thin; everything else humanoid is wide.
+	 */
+	private LimbMeshes.Kind kindOf(S state) {
+		if (state instanceof AvatarRenderState avatar) {
+			return avatar.skin.model() == PlayerModelType.SLIM ? LimbMeshes.Kind.SLIM : LimbMeshes.Kind.WIDE;
+		}
+		return getParentModel() instanceof net.minecraft.client.model.monster.skeleton.SkeletonModel<?>
+				? LimbMeshes.Kind.THIN : LimbMeshes.Kind.WIDE;
+	}
+
+	/** The texture the stump wears: the player's skin, or whatever the mob's renderer draws it with. */
+	@SuppressWarnings("unchecked")
+	private Identifier skinOf(S state) {
+		if (state instanceof AvatarRenderState avatar) {
+			return avatar.skin.body().texturePath();
+		}
+		if (parent instanceof LivingEntityRenderer<?, ?, ?> living) {
+			return ((LivingEntityRenderer<?, S, M>) living).getTextureLocation(state);
+		}
+		return net.minecraft.client.resources.DefaultPlayerSkin.getDefaultTexture();
 	}
 
 	@Override
 	public void submit(PoseStack poseStack, SubmitNodeCollector collector, int lightCoords,
-			AvatarRenderState state, float yRot, float xRot) {
+			S state, float yRot, float xRot) {
 		if (state.isInvisible) {
 			return;
 		}
@@ -244,11 +278,12 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 			return;   // a scarred but clean player still has to draw; so does a stump
 		}
 		HumanoidModel<?> model = getParentModel();
-		boolean slimArms = state.skin.model() == PlayerModelType.SLIM;
-		ModelPart[] bloodParts = slimArms ? slim : wide;
-		ModelPart[] scarParts = slimArms ? scarSlim : scarWide;
+		LimbMeshes.Kind kind = kindOf(state);
+		boolean mob = !(state instanceof AvatarRenderState);
+		ModelPart[] bloodParts = meshes(fullByKind, kind, k -> LimbMeshes.full(k, SKIN_OFFSET));
+		ModelPart[] scarParts = meshes(scarByKind, kind, k -> LimbMeshes.full(k, SCAR_OFFSET));
 		int overlay = LivingEntityRenderer.getOverlayCoords(state, 0.0F);
-		Identifier skin = state.skin.body().texturePath();
+		Identifier skin = skinOf(state);
 
 		for (BodyPart part : BodyPart.values()) {
 			ScarLevel scar = ScarMask.level(scars, part);
@@ -268,8 +303,11 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 				// rides that pose, so it hangs and swings where the limb did.
 				poseStack.pushPose();
 				source.translateAndRotate(poseStack);
-				submitStump(collector, poseStack, skin, part, slimArms, level, strength, lightCoords, overlay);
+				submitStump(collector, poseStack, skin, part, kind, level, strength, lightCoords, overlay);
 				poseStack.popPose();
+				if (mob) {
+					mobSubmitCount++;
+				}
 				continue;
 			}
 			if (scar == ScarLevel.NONE && level < VISIBLE) {
@@ -285,6 +323,9 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 			paint(collector, poseStack, scarParts[part.ordinal()], bloodParts[part.ordinal()],
 					scar, level, strength, lightCoords, overlay);
 			poseStack.popPose();
+			if (mob) {
+				mobSubmitCount++;
+			}
 		}
 	}
 
@@ -295,10 +336,10 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 	 * the same three onto the raised first-person arm.
 	 */
 	void submitStump(SubmitNodeCollector collector, PoseStack poseStack, Identifier skin, BodyPart part,
-			boolean slimArms, float bloodLevel, double strength, int lightCoords, int overlay) {
-		ModelPart[] stumps = slimArms ? stumpSlim : stumpWide;
-		ModelPart[] caps = slimArms ? stumpCapSlim : stumpCapWide;
-		ModelPart[] shells = slimArms ? stumpBloodSlim : stumpBloodWide;
+			LimbMeshes.Kind kind, float bloodLevel, double strength, int lightCoords, int overlay) {
+		ModelPart[] stumps = meshes(stumpByKind, kind, k -> LimbMeshes.stumps(k, 0.0F));
+		ModelPart[] caps = meshes(stumpCapByKind, kind, LimbMeshes::stumpCaps);
+		ModelPart[] shells = meshes(stumpBloodByKind, kind, k -> LimbMeshes.stumps(k, SKIN_OFFSET));
 		submitStump(collector, poseStack, skin, stumps[part.ordinal()], caps[part.ordinal()],
 				shells[part.ordinal()], bloodLevel, strength, lightCoords, overlay);
 	}

@@ -8,7 +8,7 @@ import net.minecraft.resources.Identifier;
 public class SeveredLimbRenderState extends EntityRenderState {
 	public BodyPart part = BodyPart.LEFT_LEG;
 	public Identifier skin = net.minecraft.client.resources.DefaultPlayerSkin.getDefaultTexture();
-	public boolean slim;
+	public LimbMeshes.Kind kind = LimbMeshes.Kind.WIDE;
 	public float yaw;
 	/** Spin in flight, degrees about the limb's own side axis. */
 	public float tumble;

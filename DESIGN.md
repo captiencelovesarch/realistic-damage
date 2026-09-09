@@ -1,4 +1,4 @@
-# Realistic Damage — Design (v1.6.2)
+# Realistic Damage — Design (v1.7, in progress)
 
 > "Minecraft, but damage is cooler." Vanilla hearts stay authoritative; this mod adds a
 > physical layer: locational body trauma, deterministic injuries (Broken / Bleeding /
@@ -520,9 +520,62 @@ frame: the death screen draws no blur of its own, so the frozen deep-band haze k
 requesting vanilla's gaussian through the fade; the afterimage never stopped, and the
 death test now asserts both.
 
+## Added in 1.7 (in progress): Anatomy for everyone
+
+**One pipeline, two kinds of body.** Every server system was typed against `ServerPlayer`,
+and almost none of them needed one: a bounding box, a body rotation, equipment slots,
+attributes and `hurtServer` are all `LivingEntity`. The pipeline, the hit resolver, armour,
+breaks, destruction, blast dismemberment, bleeding, consciousness, healing and impairment
+now take a `LivingEntity`, and the player-only consequences gate themselves inside:
+messages and HUD payloads, knockdown and microsleeps, rescue and food, the shield arm, the
+PvP multiplier, long-term ceilings, death violence. `Notifier.message` on a mob is a no-op;
+its injury sounds still reach everyone nearby. The public 1.3 API keeps its player types;
+a mob victim skips the external classifier and impact-point hooks.
+
+**Which mobs is data.** `MobAnatomy.participates` is the one question every hook asks — a
+non-creative player, or a mob in the `realisticdamage:has_anatomy` entity type tag while
+`enableMobAnatomy` is on. The tag ships with the humanoid families whose models extend
+`HumanoidModel` and whose hitboxes are player-shaped (zombie, husk, drowned, zombie
+villager, zombified piglin, skeleton, stray, wither skeleton, bogged, parched, piglin, piglin
+brute). A second tag, `throws_limbs`, names the types whose severed limb the client can
+draw; the rest lose the limb on the model and keep the stump.
+
+**What a mob body does.** The same six regions, routing, wounds, breaks, destruction and
+hidden meters. Bleeding drains Blood and then hearts through the same bleed-out damage type.
+The existing attribute modifiers cripple it — legs cut movement, arms cut attack damage —
+and attributes a mob lacks are skipped. Both arms destroyed refuses `Mob.doHurtTarget`; a
+skeleton without its drawing arm refuses `performRangedAttack`. Headshots run the
+consciousness ladder: a concussed mob forgets its target every two seconds and finds it
+again, and at zero it collapses — `setNoAi(true)` for the unconscious window, restored on
+waking, leaving alone any mob that was NoAI for its own reasons. Time is its only cure: five
+seconds unhurt and it mends a fraction of a regen-HP every eighty ticks, so a zombie that
+walks away from a fight is whole in a couple of minutes and a minor wound is not a slow
+death. No microsleeps, knockdown, rescue, food, sleep, ceilings or messages.
+
+**Performance.** The body attachment is created on first damage, never before. A
+per-server identity set of injured mobs is what ticks: added on damage, dropped when the
+mob dies, unloads, or settles (no wound, blood full, consciousness at its cap, nothing
+broken or missing — a mob missing a limb never settles, because its penalty has to keep
+being asserted). A server of healthy zombies iterates nothing.
+
+**On screen.** The limb, stain and pose carriers moved from `AvatarRenderState` to its
+parent `HumanoidRenderState`, extracted for mobs from `HumanoidMobRenderer` by the same
+`LimbStateExtractor` the player renderer uses. `HumanoidModel.setupAnim` hides destroyed
+parts and applies the limp for any humanoid state. `BloodBodyLayer` is generic over
+humanoid states and models, sits on every humanoid mob renderer, reads the texture from
+its parent renderer, and picks its limb build from the body: slim or wide from a player's
+skin, thin from a skeleton's model. `LimbMeshes` gained the thin two-by-two build from
+`SkeletonModel`, mirrored on the left as vanilla mirrors it. The emitter and body staining
+iterate living entities with a snapshot rather than players. The severed limb syncs its
+owner's entity type, and `MobLooks` maps that to a texture and a build.
+
+**Still to come in 1.7.** Illagers, witches and villagers (non-humanoid models); mob
+falls and knockdown; a limb entity for the zombie villager and piglin texture layouts;
+tuning of the daze and collapse against real fights.
+
 ## Deliberate non-goals
 
-Persistent blood as block/world state, medical items, mob anatomy, and numeric HUD stats. The inventory panel may show condition figures on request;
+Persistent blood as block/world state, medical items, and numeric HUD stats. The inventory panel may show condition figures on request;
 the HUD never does, and Blood/Consciousness are named by band and never numbered anywhere.
 TACZ integration is still deferred, but `DamageCategory` + `BodyHitResolver` accept
 externally supplied classification and hit points so an adapter can slot in later.

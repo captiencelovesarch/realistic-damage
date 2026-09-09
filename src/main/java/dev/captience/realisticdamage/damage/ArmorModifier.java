@@ -6,7 +6,7 @@ import dev.captience.realisticdamage.config.Balance;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -24,7 +24,7 @@ public final class ArmorModifier {
 	private ArmorModifier() {}
 
 	/** Fraction (0..cap) by which the covering armor reduces body trauma for this part. */
-	public static double reduction(ServerPlayer player, BodyPart part, DamageCategory category) {
+	public static double reduction(LivingEntity player, BodyPart part, DamageCategory category) {
 		double total = 0.0;
 		total += pieceReduction(player, EquipmentSlot.HEAD, coverageHead(part), category);
 		total += pieceReduction(player, EquipmentSlot.CHEST, coverageChest(part), category);
@@ -34,7 +34,7 @@ public final class ArmorModifier {
 		return Math.min(total, cap);
 	}
 
-	private static double pieceReduction(ServerPlayer player, EquipmentSlot slot, double coverage, DamageCategory category) {
+	private static double pieceReduction(LivingEntity player, EquipmentSlot slot, double coverage, DamageCategory category) {
 		if (coverage <= 0.0) {
 			return 0.0;
 		}
@@ -72,7 +72,7 @@ public final class ArmorModifier {
 	 * disappears entirely). Deterministic: total level >= 3 across covering slots.
 	 */
 	@Nullable
-	public static WoundSeverity downgradeWound(ServerPlayer player,
+	public static WoundSeverity downgradeWound(LivingEntity player,
 			BodyPart part, DamageCategory category, WoundSeverity severity) {
 		if (category != DamageCategory.PUNCTURE && category != DamageCategory.HEAVY_PUNCTURE) {
 			return severity;
@@ -99,7 +99,7 @@ public final class ArmorModifier {
 		return level >= 3 ? severity.weaker() : severity;
 	}
 
-	private static int level(ServerPlayer player, ResourceKey<Enchantment> key, ItemStack piece) {
+	private static int level(LivingEntity player, ResourceKey<Enchantment> key, ItemStack piece) {
 		Holder<Enchantment> holder = player.level().registryAccess()
 				.lookupOrThrow(Registries.ENCHANTMENT).getOrThrow(key);
 		return EnchantmentHelper.getItemEnchantmentLevel(holder, piece);

@@ -1,8 +1,9 @@
 package dev.captience.realisticdamage.client.mixin;
 
+import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.client.InjuryPose;
+import dev.captience.realisticdamage.client.LimbStateHolder;
 import net.minecraft.client.model.HumanoidModel;
-import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -27,12 +28,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * reads the destroyed rung off the synced mask rather than off
  * {@code part.visible}, a flag that is still vanilla's at this point.
  *
- * <p><strong>The instanceof guard is the single point of failure for "does this
- * mod touch mob rendering".</strong> {@code HumanoidModel} is the class every
- * humanoid mob and every armour set instantiates — a wider target than anything
- * else this mod mixes into — and {@code AvatarRenderState} is exactly a player,
- * because nothing in {@code entity/state} extends it. If that ever stops being
- * true, this is the line that has to change.
+ * <p>Since 1.7 this deliberately <em>does</em> touch mob rendering: every
+ * humanoid render state carries the limb holders, and a mob with a body limps
+ * and loses limbs on its model exactly as a player does. A state with no body
+ * carries zero masks and costs two reads.
  */
 @Mixin(HumanoidModel.class)
 public abstract class HumanoidModelMixin {
@@ -42,8 +41,25 @@ public abstract class HumanoidModelMixin {
 	@Inject(method = "setupAnim(Lnet/minecraft/client/renderer/entity/state/HumanoidRenderState;)V",
 			at = @At("TAIL"))
 	private void realisticdamage$carryInjuredLimbs(HumanoidRenderState state, CallbackInfo ci) {
-		if (state instanceof AvatarRenderState avatar) {
-			InjuryPose.apply(avatar, (HumanoidModel<?>) (Object) this);
+		HumanoidModel<?> model = (HumanoidModel<?>) (Object) this;
+		InjuryPose.apply(state, model);
+		// A destroyed limb is gone on every humanoid (1.7). The player model
+		// hides its sleeves and pants as well in PlayerModelMixin, which runs
+		// after this; here is the base part, which is all a mob has.
+		int destroyed = ((LimbStateHolder) state).realisticdamage$destroyedMask();
+		if (destroyed != 0) {
+			if ((destroyed & (1 << BodyPart.LEFT_ARM.ordinal())) != 0) {
+				model.leftArm.visible = false;
+			}
+			if ((destroyed & (1 << BodyPart.RIGHT_ARM.ordinal())) != 0) {
+				model.rightArm.visible = false;
+			}
+			if ((destroyed & (1 << BodyPart.LEFT_LEG.ordinal())) != 0) {
+				model.leftLeg.visible = false;
+			}
+			if ((destroyed & (1 << BodyPart.RIGHT_LEG.ordinal())) != 0) {
+				model.rightLeg.visible = false;
+			}
 		}
 	}
 }

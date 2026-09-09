@@ -118,6 +118,12 @@ Losing a limb leaves a stump — on your model, and raised into view in first pe
 the limb itself, thrown along the blow, lying where it lands and bleeding out for most of a
 minute before it's gone. You can walk through it, mobs ignore it, and fire burns it away.
 
+Mobs have bodies too. Zombies, skeletons, piglins and the rest of the humanoid families take
+the same regional trauma you do: they bleed and bleed out, limp on a broken leg, lose limbs
+to a blow or a blast, stop swinging with no arms and stop shooting without a drawing arm,
+lose the thread when concussed, and go down at zero consciousness. They mend on time alone.
+Which mobs is a data tag, so a pack can add its own.
+
 Breaking, losing a limb and going down each have their own synthesised audio, in a muted
 set that sits inside Minecraft's palette and a visceral set that doesn't. Your own
 injuries are close and loud; a teammate's carry from where they're standing, quieter —
@@ -160,6 +166,7 @@ mod is concerned, so it bleeds, breaks, concusses and goes down exactly as you w
 | `enableLimbDestruction` | true | Arcade preset: limbs can be destroyed permanently |
 | `enableExplosiveDismemberment` | true | Extreme TNT and creeper trauma can take the nearest limb outright; nested under limb destruction |
 | `enableLongTermInjuries` | false | Worst injuries permanently lower a region's healing ceiling by state band |
+| `enableMobAnatomy` | true | Mobs in the `realisticdamage:has_anatomy` tag (humanoids by default) take regional trauma, bleed, break, lose limbs and collapse like players |
 | `spawnSeveredLimbs` | true | A lost limb is thrown into the world, lands, bleeds for a minute and is gone; nested under limb destruction |
 | `enableKnockdown` | true | Hard landings put you on the ground for a moment |
 | `enableMicrosleeps` | true | Consciousness cuts out in episodes on the way down |
