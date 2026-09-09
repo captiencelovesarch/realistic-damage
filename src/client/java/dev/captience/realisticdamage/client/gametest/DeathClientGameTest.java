@@ -1,6 +1,7 @@
 package dev.captience.realisticdamage.client.gametest;
 
 import dev.captience.realisticdamage.client.ClientState;
+import dev.captience.realisticdamage.client.ConsciousnessEffects;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
@@ -160,6 +161,85 @@ public class DeathClientGameTest implements FabricClientGameTest {
 			if (context.computeOnClient(client -> ClientState.deathViolence()) != 0.0) {
 				throw new AssertionError("the violence leaked into the next life");
 			}
+
+			// Dying with the ladder already on screen (1.6.1). The report was that a
+			// player at low consciousness saw the screen clear on the frame they
+			// died and then dim again from nothing. So: drain to the bottom of the
+			// ladder, let the living pass draw its vignette and washout, then kill
+			// — and from that frame to the end of the fade nothing may be lighter
+			// than the last living frame. Cinematic style, because its dim caps at
+			// 110/255 and is therefore the ending most able to brighten.
+			singleplayer.getServer().runOnServer(server -> {
+				for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+					dev.captience.realisticdamage.body.RealisticDamageData data =
+							dev.captience.realisticdamage.RDAttachments.get(player);
+					data.reset();
+					data.drainConsciousness(92.0);   // about 8: vignette full, washout near full
+					dev.captience.realisticdamage.RDAttachments.pushSnapshot(player);
+				}
+			});
+			context.waitTicks(8);
+			double[] living = readouts(context);
+			if (living[0] < 0.9 || living[1] < 60.0) {
+				throw new AssertionError("meant to die under a full ladder, but the living frame drew vignette "
+						+ living[0] + " and washout " + living[1] + "/255");
+			}
+			context.takeScreenshot("rd_death_09_low_before");
+			singleplayer.getServer().runOnServer(server -> {
+				for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+					player.hurtServer(player.level(),
+							player.level().damageSources().fellOutOfWorld(), Float.MAX_VALUE);
+				}
+			});
+			// The death arrives a tick or two after the server call. Re-sample the
+			// living frame every tick until it does, so the comparison is against
+			// the frame death actually interrupted and not one from before the
+			// kill: the deep swell and the washout's breath both move a little
+			// every tick, and a sample taken eight ticks earlier fails on that
+			// drift alone (it did, first run: 0.0385 against a frozen 0.0279).
+			int waited = 0;
+			while (!context.computeOnClient(client -> ClientState.dying())) {
+				living = readouts(context);
+				context.waitTicks(1);
+				if (++waited > 20) {
+					throw new AssertionError("the low-consciousness death did not take");
+				}
+			}
+			// One rendered frame can still fall between the last sample and the
+			// death, so allow exactly one tick of pulse drift: the swell moves at
+			// most 0.35 x 0.2 x 2pi/70 ~ 0.006 a tick and the breath at most about
+			// 0.9/255. A real regression drops the vignette from 1.0 to 0 and the
+			// washout from ~117 to 0, orders of magnitude past either.
+			final double[] last = living;
+			for (int sample = 0; sample < 4; sample++) {
+				double[] dying = readouts(context);
+				if (dying[0] < last[0] - 1.0e-6 || dying[1] < last[1] - 1.5 || dying[2] < last[2] - 0.01) {
+					throw new AssertionError("the screen got brighter for dying: living frame drew "
+							+ last[0] + " / " + last[1] + " / " + last[2] + ", dying sample " + sample
+							+ " drew " + dying[0] + " / " + dying[1] + " / " + dying[2]);
+				}
+				if (sample == 0) {
+					context.takeScreenshot("rd_death_10_low_moment");
+				}
+				context.waitTicks(35);
+			}
+			context.takeScreenshot("rd_death_11_low_settled");
+			context.clickScreenButton("deathScreen.respawn");
+			context.waitTicks(20);
+			// A fresh body: the floor must not leak into the next life either.
+			double[] reborn = readouts(context);
+			if (reborn[0] != 0.0 || reborn[2] != 0.0) {
+				throw new AssertionError("the frozen ladder leaked into the respawn: vignette " + reborn[0]
+						+ ", blackout " + reborn[2]);
+			}
 		}
+	}
+
+	/** Vignette strength, washout alpha and blackout level of the last rendered frame. */
+	private static double[] readouts(ClientGameTestContext context) {
+		return context.computeOnClient(client -> new double[] {
+				ConsciousnessEffects.lastVignetteStrength(),
+				ConsciousnessEffects.lastExposureAlpha(),
+				ConsciousnessEffects.lastBlackoutLevel()});
 	}
 }

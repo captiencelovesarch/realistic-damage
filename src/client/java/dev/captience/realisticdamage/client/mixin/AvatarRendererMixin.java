@@ -3,13 +3,19 @@ package dev.captience.realisticdamage.client.mixin;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.client.BloodBody;
+import com.mojang.blaze3d.vertex.PoseStack;
 import dev.captience.realisticdamage.client.BloodStainHolder;
+import dev.captience.realisticdamage.client.FirstPersonBlood;
 import dev.captience.realisticdamage.client.LimbStateHolder;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import dev.captience.realisticdamage.systems.LimpMath;
 import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.player.PlayerModel;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Avatar;
 import net.minecraft.world.entity.HumanoidArm;
@@ -52,6 +58,19 @@ public abstract class AvatarRendererMixin {
 				snapshot == null ? 0 : snapshot.scarMask());
 		realisticdamage$hideDestroyedHand(state, destroyedMask, HumanoidArm.RIGHT);
 		realisticdamage$hideDestroyedHand(state, destroyedMask, HumanoidArm.LEFT);
+	}
+
+	/**
+	 * The first-person hand (1.6.1). Vanilla submits the bare arm part here and
+	 * nothing else — no layers run — so the blood and scars on it are painted
+	 * on afterwards, from the same meshes the third-person layer uses. See
+	 * {@link FirstPersonBlood}.
+	 */
+	@Inject(method = "renderHand", at = @At("TAIL"))
+	private void realisticdamage$paintFirstPersonArm(PoseStack poseStack, SubmitNodeCollector collector,
+			int lightCoords, Identifier skinTexture, ModelPart arm, boolean hasSleeve, CallbackInfo ci) {
+		PlayerModel model = ((AvatarRenderer<?>) (Object) this).getModel();
+		FirstPersonBlood.submit(poseStack, collector, lightCoords, arm, arm == model.rightArm);
 	}
 
 	/**

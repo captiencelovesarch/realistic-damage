@@ -81,6 +81,7 @@
 	"realisticdamage.config.preset.grounded": "Grounded",
 	"realisticdamage.config.full_black": "Black Out Fully",
 	"realisticdamage.config.camera_drift": "Camera Drift",
+	"realisticdamage.config.camera_sway": "Head Sway",
 	"realisticdamage.msg.blood.1": "You feel light-headed.",
 	"realisticdamage.msg.blood.2": "Your vision is greying at the edges.",
 	"realisticdamage.msg.blood.3": "You can barely stay upright.",

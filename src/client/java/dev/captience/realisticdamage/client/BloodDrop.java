@@ -7,10 +7,14 @@ import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import org.jspecify.annotations.Nullable;
 
@@ -42,6 +46,35 @@ public class BloodDrop extends SingleQuadParticle {
 	private final int sourceEntityId;
 	private final double scale;
 
+	/**
+	 * Set the tick the drop finds itself in water, after which it is a cloud
+	 * rather than a drop: it slows almost to a stop, spreads, thins and is gone,
+	 * and it never marks anything.
+	 *
+	 * <p>The bug this closes: a drop had gravity, drag and block collision and
+	 * nothing else, so water was air to it. It fell straight through, stopped on
+	 * the pool floor and laid a stain there — blood that sank like gravel and sat
+	 * on the bottom of a river. Blood is barely denser than water and disperses
+	 * into it within a second or two; the mark it leaves is a fading tint in the
+	 * water itself, not a puddle under it.
+	 */
+	private boolean dissolving;
+	private int dissolveTicks;
+	private int dissolveAge;
+	private float dissolveStartSize;
+	private float dissolveStartAlpha;
+	/** Last tick's size, so the growth interpolates instead of stepping at 20 Hz. */
+	private float oQuadSize;
+
+	/** Drops that met water and dispersed this session. Read by the client gametest. */
+	private static long dissolved;
+	private static @Nullable SpriteSet cloudSprites;
+
+	/** How many drops have dispersed into water since the client started. */
+	public static long dissolvedCount() {
+		return dissolved;
+	}
+
 	BloodDrop(ClientLevel level, double x, double y, double z, double xd, double yd, double zd,
 			int sourceEntityId, net.minecraft.client.renderer.texture.TextureAtlasSprite sprite) {
 		super(level, x, y, z, xd, yd, zd, sprite);
@@ -56,6 +89,7 @@ public class BloodDrop extends SingleQuadParticle {
 		this.gravity = (float) Balance.DROP_GRAVITY;
 		this.lifetime = Balance.DROP_MAX_AGE_TICKS;
 		this.quadSize = (float) (0.028 + 0.062 * scale);
+		this.oQuadSize = this.quadSize;
 		float[] colour = BloodPalette.colour(1.0);
 		setColor(colour[0], colour[1], colour[2]);
 		setAlpha((float) Math.clamp(ClientEffectsConfig.get().bloodIntensity(), 0.0, 1.0));
@@ -73,6 +107,23 @@ public class BloodDrop extends SingleQuadParticle {
 		zo = z;
 		if (age++ >= lifetime) {
 			remove();
+			return;
+		}
+		oQuadSize = quadSize;
+
+		// Fluids first, before gravity has its say. Lava burns the drop off
+		// outright — no mark, nothing to see — and water turns it into a cloud.
+		BlockPos at = BlockPos.containing(x, y, z);
+		FluidState fluid = level.getFluidState(at);
+		if (fluid.is(FluidTags.LAVA)) {
+			remove();
+			return;
+		}
+		if (!dissolving && fluid.is(FluidTags.WATER) && y < at.getY() + fluid.getHeight(level, at)) {
+			beginDissolve();
+		}
+		if (dissolving) {
+			tickDissolve();
 			return;
 		}
 
@@ -100,6 +151,68 @@ public class BloodDrop extends SingleQuadParticle {
 		xd *= Balance.DROP_AIR_DRAG;
 		yd *= Balance.DROP_AIR_DRAG;
 		zd *= Balance.DROP_AIR_DRAG;
+	}
+
+	/**
+	 * The drop meets water. Whatever it was doing, it now hangs, spreads and
+	 * fades; how long that takes scales with how much blood the drop was.
+	 */
+	private void beginDissolve() {
+		dissolving = true;
+		dissolved++;
+		// Water takes almost all of the speed at once — the drop was moving
+		// through air a moment ago and a cloud has no momentum to speak of.
+		xd *= Balance.DROP_WATER_ENTRY_KEEP;
+		zd *= Balance.DROP_WATER_ENTRY_KEEP;
+		yd = Math.min(0.0, yd) * Balance.DROP_WATER_ENTRY_KEEP;
+		dissolveTicks = (int) Math.round(Mth.lerp(scale,
+				Balance.DROP_DISSOLVE_TICKS_MIN, Balance.DROP_DISSOLVE_TICKS_MAX));
+		dissolveAge = 0;
+		lifetime = age + dissolveTicks + 1;
+		dissolveStartSize = quadSize;
+		dissolveStartAlpha = alpha;
+		// A cloud is round and soft where a drop is a bead: swap to the pool
+		// shape the stain field uses once a mark has spread. Deterministic
+		// variant, keyed off where the drop went in — there is no random source
+		// in here and there must not be.
+		if (cloudSprites != null) {
+			int variant = Math.floorMod((int) Math.floor(x * 7.0 + z * 13.0), 4);
+			setSprite(cloudSprites.get(BloodEmitter.POOL_SPRITE_OFFSET + variant, BloodEmitter.SPRITE_COUNT - 1));
+		}
+		// Blood in water reads darker than blood on a surface: the water takes
+		// the highlights off it.
+		float[] colour = BloodPalette.colour(1.0);
+		setColor(colour[0] * 0.80F, colour[1] * 0.80F, colour[2] * 0.80F);
+	}
+
+	/**
+	 * One tick of dispersal: the cloud grows fast at first and then barely at
+	 * all, thins the whole way, sinks a hair, and is removed when it is gone.
+	 * Nothing here settles, splashes or stains — water is where blood stops
+	 * being a thing that lands.
+	 */
+	private void tickDissolve() {
+		dissolveAge++;
+		double t = Math.min(1.0, dissolveAge / (double) dissolveTicks);
+		if (t >= 1.0) {
+			remove();
+			return;
+		}
+		double spread = 1.0 + (Balance.DROP_DISSOLVE_GROWTH - 1.0) * Math.sqrt(t);
+		quadSize = (float) Math.min(Balance.DROP_DISSOLVE_SIZE_MAX, dissolveStartSize * spread);
+		double thin = Math.pow(1.0 - t, 1.5);
+		setAlpha((float) (dissolveStartAlpha * thin));
+		// Blood is a shade denser than water: it sinks, slowly, while it spreads.
+		yd -= Balance.DROP_WATER_SINK;
+		xd *= Balance.DROP_WATER_DRAG;
+		yd *= Balance.DROP_WATER_DRAG;
+		zd *= Balance.DROP_WATER_DRAG;
+		move(xd, yd, zd);
+	}
+
+	@Override
+	public float getQuadSize(float partialTick) {
+		return Mth.lerp(partialTick, oQuadSize, quadSize);
 	}
 
 	/**
@@ -169,6 +282,7 @@ public class BloodDrop extends SingleQuadParticle {
 			// place a SpriteSet for it is handed out.
 			BloodStains.bindSprites(sprites);
 			BloodEmitter.bindSprites(sprites);
+			cloudSprites = sprites;
 		}
 
 		@Override

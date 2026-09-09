@@ -37,8 +37,11 @@ public final class LandingEffect {
 		}
 		shock = Math.max(shock, s * 0.75);
 		// Straight down, and harder than a body blow: this is your whole mass
-		// stopping at once.
-		slamRemaining = Math.max(slamRemaining, 16.0 * s * intensity);
+		// stopping at once. Half of it is the aim being driven down; the other
+		// half (1.6.1) is the eye itself dropping and springing back, which is
+		// the part that reads as knees buckling.
+		slamRemaining = Math.max(slamRemaining, 10.0 * s * intensity);
+		CameraMotion.landing(s, intensity);
 		shakeStrength = Math.max(shakeStrength, s * intensity);
 		shakeRemaining = Math.max(shakeRemaining, 4.0 + 16.0 * s);
 

@@ -20,18 +20,13 @@ public final class ConsciousnessEffects {
 	// Our own radial falloff: vanilla's vignette texture is deliberately subtle,
 	// far too weak to read as "losing consciousness" even at full tint.
 	private static final Identifier VIGNETTE = Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/injury_vignette.png");
-	private static final Identifier NAUSEA = Identifier.withDefaultNamespace("textures/misc/nausea.png");
 
 	/**
-	 * Smoothed haze level. Rises instantly so a blow lands at once, then falls
-	 * linearly, because vanilla's blur is all-or-nothing and without a decay to
-	 * hide behind it simply vanishes mid-frame when you recover.
+	 * Blur is cut while the haze is still strong, so the ghosting covers its
+	 * exit. The haze itself now lives with the afterimage that hands over to
+	 * the blur (see {@link Afterimage#haze()}).
 	 */
-	private static double haze;
-	/** Blur is cut while the haze is still strong, so the ghosting covers its exit. */
 	private static final double BLUR_CUTOFF = 0.62;
-	/** Haze lost per tick on the way down: a touch under a second and a half. */
-	private static final double HAZE_FALLOFF = 0.035;
 
 	/**
 	 * Peak washout alpha, 120/255 = 47% of the way to near-white. Presentation
@@ -49,16 +44,6 @@ public final class ConsciousnessEffects {
 	 * this is the single constant to lower.
 	 */
 	private static final double EXPOSURE_MAX_ALPHA = 120.0;
-	/**
-	 * How far the ghosted copy slides out of register at the top of its pulse.
-	 * The old 0.06 was a 6% breath, which reads as a static tint rather than as a
-	 * doubled image — and an afterimage that never separates is not one. Vanilla
-	 * sweeps this same texture across 2.0 → 1.0, so 1.03 → 1.17 is still far more
-	 * restrained than vanilla nausea.
-	 */
-	private static final double GHOST_SEPARATION = 0.14;
-	/** One ghost pulse: 40 / 20 = two seconds, slow enough to read as dazed. */
-	private static final double GHOST_PERIOD = 40.0;
 
 	// What the last frame actually asked for. Written here and read by the client
 	// gametests, because "the symptom is perceptible" is a claim about magnitude
@@ -66,6 +51,29 @@ public final class ConsciousnessEffects {
 	private static boolean blurRequested;
 	private static int exposureAlpha;
 	private static double ghostStrength;
+	/** The consciousness vignette's strength and the total blackout, 0 to 1, on the last frame. */
+	private static double vignetteStrength;
+	private static double blackoutLevel;
+
+	/**
+	 * The ladder as death found it (1.6.1). Captured from the last living frame
+	 * on the first dying one, then held for the whole of the death sequence, so
+	 * that the screen never gets brighter for having died.
+	 *
+	 * <p>The bug: the dying pass drew only its own look, and its own look starts
+	 * from nothing — a vignette at zero, no washout, no ghost — while the living
+	 * pass had been drawing a full ladder a frame earlier. A player at
+	 * consciousness five saw the screen <em>clear</em> on the frame they died
+	 * and then start dimming again from scratch. Only the unconscious blackout
+	 * was handed over, and that with a linear crossfade against the death fade,
+	 * which for the cinematic ending (whose dim caps at 110/255) still meant a
+	 * blacked-out player watched the world come back before it went. Now every
+	 * layer the ladder was drawing is the floor the death look builds on.
+	 */
+	private static boolean deathFloorCaptured;
+	private static double floorVignette;
+	private static int floorExposureAlpha;
+	private static double floorBlackout;
 
 	/** True if the last rendered frame asked vanilla for its gaussian blur. */
 	public static boolean blurRequestedLastFrame() {
@@ -77,9 +85,19 @@ public final class ConsciousnessEffects {
 		return exposureAlpha;
 	}
 
-	/** The ghost blit's strength, 0 to 1, on the last frame. */
+	/** The afterimage strength, 0 to 1, asked for on the last frame. */
 	public static double lastGhostStrength() {
 		return ghostStrength;
+	}
+
+	/** The consciousness vignette's strength, 0 to 1, on the last frame (held while dying). */
+	public static double lastVignetteStrength() {
+		return vignetteStrength;
+	}
+
+	/** The total blackout, 0 to 1, on the last frame — living ladder or death look, whichever drew. */
+	public static double lastBlackoutLevel() {
+		return blackoutLevel;
 	}
 
 	/** Slow deterministic pulse (no RNG flicker) driven by game time. */
@@ -99,9 +117,21 @@ public final class ConsciousnessEffects {
 		// for gameplay effects — but that exclusion is exactly why death used to
 		// snap the screen back to normal on the frame it happened.
 		if (ClientState.dying()) {
+			if (!deathFloorCaptured) {
+				// The last living frame's numbers are still in the readouts; they
+				// become the floor before this frame overwrites them.
+				floorVignette = vignetteStrength;
+				floorExposureAlpha = lastExposureAlphaDrawn;
+				floorBlackout = blackoutLevel;
+				deathFloorCaptured = true;
+			}
 			renderDeath(graphics);
 			return;
 		}
+		deathFloorCaptured = false;
+		vignetteStrength = 0.0;
+		blackoutLevel = 0.0;
+		lastExposureAlphaDrawn = 0;
 		if (!ClientState.active() || ClientState.snapshot() == null) {
 			return;
 		}
@@ -122,8 +152,8 @@ public final class ConsciousnessEffects {
 			// The VIGNETTE pipeline blends (ZERO, ONE_MINUS_SRC_COLOR): dst *= (1 - src*tint),
 			// so the tint is the darkening strength and the red bias tinges it toward blood.
 			float strength = (float) Math.min(1.0, vignette);
-			graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-					ARGB.colorFromFloat(1.0F, strength * 0.80F, strength, strength));
+			vignetteStrength = strength;
+			ladderVignette(graphics, width, height, strength);
 		}
 
 		// Near-death: a red vignette that slams shut on every heartbeat. Driven by
@@ -156,7 +186,8 @@ public final class ConsciousnessEffects {
 			// back to nothing is one the eye renormalises away instead of reading.
 			double breathe = 0.80 + 0.20 * ClientState.breath();
 			exposureAlpha = (int) (Math.min(1.0, exposure) * breathe * EXPOSURE_MAX_ALPHA);
-			graphics.fill(0, 0, width, height, ARGB.color(exposureAlpha, 235, 232, 220));
+			lastExposureAlphaDrawn = exposureAlpha;
+			washout(graphics, width, height, exposureAlpha);
 		}
 
 		// Vision blur (from 18 down): vanilla's own gaussian blur applied to
@@ -169,49 +200,22 @@ public final class ConsciousnessEffects {
 		// c = 9.6, by which point the deep clamp below had already forced 0.95.
 		// The quadratic term was dead code for every consciousness it could ever
 		// see, and pretending it carried the 45 rung is what left that rung empty.
-		// It is deleted here and the ghost carries 45 properly, below.
-		boolean deep = ClientState.effectiveConsciousness() < Balance.SYMPTOM_BLUR;
-		double hazeTarget = deep ? 0.95 * config.afterimageIntensity : 0.0;
-		if (hazeTarget >= haze) {
-			haze = hazeTarget;   // getting worse lands immediately
-		} else {
-			haze = Math.max(hazeTarget, haze - HAZE_FALLOFF * deltaTracker.getGameTimeDeltaTicks());
-		}
-
+		// It is deleted here and the afterimage carries 45 properly.
+		//
 		// Vanilla's blur has no intensity, so it is kept on while the haze is
 		// strong and cut once the ghosting is heavy enough to cover its going.
-		if (haze > BLUR_CUTOFF && config.afterimageIntensity > 0.0
+		if (Afterimage.haze() > BLUR_CUTOFF && config.afterimageIntensity > 0.0
 				&& Minecraft.getInstance().gui.screen() == null) {
 			graphics.blurBeforeThisStratum();
 			blurRequested = true;
 		}
-		// Ghosting: doubles as the concussion symptom, and since 1.6 it is what
-		// actually carries the 45 rung. A concussion holds a constant low level of
-		// it — seeing double is what being dazed looks like — and it deepens as
-		// consciousness falls, over 45 → 18 rather than 45 → 0, so the whole band
-		// is rungs instead of twenty-seven points of nothing in front of a cliff.
-		// A club to the head adds a burst of it on top (1.5), which is the same
-		// symptom arriving suddenly rather than settling in.
-		double ghost = Math.max(Math.max(haze,
-						Vitals.afterimageStrength(ClientState.effectiveConsciousness(),
-								ClientState.concussed()) * config.afterimageIntensity),
-				ImpactEffect.doubled() * 0.8);
-		if (ghost > 0.01) {
-			double phase = pulse(GHOST_PERIOD);
-			// Floor raised from 0.35 to 0.55 for the same reason the breath was
-			// narrowed: a pulse that drops to a third of itself twice a cycle is
-			// read as flicker, not as a second image coming and going.
-			float strength = (float) (Math.min(1.0, ghost) * (0.55 + 0.45 * phase));
-			ghostStrength = strength;
-			graphics.pose().pushMatrix();
-			graphics.pose().translate(width / 2.0F, height / 2.0F);
-			float scale = (float) (1.03 + GHOST_SEPARATION * phase);
-			graphics.pose().scale(scale, scale);
-			graphics.pose().translate(-width / 2.0F, -height / 2.0F);
-			graphics.blit(RenderPipelines.GUI_NAUSEA_OVERLAY, NAUSEA, 0, 0, 0.0F, 0.0F, width, height,
-					width, height, ARGB.colorFromFloat(1.0F, strength * 0.85F, strength * 0.55F, strength * 0.55F));
-			graphics.pose().popMatrix();
-		}
+		// Ghosting (1.6.1): no longer drawn here at all. It used to be vanilla's
+		// nausea texture, tinted and scaled up a few percent and pulsed — which
+		// contains no previous frame and so is not an afterimage, whatever the
+		// slider called it. The real one is a post chain over the world render
+		// with a persistent history target (see Afterimage); this readout is the
+		// strength it was asked for, so the tests can still assert the magnitude.
+		ghostStrength = Afterimage.strength();
 
 		// A dimming that swells below 10 — the sense of nearly going, underneath
 		// the real blackouts.
@@ -292,9 +296,30 @@ public final class ConsciousnessEffects {
 					ARGB.color((int) (eased * 150.0), 215, 190, 165));
 		}
 
+		blackoutLevel = Math.min(1.0, blackout);
 		if (blackout > 0.01) {
-			graphics.fill(0, 0, width, height, ARGB.color((int) Math.ceil(Math.min(1.0, blackout) * 255.0), 0, 0, 0));
+			black(graphics, width, height, blackoutLevel);
 		}
+	}
+
+	/** Washout alpha actually drawn on the last living frame; the floor reads it. */
+	private static int lastExposureAlphaDrawn;
+
+	/** The consciousness vignette: a red-biased darkening of the edges. */
+	private static void ladderVignette(GuiGraphicsExtractor graphics, int width, int height, float strength) {
+		graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
+				ARGB.colorFromFloat(1.0F, strength * 0.80F, strength, strength));
+	}
+
+	/** The exposure washout: a milky veil, the world looking wrong rather than gone. */
+	private static void washout(GuiGraphicsExtractor graphics, int width, int height, int alpha) {
+		if (alpha > 0) {
+			graphics.fill(0, 0, width, height, ARGB.color(alpha, 235, 232, 220));
+		}
+	}
+
+	private static void black(GuiGraphicsExtractor graphics, int width, int height, double level) {
+		graphics.fill(0, 0, width, height, ARGB.color((int) Math.ceil(Math.min(1.0, level) * 255.0), 0, 0, 0));
 	}
 
 	/**
@@ -302,6 +327,13 @@ public final class ConsciousnessEffects {
 	 * screen instead of vanishing from it: the vignette closes in and loses its
 	 * red as the last beats squeeze it, the lens blood stays where it landed,
 	 * and the darkness settles rather than arriving.
+	 *
+	 * <p>Since 1.6.1 it starts from where the living ladder left off rather than
+	 * from nothing. The consciousness vignette, the washout, the ghost and the
+	 * blackout are held at the values of the last living frame for the whole
+	 * sequence, and the death look is added on top: its vignette only draws the
+	 * part that exceeds the floor, and its darkness is the greater of the two.
+	 * Nothing on this screen may ever be brighter than it was the moment before.
 	 *
 	 * <p>Deliberately restrained at the top end — the death screen's own text and
 	 * buttons sit above this and must stay readable, so the fade closes most of
@@ -312,60 +344,60 @@ public final class ConsciousnessEffects {
 		int width = graphics.guiWidth();
 		int height = graphics.guiHeight();
 		double fade = ClientState.deathFade() * config.deathIntensity();
+		// The readouts describe this frame too: the floor, unchanged.
+		vignetteStrength = floorVignette;
+		exposureAlpha = floorExposureAlpha;
+		ghostStrength = Afterimage.strength();
 
 		// What was on the lens when you died stays on the lens, drying.
 		BloodLens.render(graphics, width, height);
 
-		// Dying while already blacked out must not brighten the screen on the
-		// death frame. The unconscious fade froze where death interrupted it;
-		// hand it over to the death look across the fade rather than dropping it.
-		double frozen = Math.max(ClientState.unconsciousFade(),
-				ClientState.microsleepFade() * 0.94)
-				* (config.fullBlackUnconscious ? 1.0 : 0.88)
-				* (1.0 - ClientState.deathFade());
-		if (frozen > 0.01) {
-			graphics.fill(0, 0, width, height,
-					ARGB.color((int) Math.ceil(Math.min(1.0, frozen) * 255.0), 0, 0, 0));
+		// The ladder, exactly as death found it.
+		if (floorVignette > 0.01) {
+			ladderVignette(graphics, width, height, (float) floorVignette);
 		}
-		if (fade <= 0.001) {
-			return;
-		}
+		washout(graphics, width, height, floorExposureAlpha);
 
-		double beat = ClientState.heartbeatEnvelope();
-		if (ClientEffectsConfig.get().realisticDeath) {
-			// The realistic ending. No red, no drama — a tunnel that closes. The
-			// vignette leads, then a true blackout completes just past the middle
-			// of the fade, and from there the only thing left of the world is the
-			// heart still beating in the dark. The death screen's own text and
-			// buttons draw above this, so the way out never disappears with the
-			// world.
-			float strength = (float) Math.min(1.0, fade * 1.6 + beat * 0.15);
-			graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-					ARGB.colorFromFloat(1.0F, strength, strength, strength));
-			double black = Math.clamp((fade - Balance.DEATH_BLACK_FROM)
-					/ (Balance.DEATH_BLACK_AT - Balance.DEATH_BLACK_FROM), 0.0, 1.0);
-			if (black > 0.004) {
-				graphics.fill(0, 0, width, height,
-						ARGB.color((int) Math.ceil(black * 255.0), 0, 0, 0));
+		double black = floorBlackout;
+		if (fade > 0.001) {
+			double beat = ClientState.heartbeatEnvelope();
+			if (config.realisticDeath) {
+				// The realistic ending. No red, no drama — a tunnel that closes.
+				// The vignette leads, then a true blackout completes just past the
+				// middle of the fade, and from there the only thing left of the
+				// world is the heart still beating in the dark. The death screen's
+				// own text and buttons draw above this, so the way out never
+				// disappears with the world.
+				double wanted = Math.min(1.0, fade * 1.6 + beat * 0.15);
+				float extra = (float) Math.max(0.0, wanted - floorVignette);
+				if (extra > 0.004F) {
+					graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
+							ARGB.colorFromFloat(1.0F, extra, extra, extra));
+				}
+				black = Math.max(black, Math.clamp((fade - Balance.DEATH_BLACK_FROM)
+						/ (Balance.DEATH_BLACK_AT - Balance.DEATH_BLACK_FROM), 0.0, 1.0));
+			} else {
+				// The cinematic ending: the vignette closes in and drains,
+				// red-biased while the heart still runs, settling toward plain
+				// darkness once it has stopped.
+				double squeeze = Math.min(1.0, fade * (0.55 + 0.45 * Math.sqrt(fade)) + beat * 0.30);
+				float extra = (float) Math.max(0.0, squeeze - floorVignette);
+				if (extra > 0.004F) {
+					float redBias = (float) (0.55 + 0.35 * fade);
+					graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
+							ARGB.colorFromFloat(1.0F, extra * redBias, extra, extra));
+				}
+				// The settle: a flat dimming that arrives late in the fade, under
+				// the death screen's own gradient. Capped well short of black — the
+				// screen still has a job to do — unless the body was already
+				// further gone than that when it died.
+				double dim = Math.max(0.0, fade - 0.45) / 0.55;
+				black = Math.max(black, dim * 110.0 / 255.0);
 			}
-			return;
 		}
-
-		// The cinematic ending: the vignette closes in and drains, red-biased
-		// while the heart still runs, settling toward plain darkness once it has
-		// stopped.
-		double squeeze = Math.min(1.0, fade * (0.55 + 0.45 * Math.sqrt(fade)) + beat * 0.30);
-		float strength = (float) squeeze;
-		float redBias = (float) (0.55 + 0.35 * fade);
-		graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-				ARGB.colorFromFloat(1.0F, strength * redBias, strength, strength));
-
-		// The settle: a flat dimming that arrives late in the fade, under the
-		// death screen's own gradient. Capped well short of black — the screen
-		// still has a job to do.
-		double dim = Math.max(0.0, fade - 0.45) / 0.55;
-		if (dim > 0.01) {
-			graphics.fill(0, 0, width, height, ARGB.color((int) (dim * 110.0), 0, 0, 0));
+		blackoutLevel = black;
+		if (black > 0.004) {
+			black(graphics, width, height, black);
 		}
 	}
 }

@@ -89,6 +89,9 @@ public final class ImpactEffect {
 		kickYaw = -Math.sin(relative);
 		kickPitch = -0.55 - 0.45 * Math.cos(relative);
 		kickRemaining = Math.max(kickRemaining, 9.0 * m * intensity);
+		// And the picture itself lurches (1.6.1): roll, shove and overshoot on
+		// the view matrix, where it can be violent without moving the aim.
+		CameraMotion.impact(m, relative, impactFamily, intensity);
 
 		// A dull body blow, pitched down for weight.
 		Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forLocalAmbience(
@@ -188,6 +191,15 @@ public final class ImpactEffect {
 	/** Blow: how doubled the world looks, 0 to 1. */
 	public static double doubled() {
 		return doubled * ClientEffectsConfig.get().impactIntensity;
+	}
+
+	/**
+	 * The same, before the impact slider. The afterimage reads this one: seeing
+	 * double after a club is the afterimage symptom arriving suddenly, so it is
+	 * the Afterimages slider that owns it, not Impact Shock.
+	 */
+	public static double doubledRaw() {
+		return doubled;
 	}
 
 	/** Blast: overpressure whiteout, 0 to 1. */

@@ -95,6 +95,8 @@ public class RealisticDamageClient implements ClientModInitializer {
 			BloodBody.reset();
 			BloodStains.reset();
 			BloodLens.reset();
+			Afterimage.reset();
+			CameraMotion.reset();
 		});
 	}
 }

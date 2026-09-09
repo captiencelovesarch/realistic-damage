@@ -51,6 +51,9 @@ public final class BloodEmitter {
 	 * copy of its own.
 	 */
 	public static final int DROP_SPRITE_COUNT = 4;
+	/** First splat sprite, and first pool sprite. Public since the water cloud borrows the pool shape. */
+	public static final int SPLAT_SPRITE_OFFSET = 4;
+	public static final int POOL_SPRITE_OFFSET = 8;
 	public static final int SPRITE_COUNT = 12;
 	/** Beyond this, someone else's bleeding is not worth the particles. */
 	private static final double EMIT_RANGE = 28.0;

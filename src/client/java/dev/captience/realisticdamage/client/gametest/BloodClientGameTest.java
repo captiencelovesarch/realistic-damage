@@ -7,9 +7,11 @@ import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.client.BloodBody;
+import dev.captience.realisticdamage.client.BloodDrop;
 import dev.captience.realisticdamage.client.BloodLens;
 import dev.captience.realisticdamage.client.BloodStains;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
+import dev.captience.realisticdamage.client.FirstPersonBlood;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.damage.DestructionLogic;
 import dev.captience.realisticdamage.systems.BleedingSystem;
@@ -115,6 +117,23 @@ public class BloodClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("bled for seconds and nothing reached the camera");
 			}
 			context.takeScreenshot("rd_blood_04_accumulating");
+
+			// The arm you are looking down at (1.6.1). Third person showed the
+			// blood and first person never did, because the hand is not drawn
+			// through the player renderer's layers. Wound the right arm, hold the
+			// empty hand up in first person, and the blood shell has to be
+			// submitted onto it frame after frame.
+			mutate(singleplayer, data -> data.addWound(BodyPart.RIGHT_ARM, WoundSeverity.CRITICAL));
+			context.waitTicks(40);
+			assertStain(context, BodyPart.RIGHT_ARM, "a critical right arm wound");
+			long handSubmits = context.computeOnClient(client -> FirstPersonBlood.bloodSubmits());
+			context.waitTicks(10);
+			long handSubmitsLater = context.computeOnClient(client -> FirstPersonBlood.bloodSubmits());
+			if (handSubmitsLater <= handSubmits) {
+				throw new AssertionError("a bloody right arm was drawn clean in first person: "
+						+ handSubmits + " then " + handSubmitsLater + " shells submitted");
+			}
+			context.takeScreenshot("rd_blood_14_first_person_arm");
 
 			// Drops have to actually arrive somewhere. This is the headline of the
 			// rework — the old particles hung in the air and never landed — and it
@@ -464,6 +483,36 @@ public class BloodClientGameTest implements FabricClientGameTest {
 			}
 			context.takeScreenshot("rd_blood_13_severance");
 
+			// Water (1.6.1). A drop treated water as air: it fell through, stopped
+			// on the pool floor and marked it, blood sitting on the bottom like
+			// gravel. Wade into a shallow pool with an open wound and the drops
+			// must disperse — and the floor under the water must stay unmarked.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.clearWounds();
+			});
+			context.runOnClient(client -> BloodStains.reset());
+			wadeIntoPool(singleplayer);
+			context.waitTicks(10);
+			mutate(singleplayer, data -> data.addWound(BodyPart.TORSO, WoundSeverity.SEVERE));
+			long dissolvedBefore = context.computeOnClient(client -> BloodDrop.dissolvedCount());
+			context.waitTicks(60);
+			long dissolvedAfter = context.computeOnClient(client -> BloodDrop.dissolvedCount());
+			if (dissolvedAfter <= dissolvedBefore) {
+				throw new AssertionError("bled into a pool for three seconds and no drop dispersed");
+			}
+			int wetMarks = context.computeOnClient(client -> BloodStains.count());
+			if (wetMarks != 0) {
+				throw new AssertionError("blood marked the bottom of the pool: " + wetMarks + " marks");
+			}
+			context.runOnClient(client -> {
+				if (client.player != null) {
+					client.player.setXRot(72.0F);
+				}
+			});
+			context.waitTicks(4);
+			context.takeScreenshot("rd_blood_15_water");
+
 			// The panic button has to cover blood too. This is the promise
 			// disableAllEffects makes, and a new effect that forgot to join it
 			// would break that promise silently.
@@ -600,6 +649,32 @@ public class BloodClientGameTest implements FabricClientGameTest {
 				player.setDeltaMovement(Vec3.ZERO);
 				player.teleportTo(player.getX(), player.getY(),
 						wallZ - player.getBbWidth() / 2.0 - 0.001);
+			}
+		});
+	}
+
+	/**
+	 * Moves the player twelve blocks along and stands them knee-deep in a
+	 * five-by-five pool one block deep, with dry floor under it. Wide enough
+	 * that a falling seep cannot drift past its edge, shallow enough that the
+	 * player stands rather than swims.
+	 */
+	private static void wadeIntoPool(TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runOnServer(server -> {
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				ServerLevel level = player.level();
+				double px = player.getX() + 12.0;
+				int originX = Mth.floor(px);
+				int originY = Mth.floor(player.getY());
+				int originZ = Mth.floor(player.getZ());
+				for (int dx = -2; dx <= 2; dx++) {
+					for (int dz = -2; dz <= 2; dz++) {
+						level.setBlockAndUpdate(new BlockPos(originX + dx, originY, originZ + dz),
+								Blocks.WATER.defaultBlockState());
+					}
+				}
+				player.setDeltaMovement(Vec3.ZERO);
+				player.teleportTo(px, player.getY(), player.getZ());
 			}
 		});
 	}

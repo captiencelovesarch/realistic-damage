@@ -259,6 +259,21 @@ public final class Balance {
 	/** Share of visible wound flow transferred to a wall the body is touching. */
 	public static final double CONTACT_TRANSFER_SHARE = 0.35;
 
+	// Blood meeting water (1.6.1): it disperses instead of sinking to the floor.
+	/** Fraction of a drop's speed that survives the instant it enters water. */
+	public static final double DROP_WATER_ENTRY_KEEP = 0.18;
+	/** Velocity kept per tick while dispersing; water is thick. */
+	public static final double DROP_WATER_DRAG = 0.82;
+	/** Blocks per tick squared the cloud sinks at; blood is a shade denser than water. */
+	public static final double DROP_WATER_SINK = 0.0012;
+	/** How long a bead takes to disperse, scaled from a seep to a gout. */
+	public static final int DROP_DISSOLVE_TICKS_MIN = 18;
+	public static final int DROP_DISSOLVE_TICKS_MAX = 44;
+	/** How many times its starting size the cloud reaches before it is gone. */
+	public static final double DROP_DISSOLVE_GROWTH = 5.5;
+	/** ...and the ceiling on that, so a gout does not fog a whole pool. */
+	public static final double DROP_DISSOLVE_SIZE_MAX = 0.34;
+
 	// Stains: what a drop leaves on the surface it hits.
 	/** Hard cap on tracked stains. Oldest are evicted first (spec §56: no unbounded state). */
 	public static final int STAIN_CAPACITY = 768;
@@ -756,6 +771,15 @@ public final class Balance {
 	public static final double CONCUSSION_SYMPTOM_SHIFT = 18.0;
 	/** Constant double-vision ghosting while concussed — the signature symptom. */
 	public static final double CONCUSSION_GHOST = 0.25;
+	/**
+	 * How much of the previous frame the afterimage keeps, per tick, at the
+	 * bottom and top of its strength (1.6.1). Raised to the power of the real
+	 * frame delta, so a trail lasts the same fraction of a second at any frame
+	 * rate. 0.72/tick is a smear you can see your own hand through; 0.10 is a
+	 * faint doubling that is gone within a couple of frames.
+	 */
+	public static final double AFTERIMAGE_KEEP_MIN = 0.10;
+	public static final double AFTERIMAGE_KEEP_MAX = 0.72;
 	/**
 	 * Vanilla's gaussian blur has no intensity parameter — it is on or off — so it
 	 * is held back to a late, distinct stage while the ghosting carries the smooth

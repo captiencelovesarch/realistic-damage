@@ -1,4 +1,4 @@
-# Realistic Damage — Design (v1.6)
+# Realistic Damage — Design (v1.6.1)
 
 > "Minecraft, but damage is cooler." Vanilla hearts stay authoritative; this mod adds a
 > physical layer: locational body trauma, deterministic injuries (Broken / Bleeding /
@@ -379,6 +379,85 @@ actual collision face. A large, wet vertical mark advances a deterministic phase
 a physics drop from its lower edge, paying radius each time and slowing as it dries. Both
 paths reuse the bounded stain field and disappear with the client particles. Persistent
 per-face block blood would be a different storage system and remains deliberately deferred.
+
+## Added in 1.6.1
+
+Four playtest bugs and one presentation system, all client-side. Nothing here touches the
+server, the save, or the wire.
+
+**Death starts from where the ladder left off.** The dying pass drew only its own look, and
+its own look begins at nothing — vignette at zero, no washout, no ghost — while the living
+pass had drawn a full ladder one frame earlier. A player at consciousness five therefore
+saw the screen *clear* on the frame they died and then dim again from scratch. Only the
+unconscious blackout was carried over, and that on a linear crossfade against the death
+fade, which for the cinematic ending (dim capped at 110/255) still meant a blacked-out
+player watched the world come back before it went. `ConsciousnessEffects` now captures the
+last living frame's vignette, washout and blackout on the first dying frame and holds them
+for the whole sequence as a floor; the death look draws only the part of its vignette that
+exceeds the floor, and its darkness is the greater of the two. The one rule: nothing on the
+death screen may be lighter than the frame before it. The afterimage and the camera pose
+freeze with it. Verified by `DeathClientGameTest`, which samples the three readouts across
+a whole low-consciousness death and fails on any drop.
+
+**Afterimages are afterimages.** What shipped under that name from 1.0 was vanilla's nausea
+texture, tinted, scaled up a few percent and pulsed. It contained no previous frame — the
+HUD has no access to one — so it was a vignette with a heartbeat, and the report that
+afterimages "still don't work" was correct. `Afterimage` is a post chain on the world
+render target with a *persistent* internal target (the 26.2 chain format allows one):
+each frame it writes `mix(now, history, keep)` to both the screen and the history, so what
+you saw a moment ago trails behind what you see now and decays exponentially. Anything
+that moves leaves itself behind — you, a mob, your own hand — which is what seeing double
+when dazed actually looks like. Vanilla bakes a pass's uniforms once from the JSON, so the
+mod swaps its own writable buffer into the pass's uniform map (`PostPassAccessor`) and
+rewrites the retention every frame, raised to the power of the real frame delta so the trail
+lasts the same fraction of a second at any frame rate. It runs before the greyout so the
+history holds full-colour frames, reseeds itself after being off or after a resize rather
+than blending a stale frame in, and is gated on `framesProcessed` in the HUD test rather
+than on the strength alone. The concussion floor, the 45→18 curve and the post-blow
+doubling all feed it, behind the one Afterimages slider.
+
+**The arm you are looking down at bleeds.** `BloodBodyLayer` is a layer on the player
+renderer; the first-person hand is not drawn through those layers — `ItemInHandRenderer`
+asks `AvatarRenderer.renderHand` for the bare arm part and nothing else. Everyone else saw
+your bloody arm; you saw a clean sleeve. `FirstPersonBlood` injects at the tail of that
+method and paints the same blood and scar shells from the same baked meshes through the
+same `paint` call the layer uses, so the two views cannot disagree.
+
+**Blood disperses in water.** A drop had gravity, drag and block collision and nothing else,
+so water was air to it: it fell through, stopped on the pool floor and laid a stain there.
+Now the tick checks the fluid first. Lava burns the drop off with no mark; water turns it
+into a cloud — nearly all of its speed gone at once, a slow sink, growing fast then barely
+at all, thinning the whole way, gone in one to two seconds scaled by the drop's size, and
+never settling, splashing or staining. The stain field refuses a landing point that is
+inside water, which catches the two callers that never fall (contact transfer from a wading
+body, and a wall run shedding into a pool).
+
+**The camera moves as a picture, not as an aim.** Everything the mod did to the camera
+before went through `Entity.turn`, which moves the crosshair — right for a head being
+knocked aside, wrong for weight, because a rotation of the aim is capped by how far a player
+will tolerate losing their target. Vanilla's own hurt tilt is a roll on the view matrix and
+never on the player, and `CameraMotion` rides the same hook (`GameRenderer.bobHurt`), so it
+reaches the world and the first-person hand together and leaves the aim exactly where it
+was. Two things live there:
+
+- **The impact spring.** Pitch, yaw, roll and a small sideways/downward shove of the eye,
+  each a damped spring (natural period about seven ticks, damping ratio near 0.28) kicked
+  by a blow, a landing or a blast and integrated per frame with substeps. A spring rather
+  than a scripted curve because it composes: two hits a quarter-second apart add, a hit
+  landing on a ringing head overshoots further. Blows roll and yaw away from the attacker
+  and snap the chin up; cuts roll less; a stab flinches the body down and in; a landing
+  drops the eye and drives the chin down, replacing half of what used to be aim slam; a
+  blast adds a fast decaying multi-sine shake. As consciousness fails the damping falls
+  away, so a head that cannot steady itself keeps wobbling. Scaled by Impact Shock and by
+  vanilla's Damage Tilt accessibility slider both.
+- **The sway.** Below the middle of the ladder the horizon tilts: two slow, mutually prime
+  rolls, a slower pitch, a heave on the shared breath clock, a lateral drift of the eye,
+  growing quadratically toward collapse. A microsleep drops the head as the blackout closes
+  and lifts it as it opens, so you *come to* with the world swinging back; unconsciousness
+  slumps it over. Its own slider, **Head Sway**, on by default at a restrained level and
+  full in Grounded, because it is the answer to a specific question — how to make a player
+  feel the camera slipping without taking the camera away — and a player who cannot stand
+  their aim being touched can still have this. Deterministic, frozen while dying.
 
 ## Deliberate non-goals
 

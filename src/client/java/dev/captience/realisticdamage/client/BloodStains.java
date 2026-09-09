@@ -55,10 +55,9 @@ import org.jspecify.annotations.Nullable;
 public final class BloodStains {
 	private BloodStains() {}
 
-	/** The four splat sprites sit after the four drop sprites in {@code blood.json}. */
-	private static final int SPLAT_SPRITE_OFFSET = 4;
-	/** ...and the four pool sprites after those. */
-	private static final int POOL_SPRITE_OFFSET = 8;
+	/** The four splat sprites sit after the four drop sprites in {@code blood.json}, and the pools after those. */
+	private static final int SPLAT_SPRITE_OFFSET = BloodEmitter.SPLAT_SPRITE_OFFSET;
+	private static final int POOL_SPRITE_OFFSET = BloodEmitter.POOL_SPRITE_OFFSET;
 	private static final int SPRITE_VARIANTS = 4;
 
 	private static @Nullable SpriteSet sprites;
@@ -131,6 +130,13 @@ public final class BloodStains {
 		double sx = x + normal.getX() * Balance.STAIN_SURFACE_OFFSET;
 		double sy = y + normal.getY() * Balance.STAIN_SURFACE_OFFSET;
 		double sz = z + normal.getZ() * Balance.STAIN_SURFACE_OFFSET;
+		// A surface under water takes no mark: the blood disperses into the
+		// water instead (see BloodDrop). A falling drop has already dissolved
+		// before it can get here, so this catches the other two callers — a
+		// body wading against a wall, and a wall run shedding into a pool.
+		if (!level.getFluidState(BlockPos.containing(sx, sy, sz)).isEmpty()) {
+			return;
+		}
 
 		BloodStain thirsty = findMergeTarget(sx, sy, sz, face, true);
 		if (thirsty != null) {

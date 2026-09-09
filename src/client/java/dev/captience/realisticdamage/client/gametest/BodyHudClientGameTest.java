@@ -2,7 +2,9 @@ package dev.captience.realisticdamage.client.gametest;
 
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.client.Afterimage;
 import dev.captience.realisticdamage.client.BodyHud;
+import dev.captience.realisticdamage.client.CameraMotion;
 import dev.captience.realisticdamage.client.BodyInspector;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
 import dev.captience.realisticdamage.client.ClientState;
@@ -121,7 +123,23 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			if (context.computeOnClient(client -> ConsciousnessEffects.blurRequestedLastFrame())) {
 				throw new AssertionError("the blur fired in mid-band, at consciousness " + midband[0]);
 			}
+			// The ghost is a post chain now (1.6.1), not a HUD blit: a strength
+			// being asked for proves nothing unless the chain actually ran on the
+			// world target. Frames processed has to move while the strength is up.
+			long ghostFrames = context.computeOnClient(client -> Afterimage.framesProcessed());
+			context.waitTicks(3);
+			long ghostFramesLater = context.computeOnClient(client -> Afterimage.framesProcessed());
+			if (ghostFramesLater <= ghostFrames) {
+				throw new AssertionError("the afterimage chain never ran while a ghost of "
+						+ midband[2] + " was asked for");
+			}
 			context.takeScreenshot("rd_18_midladder");
+			// A trail needs motion: snap the view sideways and shoot the next frame,
+			// where the horizon and the hand from the frame before should still be
+			// visible under the new ones.
+			context.runOnClient(client -> client.player.setYRot(client.player.getYRot() + 30.0F));
+			context.waitTicks(1);
+			context.takeScreenshot("rd_18b_midladder_turning");
 
 			// Every sensory effect keeps its own switch. Turning these two off has
 			// to actually stop them, not merely quieten them.
@@ -135,6 +153,12 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			if (mutedAlpha != 0 || mutedGhost != 0.0) {
 				throw new AssertionError("sliders at zero still drew " + mutedAlpha + "/255 and "
 						+ mutedGhost);
+			}
+			// ...and off means the chain stops running, not merely blending at zero.
+			long mutedFrames = context.computeOnClient(client -> Afterimage.framesProcessed());
+			context.waitTicks(3);
+			if (context.computeOnClient(client -> Afterimage.framesProcessed()) != mutedFrames) {
+				throw new AssertionError("the afterimage chain kept running with its slider at zero");
 			}
 			// The config is a singleton shared with every other client gametest.
 			context.runOnClient(client -> ClientEffectsConfig.load());
@@ -176,6 +200,74 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			});
 			context.waitTicks(1);
 			context.takeScreenshot("rd_11_impact");
+			// The blow has to move the picture as well as the crosshair (1.6.1):
+			// the view spring must be displaced within a couple of frames of the
+			// payload arriving, and none of that displacement may be on the aim,
+			// which is the whole reason it exists.
+			float[] aim = context.computeOnClient(client -> new float[] {
+					client.player.getXRot(), client.player.getYRot()});
+			context.waitTicks(1);
+			double[] view = context.computeOnClient(client -> new double[] {
+					CameraMotion.lastPitch(), CameraMotion.lastRoll()});
+			if (Math.abs(view[0]) < 0.05 && Math.abs(view[1]) < 0.05) {
+				throw new AssertionError("a mace blow left the view spring at rest: pitch " + view[0]
+						+ ", roll " + view[1]);
+			}
+			// The aim kick moves the crosshair on purpose; the view spring must
+			// then be settling on its own. Wait it out and the picture returns to
+			// where the aim is, which is the property a spring has and a scripted
+			// lurch does not.
+			context.waitTicks(40);
+			double[] settled = context.computeOnClient(client -> new double[] {
+					CameraMotion.lastPitch(), CameraMotion.lastRoll()});
+			if (Math.abs(settled[0]) > 0.3 || Math.abs(settled[1]) > 0.3) {
+				throw new AssertionError("two seconds after a blow the view spring is still at pitch "
+						+ settled[0] + ", roll " + settled[1]);
+			}
+
+			// The sway: near collapse the horizon tilts on its own, and with its
+			// slider at zero it does not — while the aim stays exactly put, because
+			// this is the camera effect that never touches it.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.drainConsciousness(88.0);   // about 12: deep in the sway band
+			});
+			context.runOnClient(client -> {
+				client.player.setXRot(10.0F);
+				client.player.setYRot(0.0F);
+			});
+			context.waitTicks(15);
+			double swayRoll = context.computeOnClient(client -> CameraMotion.lastRoll());
+			float[] aimAfterSway = context.computeOnClient(client -> new float[] {
+					client.player.getXRot(), client.player.getYRot()});
+			if (Math.abs(swayRoll) < 0.05) {
+				throw new AssertionError("near collapse the horizon did not tilt: roll " + swayRoll);
+			}
+			// ...and the tilt has to reach the picture. The value above is what the
+			// motion asked for; this is whether the view hook carried it. The first
+			// build injected at the wrong point of vanilla's hurt tilt and applied
+			// nothing outside a hurt animation, which only the screenshot showed.
+			long applied = context.computeOnClient(client -> CameraMotion.applications());
+			context.waitTicks(3);
+			if (context.computeOnClient(client -> CameraMotion.applications()) <= applied) {
+				throw new AssertionError("the head sway was computed but never applied to the view");
+			}
+			// Camera Drift is zero in a default config, so nothing else in the mod
+			// should be moving the aim here; the sway certainly must not be.
+			if (Math.abs(aimAfterSway[0] - 10.0F) > 0.01F || Math.abs(aimAfterSway[1]) > 0.01F) {
+				throw new AssertionError("the head sway moved the aim: pitch " + aimAfterSway[0]
+						+ ", yaw " + aimAfterSway[1]);
+			}
+			context.takeScreenshot("rd_20_sway");
+			context.runOnClient(client -> ClientEffectsConfig.get().cameraSwayIntensityValue = 0.0);
+			context.waitTicks(3);
+			double mutedSway = context.computeOnClient(client -> CameraMotion.lastRoll());
+			if (mutedSway != 0.0) {
+				throw new AssertionError("Head Sway at zero still rolled the view by " + mutedSway);
+			}
+			context.runOnClient(client -> ClientEffectsConfig.load());
+			mutate(singleplayer, RealisticDamageData::reset);
+			context.waitTicks(10);
 
 			// Near-death on the ordinary health bar, body otherwise fine: the red
 			// vignette must still read (the "one heart and nothing happens" case).

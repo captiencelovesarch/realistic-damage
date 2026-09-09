@@ -215,6 +215,24 @@ public final class ClientEffectsConfig {
 	/** Grounded preset: the camera sways and sags as consciousness fades. */
 	public double cameraDriftIntensity = 0.0;
 	/**
+	 * The horizon tilting, the head nodding into a microsleep, the slump of
+	 * collapse (1.6.1) — all of it on the view only, never on the aim. See
+	 * {@link CameraMotion}. Separate from Camera Drift above because they answer
+	 * different complaints: drift moves the crosshair, this moves the picture,
+	 * and a player who cannot stand having their aim touched can still have
+	 * this. On by default at a restrained level; the Grounded preset takes it
+	 * all the way.
+	 *
+	 * <p>Boxed and migrated like the other post-1.0 controls: seeded from the
+	 * vignette so a panic-buttoned config stays silent across the upgrade.
+	 */
+	public Double cameraSwayIntensityValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double cameraSway() {
+		return cameraSwayIntensityValue == null ? 0.7 : cameraSwayIntensityValue;
+	}
+	/**
 	 * Which set of injury sounds to play: the muted set that sits inside
 	 * vanilla's palette, or the visceral set that does not. Presentation only,
 	 * so each player picks their own — the server never decides this.
@@ -233,6 +251,7 @@ public final class ClientEffectsConfig {
 		heartbeatVolume = 1.0;
 		fullBlackUnconscious = false;
 		cameraDriftIntensity = 0.0;
+		cameraSwayIntensityValue = 0.55;
 		desaturationIntensity = 0.7;
 		distortionIntensity = 0.5;
 		visceralInjurySounds = false;
@@ -260,6 +279,7 @@ public final class ClientEffectsConfig {
 		heartbeatVolume = 1.0;
 		fullBlackUnconscious = true;
 		cameraDriftIntensity = 1.0;
+		cameraSwayIntensityValue = 1.0;
 		desaturationIntensity = 1.0;
 		distortionIntensity = 1.0;
 		visceralInjurySounds = true;
@@ -287,6 +307,7 @@ public final class ClientEffectsConfig {
 		ringingVolume = 0.0;
 		heartbeatVolume = 0.0;
 		cameraDriftIntensity = 0.0;
+		cameraSwayIntensityValue = 0.0;
 		desaturationIntensity = 0.0;
 		distortionIntensity = 0.0;
 		mufflingIntensity = 0.0;
@@ -346,6 +367,10 @@ public final class ClientEffectsConfig {
 		}
 		if (deathIntensityValue == null) {
 			deathIntensityValue = vignetteIntensity;
+		}
+		if (cameraSwayIntensityValue == null) {
+			// Zero for a silenced config, a restrained default for anyone else.
+			cameraSwayIntensityValue = vignetteIntensity <= 0.0 ? 0.0 : 0.7 * Math.min(1.0, vignetteIntensity);
 		}
 	}
 

@@ -292,6 +292,28 @@ wall transfers blood to it; and a large wet wall mark sheds a gravity-driven run
 before it dries. These are bounded client presentation, not persistent block
 state, so blood remains a readout rather than a save-file decoration.
 
+## Shipped in 1.6.1
+
+The first playtest pass over Consequence, and the roadmap's own principle applied — fix
+what exists before adding what doesn't.
+
+- **Death inherits the ladder.** Dying at low consciousness used to clear the screen on
+  the death frame and dim it again from nothing. The last living frame is now the floor
+  the death look builds on; nothing on the death screen may be lighter than the frame
+  before it.
+- **Afterimages, actually.** The old one was a tinted nausea texture with a pulse. The new
+  one is a post chain with a persistent history target: the previous frames really do
+  trail behind the current one, frame-rate corrected, from the concussion floor down to
+  the blur.
+- **Blood on your own first-person arm**, from the same meshes and paint call as the
+  third-person body, so the two cannot disagree.
+- **Blood disperses in water** instead of sinking to the pool floor and marking it, and
+  burns off in lava.
+- **The camera moves as a picture.** Impacts kick a view-only spring — roll, pitch, yaw,
+  a shove of the eye, a shake for blasts — on top of the existing aim kick, and the
+  horizon sways, nods and slumps as consciousness fails, without the aim moving at all.
+  New **Head Sway** slider; the spring rides Impact Shock and vanilla's Damage Tilt.
+
 ## 1.7: Anatomy for everyone
 
 Mobs get bodies. Deliberately last, because it doubles the surface area of

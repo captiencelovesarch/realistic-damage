@@ -152,10 +152,14 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						() -> config.impactIntensity, value -> config.impactIntensity = value));
 		// Its own row: this is the only slider here that changes where the player
 		// physically ends up, so it should not read as one more screen effect.
+		// Head Sway shares it because it is the opposite statement — the one
+		// camera effect that never touches the aim — and the two belong side by
+		// side for a player deciding how much of their control to give up.
 		this.list.addSmall(
 				slider("realisticdamage.config.stumble",
 						config::stumbleIntensity, value -> config.stumbleIntensityValue = value),
-				null);
+				slider("realisticdamage.config.camera_sway",
+						config::cameraSway, value -> config.cameraSwayIntensityValue = value));
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.sound"));
 		this.list.addSmall(

@@ -109,26 +109,26 @@ import net.minecraft.world.entity.player.PlayerModelType;
  * ModelPart.render} applies internally before compiling its cubes.
  */
 public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
-	private static final Identifier TEXTURE =
+	static final Identifier TEXTURE =
 			Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/blood_body.png");
 	/** Old injuries, in the same vanilla skin UV layout as the blood overlay. */
-	private static final Identifier SCAR_TEXTURE =
+	static final Identifier SCAR_TEXTURE =
 			Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/scar_body.png");
 	/** Below this the stain is not worth a draw call. */
-	private static final float VISIBLE = 0.02F;
+	static final float VISIBLE = 0.02F;
 	/**
 	 * How far off the skin the blood sits, in model units. Slightly proud so it
 	 * cannot z-fight the base layer, and far inside the overlay's 0.25 so it can
 	 * never read as clothing.
 	 */
-	private static final float SKIN_OFFSET = 0.01F;
+	static final float SKIN_OFFSET = 0.01F;
 	/**
 	 * Where the scars sit: half the blood's stand-off, so the seam is on the
 	 * body and the blood shell encloses it rather than sharing a surface with
 	 * it. Half rather than some smaller sliver because the gap has to survive
 	 * being multiplied by the model's scale and squashed into a depth buffer.
 	 */
-	private static final float SCAR_OFFSET = SKIN_OFFSET / 2.0F;
+	static final float SCAR_OFFSET = SKIN_OFFSET / 2.0F;
 
 	/** Translucent buckets, drawn in ascending order. See the class javadoc. */
 	private static final int ORDER_SCARS = 1;
@@ -245,30 +245,45 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 			// The pose goes on the stack, which is copied per submit, rather than
 			// onto our shared meshes, which are not.
 			source.translateAndRotate(poseStack);
-			if (scar != ScarLevel.NONE) {
-				boolean lost = scar == ScarLevel.DESTROYED;
-				float[] tone = lost ? SCAR_TONE_DESTROYED : SCAR_TONE_BROKEN;
-				// Through the accessor rather than past it, so the number the test
-				// reads is the number that was drawn.
-				float alpha = (float) (strength * scarWeight(scar));
-				collector.order(ORDER_SCARS).submitModelPart(scarParts[part.ordinal()], poseStack,
-						RenderTypes.entityTranslucent(SCAR_TEXTURE), lightCoords, overlay, null,
-						ARGB.colorFromFloat(alpha, tone[0], tone[1], tone[2]), null, 0);
-				scarSubmitCounts[scar.ordinal()]++;
-			}
-			if (level >= VISIBLE) {
-				// Blood on a body dries where it lands. Wetness trails the amount,
-				// so a limb that is actively bleeding looks fresh and one that
-				// stopped an hour ago looks like it stopped an hour ago.
-				float[] colour = BloodPalette.colour(Math.min(1.0, level * 1.4));
-				int alpha = (int) Math.clamp(level * strength * 235.0, 0.0, 235.0);
-				if (alpha > 2) {
-					collector.order(ORDER_BLOOD).submitModelPart(bloodParts[part.ordinal()], poseStack,
-							RenderTypes.entityTranslucent(TEXTURE), lightCoords, overlay, null,
-							ARGB.colorFromFloat(alpha / 255.0F, colour[0], colour[1], colour[2]), null, 0);
-				}
-			}
+			paint(collector, poseStack, scarParts[part.ordinal()], bloodParts[part.ordinal()],
+					scar, level, strength, lightCoords, overlay);
 			poseStack.popPose();
+		}
+	}
+
+	/**
+	 * One region's two shells, scar under blood, onto an already-posed stack.
+	 *
+	 * <p>Shared with {@link FirstPersonBlood}, which paints the same arm onto
+	 * the first-person hand: the tones, alphas, buckets and render types are
+	 * the statement of what blood on a body looks like, and the hand you are
+	 * looking down at must not be allowed to disagree with the arm everyone
+	 * else sees.
+	 */
+	static void paint(SubmitNodeCollector collector, PoseStack poseStack, ModelPart scarPart,
+			ModelPart bloodPart, ScarLevel scar, float level, double strength, int lightCoords, int overlay) {
+		if (scar != ScarLevel.NONE) {
+			boolean lost = scar == ScarLevel.DESTROYED;
+			float[] tone = lost ? SCAR_TONE_DESTROYED : SCAR_TONE_BROKEN;
+			// Through the accessor rather than past it, so the number the test
+			// reads is the number that was drawn.
+			float alpha = (float) (strength * scarWeight(scar));
+			collector.order(ORDER_SCARS).submitModelPart(scarPart, poseStack,
+					RenderTypes.entityTranslucent(SCAR_TEXTURE), lightCoords, overlay, null,
+					ARGB.colorFromFloat(alpha, tone[0], tone[1], tone[2]), null, 0);
+			scarSubmitCounts[scar.ordinal()]++;
+		}
+		if (level >= VISIBLE) {
+			// Blood on a body dries where it lands. Wetness trails the amount,
+			// so a limb that is actively bleeding looks fresh and one that
+			// stopped an hour ago looks like it stopped an hour ago.
+			float[] colour = BloodPalette.colour(Math.min(1.0, level * 1.4));
+			int alpha = (int) Math.clamp(level * strength * 235.0, 0.0, 235.0);
+			if (alpha > 2) {
+				collector.order(ORDER_BLOOD).submitModelPart(bloodPart, poseStack,
+						RenderTypes.entityTranslucent(TEXTURE), lightCoords, overlay, null,
+						ARGB.colorFromFloat(alpha / 255.0F, colour[0], colour[1], colour[2]), null, 0);
+			}
 		}
 	}
 
@@ -283,7 +298,7 @@ public class BloodBodyLayer extends RenderLayer<AvatarRenderState, PlayerModel> 
 	 * differs, and the moment they are described by two copies of this method
 	 * they can drift apart in a way no test would notice.
 	 */
-	private static ModelPart[] bake(boolean slimArms, float offset) {
+	static ModelPart[] bake(boolean slimArms, float offset) {
 		CubeDeformation g = new CubeDeformation(offset);
 		MeshDefinition mesh = new MeshDefinition();
 		PartDefinition root = mesh.getRoot();

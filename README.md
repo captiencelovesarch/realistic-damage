@@ -94,9 +94,11 @@ Blood and Consciousness are still only ever named ("heavy loss", "fading"), neve
 numbered. Being surprised by your own blood level is the point of hiding it.
 
 As consciousness fails the world genuinely changes rather than being overlaid: colour
-drains out of it, the view warps and blurs, your aim goes slippery and slow, your head
-sags, and the world's audio is low-passed into a dull murmur behind a ringing tone and a
-heartbeat. What the screen does tells you *which* thing is wrong — the colour drains for
+drains out of it, the view warps, doubles and blurs — the frames you just saw trail behind
+the one you're seeing — your aim goes slippery and slow, the horizon starts to tilt and
+your head nods, and the world's audio is low-passed into a dull murmur behind a ringing
+tone and a heartbeat. Being hit moves the picture as well as the crosshair: a blow rolls
+and shoves the view and it springs back, a landing drops it, a blast shakes it. What the screen does tells you *which* thing is wrong — the colour drains for
 blood loss and the world warps for head trauma — and how a blow looked tells you what
 landed: a cut throws blood across the camera, a puncture pinches the view shut, a club
 leaves it ringing and doubled, a blast whites everything out and takes your hearing with
@@ -121,7 +123,8 @@ Press **K** (rebindable) or use Mod Menu for accessibility settings. Every one o
 effects has its own slider and can be turned off individually without disabling
 unconsciousness itself, and there's a one-click "turn off all sensory effects" button.
 Slow aim and sloppy aim are separate sliders (**Look Slowdown** and **Look Drift**), so
-you can have one without the other.
+you can have one without the other, and the camera effects that never touch your aim
+(**Head Sway**, **Impact Shock**) are separate from the ones that do (**Camera Drift**).
 Two presets: **Arcade** (limb destruction, readable effects) and **Grounded** (no
 destruction, full blackout, camera drift, everything at full strength).
 
