@@ -9,6 +9,7 @@ import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.client.BloodBody;
 import dev.captience.realisticdamage.client.BloodBodyLayer;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
+import dev.captience.realisticdamage.client.LimbMeshes;
 import dev.captience.realisticdamage.client.SeveredLimbRenderer;
 import dev.captience.realisticdamage.damage.DestructionLogic;
 import dev.captience.realisticdamage.entity.SeveredLimb;
@@ -49,7 +50,7 @@ public class MobAnatomyClientGameTest implements FabricClientGameTest {
 
 			// A zombie three blocks ahead, wounded on the left arm and missing
 			// its right leg, standing still so the shot is repeatable.
-			spawn(singleplayer, EntityTypes.ZOMBIE, 3.0, data -> {
+			spawn(singleplayer, EntityTypes.ZOMBIE, 0.0, 3.0, data -> {
 				data.addWound(BodyPart.LEFT_ARM, WoundSeverity.CRITICAL);
 				data.part(BodyPart.RIGHT_LEG).setDestroyed(true);
 			});
@@ -109,21 +110,24 @@ public class MobAnatomyClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("rd_mob_01_zombie_severed");
 
 			// A skeleton beside it missing its drawing arm: the stump is a bone,
-			// two pixels wide, on the skeleton's own texture.
-			spawn(singleplayer, EntityTypes.SKELETON, 5.0, data -> data.part(BodyPart.RIGHT_ARM).setDestroyed(true));
+			// two pixels wide, on the skeleton's own texture. Counted by build, so
+			// the zombie's stumps still being drawn cannot stand in for it — the
+			// first version counted every stump and would have passed with the
+			// skeleton hidden behind the zombie, which is where it was standing.
+			spawn(singleplayer, EntityTypes.SKELETON, 2.0, 4.0, data -> data.part(BodyPart.RIGHT_ARM).setDestroyed(true));
 			context.waitTicks(30);
-			long boneStumps = context.computeOnClient(client -> BloodBodyLayer.stumpSubmits());
+			long boneStumps = context.computeOnClient(client -> BloodBodyLayer.stumpSubmits(LimbMeshes.Kind.THIN));
 			context.waitTicks(5);
-			if (context.computeOnClient(client -> BloodBodyLayer.stumpSubmits()) <= boneStumps) {
-				throw new AssertionError("the skeleton's missing arm drew no stump");
+			if (context.computeOnClient(client -> BloodBodyLayer.stumpSubmits(LimbMeshes.Kind.THIN)) <= boneStumps) {
+				throw new AssertionError("the skeleton's missing arm drew no bone stump");
 			}
 			context.takeScreenshot("rd_mob_02_skeleton_stump");
 		}
 	}
 
-	/** Spawns a still, persistent mob {@code ahead} blocks in front of the player with the given body. */
-	private static <T extends Mob> void spawn(TestSingleplayerContext singleplayer, EntityType<T> type, double ahead,
-			java.util.function.Consumer<RealisticDamageData> body) {
+	/** Spawns a still, persistent mob {@code ahead} blocks in front of and {@code aside} to the player's left, with the given body. */
+	private static <T extends Mob> void spawn(TestSingleplayerContext singleplayer, EntityType<T> type, double aside,
+			double ahead, java.util.function.Consumer<RealisticDamageData> body) {
 		singleplayer.getServer().runOnServer(server -> {
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 				ServerLevel level = player.level();
@@ -131,8 +135,11 @@ public class MobAnatomyClientGameTest implements FabricClientGameTest {
 				if (mob == null) {
 					throw new AssertionError("could not create " + type);
 				}
-				mob.setPos(player.getX(), player.getY(), player.getZ() + ahead);
+				mob.setPos(player.getX() + aside, player.getY(), player.getZ() + ahead);
+				// Face the camera with head and body both: a body whose head is
+				// left at zero swings round to follow it and shows its back.
 				mob.setYRot(180.0F);
+				mob.setYHeadRot(180.0F);
 				mob.yBodyRot = 180.0F;
 				mob.setNoAi(true);
 				mob.setPersistenceRequired();

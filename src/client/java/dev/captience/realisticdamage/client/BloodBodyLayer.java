@@ -164,8 +164,14 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 	private final ModelPart[][] stumpCapByKind = new ModelPart[LimbMeshes.Kind.values().length][];
 	private final ModelPart[][] stumpBloodByKind = new ModelPart[LimbMeshes.Kind.values().length][];
 
-	/** Stumps drawn this session; read by the client gametest. */
+	/** Stumps drawn this session, in total and per limb build; read by the client gametest. */
 	private static long stumpSubmitCount;
+	private static final long[] stumpSubmitsByKind = new long[LimbMeshes.Kind.values().length];
+
+	/** Stumps of one build drawn this session — a bone's stump is provably a bone's, not a zombie's. */
+	public static long stumpSubmits(LimbMeshes.Kind kind) {
+		return stumpSubmitsByKind[kind.ordinal()];
+	}
 	/** Blood or scar shells drawn on something that is not a player (1.7); read by the client gametest. */
 	private static long mobSubmitCount;
 
@@ -342,6 +348,7 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 		ModelPart[] shells = meshes(stumpBloodByKind, kind, k -> LimbMeshes.stumps(k, SKIN_OFFSET));
 		submitStump(collector, poseStack, skin, stumps[part.ordinal()], caps[part.ordinal()],
 				shells[part.ordinal()], bloodLevel, strength, lightCoords, overlay);
+		stumpSubmitsByKind[kind.ordinal()]++;
 	}
 
 	static void submitStump(SubmitNodeCollector collector, PoseStack poseStack, Identifier skin,
