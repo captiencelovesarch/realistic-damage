@@ -1,6 +1,7 @@
 package dev.captience.realisticdamage.client.mixin;
 
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.client.HiddenLimbs;
 import dev.captience.realisticdamage.client.InjuryPose;
 import dev.captience.realisticdamage.client.LimbStateExtractor;
 import dev.captience.realisticdamage.client.LimbStateHolder;
@@ -10,6 +11,7 @@ import net.minecraft.client.renderer.entity.state.IllagerRenderState;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -21,7 +23,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * own, since half of a crossed pair is not a thing the model can draw.
  */
 @Mixin(IllagerModel.class)
-public abstract class IllagerModelMixin {
+public abstract class IllagerModelMixin implements HiddenLimbs {
+	@Unique
+	private int realisticdamage$hiddenLimbs;
+
+	@Override
+	public int realisticdamage$hidden() {
+		return this.realisticdamage$hiddenLimbs;
+	}
+
+	@Override
+	public void realisticdamage$setHidden(int mask) {
+		this.realisticdamage$hiddenLimbs = mask;
+	}
+
 	@Shadow
 	@Final
 	private ModelPart arms;
@@ -53,18 +68,9 @@ public abstract class IllagerModelMixin {
 			this.leftArm.zRot = -0.1F;
 			this.rightArm.zRot = 0.1F;
 		}
-		if (leftGone) {
-			this.leftArm.visible = false;
-		}
-		if (rightGone) {
-			this.rightArm.visible = false;
-		}
-		if (LimbStateExtractor.gone(destroyed, BodyPart.LEFT_LEG)) {
-			this.leftLeg.visible = false;
-		}
-		if (LimbStateExtractor.gone(destroyed, BodyPart.RIGHT_LEG)) {
-			this.rightLeg.visible = false;
-		}
+		// Arms are re-shown by vanilla every pose; legs are not, so the mask
+		// remembers what was hidden and restores it for the next body.
+		HiddenLimbs.apply(this, destroyed, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg);
 		InjuryPose.applyParts(holder, this.arms.visible ? null : this.leftArm, this.arms.visible ? null : this.rightArm,
 				this.leftLeg, this.rightLeg, state.isRiding ? 0.0F : 1.0F);
 	}

@@ -1,12 +1,13 @@
 package dev.captience.realisticdamage.client.mixin;
 
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.client.HiddenLimbs;
 import dev.captience.realisticdamage.client.InjuryPose;
-import dev.captience.realisticdamage.client.LimbStateExtractor;
 import dev.captience.realisticdamage.client.LimbStateHolder;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -35,7 +36,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * carries zero masks and costs two reads.
  */
 @Mixin(HumanoidModel.class)
-public abstract class HumanoidModelMixin {
+public abstract class HumanoidModelMixin implements HiddenLimbs {
+	@Unique
+	private int realisticdamage$hiddenLimbs;
+
+	@Override
+	public int realisticdamage$hidden() {
+		return this.realisticdamage$hiddenLimbs;
+	}
+
+	@Override
+	public void realisticdamage$setHidden(int mask) {
+		this.realisticdamage$hiddenLimbs = mask;
+	}
+
 	// The erased descriptor is explicit because HumanoidModel<T extends
 	// HumanoidRenderState> generates a bridge method, and an unqualified name
 	// would be ambiguous between the two.
@@ -46,21 +60,10 @@ public abstract class HumanoidModelMixin {
 		InjuryPose.apply(state, model);
 		// A destroyed limb is gone on every humanoid (1.7). The player model
 		// hides its sleeves and pants as well in PlayerModelMixin, which runs
-		// after this; here is the base part, which is all a mob has.
-		int destroyed = ((LimbStateHolder) state).realisticdamage$destroyedMask();
-		if (destroyed != 0) {
-			if (LimbStateExtractor.gone(destroyed, BodyPart.LEFT_ARM)) {
-				model.leftArm.visible = false;
-			}
-			if (LimbStateExtractor.gone(destroyed, BodyPart.RIGHT_ARM)) {
-				model.rightArm.visible = false;
-			}
-			if (LimbStateExtractor.gone(destroyed, BodyPart.LEFT_LEG)) {
-				model.leftLeg.visible = false;
-			}
-			if (LimbStateExtractor.gone(destroyed, BodyPart.RIGHT_LEG)) {
-				model.rightLeg.visible = false;
-			}
-		}
+		// after this; here is the base part, which is all a mob has. Through
+		// HiddenLimbs, because this model instance draws every mob of its type
+		// and must not carry one body's missing leg onto the next.
+		HiddenLimbs.apply(this, ((LimbStateHolder) state).realisticdamage$destroyedMask(),
+				model.leftArm, model.rightArm, model.leftLeg, model.rightLeg);
 	}
 }

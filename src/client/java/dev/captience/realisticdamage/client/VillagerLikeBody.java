@@ -1,6 +1,5 @@
 package dev.captience.realisticdamage.client;
 
-import dev.captience.realisticdamage.body.BodyPart;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
@@ -20,13 +19,7 @@ public final class VillagerLikeBody {
 		ModelPart leftLeg = root.getChild("left_leg");
 		ModelPart rightLeg = root.getChild("right_leg");
 		LimbStateHolder holder = (LimbStateHolder) state;
-		int destroyed = holder.realisticdamage$destroyedMask();
-		if (LimbStateExtractor.gone(destroyed, BodyPart.LEFT_LEG)) {
-			leftLeg.visible = false;
-		}
-		if (LimbStateExtractor.gone(destroyed, BodyPart.RIGHT_LEG)) {
-			rightLeg.visible = false;
-		}
+		HiddenLimbs.apply((HiddenLimbs) model, holder.realisticdamage$destroyedMask(), null, null, leftLeg, rightLeg);
 		InjuryPose.applyParts(holder, null, null, leftLeg, rightLeg, 1.0F);
 	}
 }

@@ -157,6 +157,56 @@ public class MobAnatomyClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("a collapsed zombie was never laid out");
 			}
 			context.takeScreenshot("rd_mob_04_zombie_collapsed");
+
+			// The shared-model trap (alpha.3): one ZombieModel draws every zombie,
+			// and a leg hidden for one must not stay hidden for the next. Pose the
+			// renderer's own model with a missing-leg body and then a whole one.
+			context.runOnClient(client -> {
+				Zombie zombie = client.level.getEntitiesOfClass(Zombie.class,
+						client.player.getBoundingBox().inflate(16.0)).getFirst();
+				@SuppressWarnings("unchecked")
+				var renderer = (net.minecraft.client.renderer.entity.LivingEntityRenderer<Zombie,
+						net.minecraft.client.renderer.entity.state.ZombieRenderState,
+						net.minecraft.client.model.monster.zombie.ZombieModel<net.minecraft.client.renderer.entity.state.ZombieRenderState>>)
+						client.getEntityRenderDispatcher().getRenderer(zombie);
+				var model = renderer.getModel();
+				var hurt = renderer.createRenderState();
+				((dev.captience.realisticdamage.client.LimbStateHolder) hurt)
+						.realisticdamage$setDestroyedMask(1 << BodyPart.LEFT_LEG.ordinal());
+				var whole = renderer.createRenderState();
+				model.setupAnim(hurt);
+				if (model.leftLeg.visible) {
+					throw new AssertionError("a body missing its left leg was drawn with one");
+				}
+				model.setupAnim(whole);
+				if (!model.leftLeg.visible) {
+					throw new AssertionError("the next zombie through the same model lost its leg too");
+				}
+			});
+			// And the illager model, whose legs vanilla never re-shows either.
+			context.runOnClient(client -> {
+				var pillager = client.level.getEntitiesOfClass(net.minecraft.world.entity.monster.illager.Pillager.class,
+						client.player.getBoundingBox().inflate(16.0)).getFirst();
+				@SuppressWarnings("unchecked")
+				var renderer = (net.minecraft.client.renderer.entity.LivingEntityRenderer<net.minecraft.world.entity.monster.illager.Pillager,
+						net.minecraft.client.renderer.entity.state.IllagerRenderState,
+						net.minecraft.client.model.monster.illager.IllagerModel<net.minecraft.client.renderer.entity.state.IllagerRenderState>>)
+						client.getEntityRenderDispatcher().getRenderer(pillager);
+				var model = renderer.getModel();
+				var leg = model.root().getChild("right_leg");
+				var hurt = renderer.createRenderState();
+				((dev.captience.realisticdamage.client.LimbStateHolder) hurt)
+						.realisticdamage$setDestroyedMask(1 << BodyPart.RIGHT_LEG.ordinal());
+				var whole = renderer.createRenderState();
+				model.setupAnim(hurt);
+				if (leg.visible) {
+					throw new AssertionError("a pillager missing its right leg was drawn with one");
+				}
+				model.setupAnim(whole);
+				if (!leg.visible) {
+					throw new AssertionError("the next pillager through the same model lost its leg too");
+				}
+			});
 		}
 	}
 
