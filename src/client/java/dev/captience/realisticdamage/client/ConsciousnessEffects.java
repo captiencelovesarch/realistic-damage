@@ -441,6 +441,9 @@ public final class ConsciousnessEffects {
 				black = Math.max(black, dim * 110.0 / 255.0);
 			}
 		}
+		// Held while the body is still moving (1.7): the fall is what the death
+		// camera exists to show. Never below what the living ladder had drawn.
+		black = Math.max(floorBlackout, Math.min(black, DeathCamera.blackCap()));
 		blackoutLevel = black;
 		topBlackout = black;
 	}

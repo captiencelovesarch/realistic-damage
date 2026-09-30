@@ -5,6 +5,7 @@ import com.mojang.blaze3d.resource.CrossFrameResourcePool;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.captience.realisticdamage.client.Afterimage;
 import dev.captience.realisticdamage.client.CameraMotion;
+import dev.captience.realisticdamage.client.DeathCamera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
@@ -47,6 +48,7 @@ public abstract class GameRendererFrameMixin {
 		// The spring is stepped here, after this frame's bobHurt has read it, so
 		// the picture lags the impulse by one frame and never by a partial one.
 		CameraMotion.frame(deltaTracker.getGameTimeDeltaTicks());
+		DeathCamera.frame(deltaTracker.getGameTimeDeltaTicks());
 	}
 
 	// RETURN, not TAIL: bobHurt returns early whenever the player is not in a
@@ -57,5 +59,16 @@ public abstract class GameRendererFrameMixin {
 	@Inject(method = "bobHurt", at = @At("RETURN"))
 	private void realisticdamage$cameraMotion(CameraRenderState cameraState, PoseStack poseStack, CallbackInfo ci) {
 		CameraMotion.apply(poseStack);
+		// The collapse on top (1.7): a dead body's view rolls over and sags.
+		DeathCamera.apply(poseStack);
+	}
+
+	// A body on the floor is not holding its hand up in front of its face.
+	@Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
+	private void realisticdamage$deadHand(CameraRenderState cameraState, float deltaPartialTick,
+			org.joml.Matrix4fc modelViewMatrix, CallbackInfo ci) {
+		if (DeathCamera.hideHand()) {
+			ci.cancel();
+		}
 	}
 }

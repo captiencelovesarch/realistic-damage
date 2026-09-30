@@ -348,6 +348,14 @@ poses, mob falls, concussed and broken-armed skeletons shooting wide, and blood
 profiles by tag — the skeleton family is bloodless, the undead bleed dark, and
 endermen are wired for purple. Remaining below.
 
+**Death camera** (Sep 30 2026, alpha.4, from a playtest: knocked off a bastion roof
+by a brute, and the view never moved). Vanilla deletes the local player a second
+after death, which froze the camera; now the body keeps its physics until the
+respawn (client-side only, never sent to the server), the view collapses to the
+floor, rolls over and thuds on landing, the blackout holds at 60% until the body
+comes to rest, and the death screen fades in, with its buttons asleep until
+it is nearly visible. One switch, Death Camera, on by default.
+
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here
   shipped early in 1.6.2 and is ready for mobs to reuse.)

@@ -101,6 +101,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			ClientState.tick();
+			DeathCamera.tick();
 			ConsciousnessAudio.tick();
 			MouseInertia.tickFallback();
 			VisionEffects.tick();
@@ -129,6 +130,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			BloodLens.reset();
 			Afterimage.reset();
 			CameraMotion.reset();
+			DeathCamera.reset();
 		});
 	}
 }

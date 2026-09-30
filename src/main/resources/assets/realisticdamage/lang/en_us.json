@@ -165,6 +165,7 @@
 	"realisticdamage.config.blood_style.muted": "Muted",
 	"realisticdamage.config.death": "Dying Fade",
 	"realisticdamage.config.death_style": "Death Style",
+	"realisticdamage.config.death_camera": "Death Camera",
 	"realisticdamage.config.death_style.cinematic": "Cinematic",
 	"realisticdamage.config.death_style.realistic": "Realistic",
 	"realisticdamage.config.scars": "Scars",

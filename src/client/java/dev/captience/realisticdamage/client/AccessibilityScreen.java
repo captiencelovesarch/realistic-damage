@@ -113,6 +113,11 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						.create(0, 0, 150, 20,
 								Component.translatable("realisticdamage.config.death_style"),
 								(button, value) -> config.realisticDeath = value));
+		this.list.addSmall(
+				CycleButton.onOffBuilder(config.deathCamera)
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.death_camera"),
+								(button, value) -> config.deathCamera = value),
+				null);
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.blood"));
 		// The master first and on its own row: everything under it is a share of

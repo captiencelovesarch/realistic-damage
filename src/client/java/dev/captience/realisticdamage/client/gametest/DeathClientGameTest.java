@@ -157,6 +157,9 @@ public class DeathClientGameTest implements FabricClientGameTest {
 			}
 			context.takeScreenshot("rd_death_08_violent_cut");
 
+			// The death screen fades in once the body settles (1.7) and its
+			// buttons wake up with it; a cut this fast outruns them.
+			context.waitTicks(60);
 			context.clickScreenButton("deathScreen.respawn");
 			context.waitTicks(20);
 			if (context.computeOnClient(client -> ClientState.deathViolence()) != 0.0) {

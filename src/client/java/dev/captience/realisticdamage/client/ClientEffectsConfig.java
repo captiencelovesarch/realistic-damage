@@ -203,6 +203,15 @@ public final class ClientEffectsConfig {
 	 */
 	public boolean realisticDeath = false;
 
+	/**
+	 * The camera stays with the body after death (1.7): knockback and gravity
+	 * keep carrying it, the view collapses to the floor, the blackout waits for
+	 * the body to come to rest and the death screen fades in. See
+	 * {@link DeathCamera}. On by default; a plain boolean, so a file from before
+	 * it existed picks up the default.
+	 */
+	public boolean deathCamera = true;
+
 	/** Fracture, destruction and collapse audio. */
 	public double injurySoundVolume = 1.0;
 	/** Real colour drain through vanilla's post-processing. */
@@ -342,6 +351,7 @@ public final class ClientEffectsConfig {
 		injurySoundVolume = 0.0;
 		bloodIntensityValue = 0.0;
 		deathIntensityValue = 0.0;
+		deathCamera = false;
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
