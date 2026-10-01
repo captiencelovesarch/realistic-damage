@@ -135,4 +135,50 @@ class DeathMotionTest {
 		assertTrue(Math.abs(DeathMotion.jerk(shot, 1.0)) > Math.abs(shot.jerk()) * 0.5);
 		assertTrue(Math.abs(DeathMotion.jerk(shot, 12.0)) < Math.abs(shot.jerk()) * 0.05);
 	}
+
+	/**
+	 * "When you die, you just stop in place." A sprint keeps its legs for a few
+	 * strides; a walk for fewer; a sneak and a standstill not at all.
+	 */
+	@Test
+	void aRunningBodyStumbles() {
+		double sprint = DeathMotion.stumbleTicks(DeathKind.BLOW, 0.1, DeathMotion.SPRINT_SPEED);
+		double walk = DeathMotion.stumbleTicks(DeathKind.BLOW, 0.1, 0.216);
+		assertTrue(sprint >= 12.0, "a sprint should stumble about three strides, got " + sprint + " ticks");
+		assertTrue(walk > 0.0 && walk < sprint, "a walk stumbles, less: " + walk);
+		assertEquals(0.0, DeathMotion.stumbleTicks(DeathKind.BLOW, 0.1, 0.065), "a sneak just drops");
+		assertEquals(0.0, DeathMotion.stumbleTicks(DeathKind.BLOW, 0.1, 0.0));
+		assertTrue(DeathMotion.stepPeriod(DeathMotion.SPRINT_SPEED) < DeathMotion.stepPeriod(0.12),
+				"a sprint's strides come quicker than a shuffle's");
+	}
+
+	/** Only the deaths that leave legs under you, and less of it the harder the blow. */
+	@Test
+	void onlyDeathsWithLegsLeftStumble() {
+		for (DeathKind kind : DeathKind.values()) {
+			double t = DeathMotion.stumbleTicks(kind, 0.0, DeathMotion.SPRINT_SPEED);
+			assertEquals(DeathMotion.stumbles(kind), t > 0.0, kind + " stumble");
+		}
+		assertTrue(DeathMotion.stumbleTicks(DeathKind.BLOW, 0.8, DeathMotion.SPRINT_SPEED)
+				< DeathMotion.stumbleTicks(DeathKind.BLOW, 0.1, DeathMotion.SPRINT_SPEED));
+		assertEquals(0.0, DeathMotion.stumbleTicks(DeathKind.BLOW, 1.0, DeathMotion.SPRINT_SPEED), 1.0e-9,
+				"a blow that ends you at once leaves no legs");
+	}
+
+	/** The legs drive less with every stride, and not at all once the stumble is over. */
+	@Test
+	void theStrideFails() {
+		double ticks = 15.0;
+		assertEquals(1.0, DeathMotion.stumbleDrive(0.0, ticks), 1.0e-9);
+		double previous = 1.0;
+		for (double t = 1.0; t < ticks; t += 1.0) {
+			double d = DeathMotion.stumbleDrive(t, ticks);
+			assertTrue(d < previous && d > 0.0, "the drive must fall away steadily, at " + t);
+			previous = d;
+		}
+		assertEquals(0.0, DeathMotion.stumbleDrive(ticks, ticks));
+		assertEquals(0.0, DeathMotion.stumbleDrive(3.0, 0.0));
+		assertEquals(1.0, DeathMotion.forwardLean(DeathMotion.STUMBLE_MAX_TICKS), 1.0e-9);
+		assertEquals(0.0, DeathMotion.forwardLean(0.0), 1.0e-9);
+	}
 }

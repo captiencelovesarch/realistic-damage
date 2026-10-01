@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -80,6 +81,14 @@ public final class DeathCamera {
 	private static final double THUD_PITCH_KICK = 3.0;
 	/** How hard an agonal twitch kicks, degrees a tick. */
 	private static final double TWITCH_KICK = 2.6;
+	/** A stumbling stride: how far the view drops, blocks a tick, and how it rolls and pitches, degrees a tick. */
+	private static final double STEP_DROP = 0.07;
+	private static final double STEP_ROLL_KICK = 3.2;
+	private static final double STEP_PITCH_KICK = 2.4;
+	/** Where a body that fell forward ends up looking: at the floor, close. */
+	private static final double FORWARD_FALL_PITCH = 44.0;
+	/** How far the head tips forward over the strides, before the fall takes over. */
+	private static final double STRIDE_LEAN = 14.0;
 
 	/** Below this horizontal speed, blocks a tick, a body on the ground is still. */
 	private static final double STILL_SPEED = 0.05;
@@ -138,6 +147,21 @@ public final class DeathCamera {
 	private static double tumblePitch;
 	private static boolean airborneSinceDeath;
 	private static double maxTumble;
+
+	/** The run on the last tick alive, blocks a tick, and whether it was on the ground. */
+	private static double aliveDx;
+	private static double aliveDz;
+	private static boolean aliveOnGround;
+	/** The stumble (DeathMotion.stumbleTicks): how long, how fast, which way. */
+	private static double stumbleTicks;
+	private static double stumbleSpeed;
+	private static double stumbleDirX;
+	private static double stumbleDirZ;
+	private static double stepPeriod;
+	private static double nextStep;
+	private static int steps;
+	private static double startX;
+	private static double startZ;
 	private static boolean released;
 	/** What {@link #apply} last put on the view, for the client gametest. */
 	private static double lastRoll;
@@ -161,6 +185,14 @@ public final class DeathCamera {
 			if (tracking) {
 				reset();
 			}
+			if (player != null && !player.isDeadOrDying()) {
+				// The run, measured as distance covered rather than read from the
+				// velocity: the killing blow's motion packet overwrites the velocity
+				// with the knockback alone, and the run is what it erased.
+				aliveDx = player.getX() - player.xo;
+				aliveDz = player.getZ() - player.zo;
+				aliveOnGround = player.onGround();
+			}
 			return;
 		}
 		if (!tracking) {
@@ -171,6 +203,9 @@ public final class DeathCamera {
 			// not always the same one.
 			rollSign = ((Mth.floor(player.getX()) + Mth.floor(player.getZ())) & 1) == 0 ? 1.0 : -1.0;
 			choose();
+			startX = player.getX();
+			startZ = player.getZ();
+			planStumble();
 			// Keep me in the world while I watch it (DeathHold, server side).
 			watch(true);
 			if (profile.impactAtDeath()) {
@@ -184,6 +219,9 @@ public final class DeathCamera {
 		// normally lands first; if it was late, take it while the fall is young.
 		if (ticks <= 4 && (kind != ClientState.deathKind() || profile != chosenFor(ClientState.deathKind()))) {
 			choose();
+			if (steps == 0) {
+				planStumble();
+			}
 		}
 
 		// The void has no floor to land on: stop the body a little below the
@@ -194,11 +232,17 @@ public final class DeathCamera {
 			player.setDeltaMovement(Vec3.ZERO);
 		}
 
+		stumble(player);
 		Vec3 velocity = player.getDeltaMovement();
-		// Fall to the side the blow pushed you, once the knockback has arrived.
-		if (ticks == 3 && velocity.horizontalDistanceSqr() > 1.0e-4) {
+		// Fall to the side the blow pushed you, once the knockback has arrived —
+		// if it pushed you sideways at all; a stumble forward has no side of its
+		// own, and the leg that gave last has already picked one.
+		if (ticks == 3) {
 			Vec3 right = Vec3.directionFromRotation(0.0F, player.getYRot() + 90.0F);
-			rollSign = velocity.x * right.x + velocity.z * right.z >= 0.0 ? 1.0 : -1.0;
+			double lateral = velocity.x * right.x + velocity.z * right.z;
+			if (Math.abs(lateral) > (stumbleTicks > 0.0 ? 0.08 : 0.01)) {
+				rollSign = lateral >= 0.0 ? 1.0 : -1.0;
+			}
 		}
 
 		boolean onGround = player.onGround();
@@ -223,7 +267,7 @@ public final class DeathCamera {
 		stillTicks = ticks >= SETTLE_EARLIEST && !moving ? stillTicks + 1 : 0;
 		// Still, and down: a faint is still folding long after its body stopped
 		// sliding, and the blackout must not close on a view that is still falling.
-		boolean down = ticks >= profile.collapseTicks();
+		boolean down = ticks >= profile.collapseTicks() + collapseDelay();
 		if (!settled && ((stillTicks >= STILL_TICKS && down) || ticks >= SETTLE_LATEST)) {
 			settled = true;
 		}
@@ -254,6 +298,66 @@ public final class DeathCamera {
 	private static void choose() {
 		kind = ClientState.deathKind();
 		profile = chosenFor(kind);
+	}
+
+	/**
+	 * Dying on the run (1.7). The playtest: "when you die, you just stop in
+	 * place" — and so a dead body did: ground friction stops one inside three
+	 * ticks, and the killing blow's knockback replaced the run before that. A
+	 * body that was running keeps its legs for a few failing strides, each one
+	 * lurching harder, and goes down forward onto its face at the end of them.
+	 * Only from the ground (a body in the air already carries its momentum) and
+	 * only for the deaths that leave legs to stumble on ({@link DeathMotion#stumbles}).
+	 */
+	private static void planStumble() {
+		double speed = Math.sqrt(aliveDx * aliveDx + aliveDz * aliveDz);
+		stumbleTicks = aliveOnGround
+				? DeathMotion.stumbleTicks(kind, ClientState.deathViolence(), speed) : 0.0;
+		if (stumbleTicks <= 0.0) {
+			stumbleTicks = 0.0;
+			return;
+		}
+		stumbleSpeed = speed;
+		stumbleDirX = aliveDx / speed;
+		stumbleDirZ = aliveDz / speed;
+		stepPeriod = DeathMotion.stepPeriod(speed);
+		nextStep = stepPeriod * 0.5;
+		// The leg that gives on the last stride is the side you go down on:
+		// strides alternate from the right, fixed, so it follows from the count.
+		int strides = Math.max(1, (int) Math.ceil((stumbleTicks - nextStep) / stepPeriod) + 1);
+		rollSign = strides % 2 == 1 ? 1.0 : -1.0;
+	}
+
+	/** One tick of the legs still trying: drive forward while the feet are down, and lurch on each stride. */
+	private static void stumble(LocalPlayer player) {
+		if (stumbleTicks <= 0.0 || ticks > stumbleTicks + 1) {
+			return;
+		}
+		double drive = DeathMotion.stumbleDrive(ticks - 1, stumbleTicks);
+		if (drive > 0.0 && player.onGround()) {
+			// The acceleration that holds this run against this ground's friction,
+			// as the movement input would have: speed x (1 - friction).
+			BlockPos below = BlockPos.containing(player.getX(), player.getY() - 0.5000001, player.getZ());
+			double friction = player.level().getBlockState(below).getBlock().getFriction() * 0.91;
+			double accel = stumbleSpeed * (1.0 - friction) * drive;
+			player.setDeltaMovement(player.getDeltaMovement().add(stumbleDirX * accel, 0.0, stumbleDirZ * accel));
+		}
+		if (ticks >= nextStep && ticks <= stumbleTicks) {
+			// Each stride heavier than the last: the head drops further, rolls
+			// over the leg that took the weight, and pitches toward the floor.
+			double heavy = Math.min(1.0, ticks / stumbleTicks);
+			double side = steps % 2 == 0 ? 1.0 : -1.0;
+			thudVel -= STEP_DROP * (0.6 + heavy);
+			rollVel += side * STEP_ROLL_KICK * (0.5 + heavy);
+			pitchVel += STEP_PITCH_KICK * (0.5 + heavy);
+			steps++;
+			nextStep += stepPeriod;
+		}
+	}
+
+	/** Ticks the collapse waits while the legs are still going. */
+	private static double collapseDelay() {
+		return stumbleTicks * DeathMotion.STUMBLE_COLLAPSE_SHARE;
 	}
 
 	private static DeathMotion.Profile chosenProfile;
@@ -315,7 +419,7 @@ public final class DeathCamera {
 		}
 		float partial = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
 		double t = ticks + partial;
-		double s = DeathMotion.settle(DeathMotion.collapse(profile, t));
+		double s = DeathMotion.settle(DeathMotion.collapse(profile, t - collapseDelay()));
 		double loll = settled ? DeathMotion.loll(profile, restTicks + partial) : 0.0;
 		boolean spinning = airborneSinceDeath && !settled && !wasOnGround;
 		// Down: let the spin come round to the nearest upright turn.
@@ -325,8 +429,14 @@ public final class DeathCamera {
 			tumbleRoll += (tumbleR - tumbleRoll) * Math.min(1.0, 0.18 * deltaTicks);
 			tumblePitch += (tumbleP - tumblePitch) * Math.min(1.0, 0.18 * deltaTicks);
 		}
-		double rollTarget = rollSign * (profile.roll() * s + profile.loll() * loll);
-		double pitchTarget = profile.pitch() * s + Math.signum(profile.pitch()) * 0.5 * profile.loll() * loll;
+		// A body moving forward goes down forward: less onto its side, more onto
+		// its face, and leaning further in with every stride before it does.
+		double lean = DeathMotion.forwardLean(stumbleTicks);
+		double fallRoll = profile.roll() * (1.0 - 0.55 * lean);
+		double fallPitch = profile.pitch() + (FORWARD_FALL_PITCH - profile.pitch()) * lean;
+		double leaning = stumbleTicks > 0.0 ? STRIDE_LEAN * lean * Math.min(1.0, t / stumbleTicks) * (1.0 - s) : 0.0;
+		double rollTarget = rollSign * (fallRoll * s + profile.loll() * loll);
+		double pitchTarget = fallPitch * s + leaning + Math.signum(fallPitch) * 0.5 * profile.loll() * loll;
 
 		double remaining = deltaTicks;
 		while (remaining > 1.0e-6) {
@@ -350,7 +460,7 @@ public final class DeathCamera {
 		if (!active()) {
 			return 0.0;
 		}
-		return DeathMotion.collapse(profile, ticks + partialTick);
+		return DeathMotion.collapse(profile, ticks + partialTick - collapseDelay());
 	}
 
 	/**
@@ -363,7 +473,7 @@ public final class DeathCamera {
 			return standing;
 		}
 		// One tick ahead so the camera's own lag does not stretch the fall.
-		return (float) Mth.lerp(DeathMotion.collapse(profile, ticks + 1.0), standing, profile.eye());
+		return (float) Mth.lerp(DeathMotion.collapse(profile, ticks + 1.0 - collapseDelay()), standing, profile.eye());
 	}
 
 	/**
@@ -447,6 +557,20 @@ public final class DeathCamera {
 		return maxTumble;
 	}
 
+	/** Strides taken since death; for the client gametest. */
+	public static int stumbleSteps() {
+		return steps;
+	}
+
+	/** How far the body has gone across the ground since death, blocks; for the client gametest. */
+	public static double travelled() {
+		LocalPlayer player = Minecraft.getInstance().player;
+		if (!tracking || player == null) {
+			return 0.0;
+		}
+		return Math.hypot(player.getX() - startX, player.getZ() - startZ);
+	}
+
 	/** Whether the server has been told it may tidy the body away; for the client gametest. */
 	public static boolean released() {
 		return released;
@@ -464,6 +588,11 @@ public final class DeathCamera {
 		tumblePitch = 0.0;
 		airborneSinceDeath = false;
 		maxTumble = 0.0;
+		stumbleTicks = 0.0;
+		stumbleSpeed = 0.0;
+		stepPeriod = 0.0;
+		nextStep = 0.0;
+		steps = 0;
 		released = false;
 		lastRoll = 0.0;
 		lastPitch = 0.0;

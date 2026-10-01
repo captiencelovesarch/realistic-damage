@@ -40,12 +40,60 @@ public class DeathKindsClientGameTest implements FabricClientGameTest {
 		});
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
 			context.waitTicks(20);
+			runningDeath(context, singleplayer);
 			golemKill(context, singleplayer);
 			blast(context, singleplayer);
 			lava(context, singleplayer);
 		} finally {
 			context.runOnClient(client -> ClientEffectsConfig.load());
 		}
+	}
+
+	/**
+	 * "When you die, you just stop in place... shouldn't you stumble a few steps
+	 * forward if you were running?" Sprinting flat out, then dead: the body has
+	 * to carry on for a couple of failing strides and go down forward, where it
+	 * used to stop within half a block. Killed with /kill's damage, which every
+	 * invulnerability lets through and which carries no knockback to muddy the
+	 * distance.
+	 */
+	private static void runningDeath(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		context.runOnClient(client -> {
+			client.player.setYRot(0.0F);
+			client.player.setXRot(10.0F);
+		});
+		context.getInput().holdKey(options -> options.keyUp);
+		context.getInput().holdKey(options -> options.keySprint);
+		context.waitTicks(25);
+		double speed = context.computeOnClient(client ->
+				Math.hypot(client.player.getX() - client.player.xo, client.player.getZ() - client.player.zo));
+		if (speed < 0.2) {
+			throw new AssertionError("the setup never got the player running: " + speed + " blocks a tick");
+		}
+		die(context, singleplayer, player -> player.kill(player.level()));
+		context.getInput().releaseKey(options -> options.keyUp);
+		context.getInput().releaseKey(options -> options.keySprint);
+		context.waitTicks(4);
+		context.takeScreenshot("rd_deathkinds_00a_stumbling");
+		waitSettled(context);
+		context.waitTicks(10);
+		double travelled = context.computeOnClient(client -> DeathCamera.travelled());
+		int strides = context.computeOnClient(client -> DeathCamera.stumbleSteps());
+		double pitch = context.computeOnClient(client -> DeathCamera.lastPitch());
+		System.out.printf("RD running death: %.2f blocks a tick, travelled %.2f blocks in %d strides, pitch %.1f%n",
+				speed, travelled, strides, pitch);
+		if (travelled < 1.4) {
+			throw new AssertionError("died at a sprint and the body stopped " + travelled + " blocks on");
+		}
+		if (strides < 2) {
+			throw new AssertionError("a sprinting body took " + strides + " stumbling strides");
+		}
+		if (pitch < 25.0) {
+			throw new AssertionError("running forward, the body should go down face first: pitch " + pitch);
+		}
+		context.takeScreenshot("rd_deathkinds_00b_stumbled");
+		respawn(context);
+		clearAround(singleplayer);
 	}
 
 	/** The playtest's death: an iron golem, a pig grazing nearby, flat ground. */
@@ -87,7 +135,7 @@ public class DeathKindsClientGameTest implements FabricClientGameTest {
 			throw new AssertionError("the pig vanished from the dead player's world at deathTime " + deathTime
 					+ " — the server dropped the body and the world froze");
 		}
-		context.takeScreenshot("rd_deathkinds_00_golem_world_alive");
+		context.takeScreenshot("rd_deathkinds_00c_golem_world_alive");
 
 		respawn(context);
 		if (context.computeOnClient(client -> DeathCamera.kind()) != DeathKind.BLOW

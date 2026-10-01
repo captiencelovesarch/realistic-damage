@@ -163,6 +163,72 @@ public final class DeathMotion {
 		return 1.0 - (1.0 - x) * (1.0 - x) * (1.0 - x);
 	}
 
+	// --- The stumble (1.7): dying on the run ---
+
+	/** A sprint, blocks a tick: the speed at which the stumble is longest. */
+	public static final double SPRINT_SPEED = 0.28;
+	/** Slower than this (a sneak, a shuffle) and the body simply goes down where it is. */
+	public static final double STUMBLE_MIN_SPEED = 0.09;
+	/** How long a sprinting body keeps its legs, ticks: about three failing strides. */
+	public static final double STUMBLE_MAX_TICKS = 15.0;
+	/** How much of the stumble passes before the knees go and the collapse begins. */
+	public static final double STUMBLE_COLLAPSE_SHARE = 0.65;
+
+	/**
+	 * Whether a kind of death leaves the legs running for a moment. A blow, a
+	 * shot, a faint or burning: the body was upright and moving and nothing
+	 * threw it. Not a fall or a blast (the body is already thrown), not water or
+	 * lava (no footing), not a convulsion or a frozen body (no strides in it).
+	 */
+	public static boolean stumbles(DeathKind kind) {
+		return kind == DeathKind.BLOW || kind == DeathKind.PROJECTILE
+				|| kind == DeathKind.FADE || kind == DeathKind.FIRE;
+	}
+
+	/**
+	 * Ticks a body dying on the run keeps stumbling forward before it goes down,
+	 * from its speed on the last tick it was alive. The playtest: "when you die,
+	 * you just stop in place" — ground friction stopped a dead body inside three
+	 * ticks, and the killing blow's knockback replaced the run outright. Scaled
+	 * down by violence, because a blow that ends you at once leaves no legs to
+	 * stumble on; 0 for anything slower than a walk.
+	 */
+	public static double stumbleTicks(DeathKind kind, double violence, double speed) {
+		if (!stumbles(kind) || speed < STUMBLE_MIN_SPEED) {
+			return 0.0;
+		}
+		double run = Math.min(1.0, speed / SPRINT_SPEED);
+		return STUMBLE_MAX_TICKS * run * Math.pow(1.0 - Math.clamp(violence, 0.0, 1.0), 0.7);
+	}
+
+	/**
+	 * How much of the running stride is left {@code t} ticks into a stumble of
+	 * {@code ticks}, 1 to 0: the legs drive less with every step.
+	 */
+	public static double stumbleDrive(double t, double ticks) {
+		if (ticks <= 0.0 || t >= ticks || t < 0.0) {
+			return 0.0;
+		}
+		return Math.pow(1.0 - t / ticks, 1.3);
+	}
+
+	/** Ticks between stumbling steps: a sprint's quick strides, a walk's slower ones. */
+	public static double stepPeriod(double speed) {
+		double run = Math.clamp(speed / SPRINT_SPEED, 0.0, 1.0);
+		return 6.0 + (4.5 - 6.0) * run;
+	}
+
+	/**
+	 * How far the body leans into its fall, 0 to 1: a body moving forward falls
+	 * forward, face first, where one standing still goes over sideways.
+	 */
+	public static double forwardLean(double stumbleTicks) {
+		if (stumbleTicks <= 0.0) {
+			return 0.0;
+		}
+		return Math.clamp(stumbleTicks / (STUMBLE_MAX_TICKS * 0.6), 0.0, 1.0);
+	}
+
 	/** Ticks after landing at which an agonal twitch fires; fixed, not drawn. */
 	public static final int[] TWITCH_TICKS = {9, 26};
 
