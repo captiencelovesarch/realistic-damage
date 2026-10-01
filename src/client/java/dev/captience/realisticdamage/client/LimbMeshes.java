@@ -1,10 +1,13 @@
 package dev.captience.realisticdamage.client;
 
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.model.geom.PartPose;
+import net.minecraft.client.model.geom.builders.CubeDefinition;
 import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.CubeListBuilder;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
@@ -115,11 +118,9 @@ public final class LimbMeshes {
 	 * one limb. The first build threw a whole twelve-pixel leg while the body
 	 * kept five of them — "the entire leg is visible", as reported.
 	 *
-	 * <p>Two cubes per limb when unoffset: the sides with their texture rows
-	 * shifted down by the stump's length, and a full-height cube showing only
-	 * its bottom face, so the sole and the palm keep the texture rows they had.
-	 * No end face at the cut at all: the cap is what is seen there. An offset
-	 * shell (the blood) is one cube, since it has no sole worth the second.
+	 * <p>Two cubes per limb, the offset blood shell included: the sides, and the
+	 * far end on its own (see {@link #lower}). No end face at the cut at all:
+	 * the cap is what is seen there.
 	 */
 	public static ModelPart[] severed(boolean slimArms, float offset) {
 		return severed(Kind.of(slimArms), offset);
@@ -306,41 +307,48 @@ public final class LimbMeshes {
 	}
 
 	private static ModelPart[] bakeLower(Kind kind, float offset, boolean overlay) {
-		MeshDefinition mesh = new MeshDefinition();
-		PartDefinition root = mesh.getRoot();
-		root.addOrReplaceChild("head", CubeListBuilder.create(), PartPose.ZERO);
-		root.addOrReplaceChild("body", CubeListBuilder.create(), PartPose.ZERO);
+		ModelPart[] byRegion = new ModelPart[BodyPart.values().length];
 		for (BodyPart part : BodyPart.values()) {
-			if (!part.isLimb()) {
-				continue;
-			}
-			Limb limb = limb(kind, part, overlay);
-			if (limb == null) {
-				root.addOrReplaceChild(name(part), CubeListBuilder.create(), PartPose.ZERO);
-				continue;
-			}
-			lower(root, name(part), limb, top(part), offset);
+			Limb limb = part.isLimb() ? limb(kind, part, overlay) : null;
+			byRegion[part.ordinal()] = limb == null
+					? new ModelPart(List.of(), Map.of())
+					: lower(limb, top(part), offset);
 		}
-		return index(LayerDefinition.create(mesh, 64, 64).bakeRoot());
+		return byRegion;
 	}
 
-	private static void lower(PartDefinition root, String name, Limb limb, float top, float offset) {
+	/**
+	 * The piece below the cut, as two cubes: the sides with their texture rows
+	 * shifted down by the stump's length, and a full-height cube showing only
+	 * its far end — the sole or the palm — so that end keeps the texture square
+	 * vanilla gives it. Nothing at the cut: the cap is what is seen there.
+	 *
+	 * <p>The far end is the cube's {@code UP} face. Model space runs +y down the
+	 * limb, and {@code ModelPart.Cube} names its faces in model space: DOWN is
+	 * the face at the cube's <em>minimum</em> y, which on a limb is the hip or the
+	 * shoulder. The first build asked for DOWN, so every limb on the floor had a
+	 * loose quad of hip texture floating five pixels past its cut — a flat sheet
+	 * lying beside the limb — and an open far end you could see inside through
+	 * ("bug found with limbs", Oct 1 2026 playtest). Asserted by geometry in
+	 * {@code BloodClientGameTest}, not by screenshot.
+	 *
+	 * <p>Built from {@link CubeDefinition}s rather than through a
+	 * {@link CubeListBuilder} because the builder has no overload that takes both
+	 * an inflation and a face set, and the skin's second layer needs both: it is
+	 * inflated as vanilla inflates it, and it must not close over the cut either.
+	 */
+	private static ModelPart lower(Limb limb, float top, float offset) {
 		float length = 12.0F - STUMP_LENGTH;
 		float cut = top + STUMP_LENGTH;
 		float z = -limb.depth() / 2.0F;
-		CubeListBuilder cubes = CubeListBuilder.create();
-		if (limb.mirror()) {
-			cubes.mirror();
-		}
-		if (offset == 0.0F) {
-			cubes.texOffs(limb.u(), limb.v() + (int) STUMP_LENGTH).addBox(limb.x(), cut, z, limb.width(), length, limb.depth(),
-					EnumSet.of(Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST));
-			cubes.texOffs(limb.u(), limb.v()).addBox(limb.x(), top, z, limb.width(), 12.0F, limb.depth(), EnumSet.of(Direction.DOWN));
-		} else {
-			cubes.texOffs(limb.u(), limb.v() + (int) STUMP_LENGTH).addBox(limb.x(), cut, z, limb.width(), length, limb.depth(),
-					new CubeDeformation(offset));
-		}
-		root.addOrReplaceChild(name, cubes, PartPose.ZERO);
+		CubeDeformation g = new CubeDeformation(offset);
+		CubeDefinition sides = new CubeDefinition(null, limb.u(), limb.v() + (int) STUMP_LENGTH,
+				limb.x(), cut, z, limb.width(), length, limb.depth(), g, limb.mirror(), 1.0F, 1.0F,
+				EnumSet.of(Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST));
+		CubeDefinition farEnd = new CubeDefinition(null, limb.u(), limb.v(),
+				limb.x(), top, z, limb.width(), 12.0F, limb.depth(), g, limb.mirror(), 1.0F, 1.0F,
+				EnumSet.of(Direction.UP));
+		return new ModelPart(List.of(sides.bake(64, 64), farEnd.bake(64, 64)), Map.of());
 	}
 
 	private static ModelPart[] index(ModelPart baked) {

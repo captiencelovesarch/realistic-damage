@@ -15,6 +15,7 @@ import dev.captience.realisticdamage.client.BloodLens;
 import dev.captience.realisticdamage.client.BloodStains;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
 import dev.captience.realisticdamage.client.FirstPersonBlood;
+import dev.captience.realisticdamage.client.LimbMeshes;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.damage.DestructionLogic;
 import dev.captience.realisticdamage.systems.BleedingSystem;
@@ -23,6 +24,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -507,6 +509,7 @@ public class BloodClientGameTest implements FabricClientGameTest {
 				throw new AssertionError("the severed limb lay there without bleeding");
 			}
 			context.takeScreenshot("rd_blood_16_severed_limb");
+			assertSeveredPiecesAreWhole();
 
 			// Water (1.6.1). A drop treated water as air: it fell through, stopped
 			// on the pool floor and marked it, blood sitting on the bottom like
@@ -765,5 +768,80 @@ public class BloodClientGameTest implements FabricClientGameTest {
 				RDAttachments.pushSnapshot(player);
 			}
 		});
+	}
+
+	/**
+	 * The piece on the floor, checked as geometry rather than as a picture (1.7
+	 * fix). Every limb mesh that lies on the floor — the skin, the skin's second
+	 * layer, the blood shell — must be closed at its far end (the sole or the
+	 * palm) and open at the cut, with nothing drawn past the cut toward where
+	 * the body was. The first build closed the wrong end: {@code Direction.DOWN}
+	 * is a cube's minimum-y face, which on a limb is the hip, so a quad of hip
+	 * texture floated five pixels past every cut — a flat sheet lying next to
+	 * the limb in the playtest's screenshots — and the far end was open. This
+	 * screenshot suite looked at it for weeks; only the playtest saw it.
+	 */
+	private static void assertSeveredPiecesAreWhole() {
+		for (LimbMeshes.Kind kind : LimbMeshes.Kind.values()) {
+			for (BodyPart part : BodyPart.values()) {
+				if (!part.isLimb()) {
+					continue;
+				}
+				checkPiece(kind, part, "skin", LimbMeshes.severed(kind, 0.0F)[part.ordinal()]);
+				checkPiece(kind, part, "blood shell", LimbMeshes.severed(kind, 0.01F)[part.ordinal()]);
+				checkPiece(kind, part, "second layer", LimbMeshes.severedOverlays(kind)[part.ordinal()]);
+			}
+		}
+	}
+
+	private static void checkPiece(LimbMeshes.Kind kind, BodyPart part, String what, ModelPart piece) {
+		java.util.List<float[]> faces = new java.util.ArrayList<>();
+		piece.visit(new com.mojang.blaze3d.vertex.PoseStack(), (pose, path, index, cube) -> {
+			for (ModelPart.Polygon polygon : cube.polygons) {
+				float[] ys = new float[polygon.vertices().length];
+				for (int i = 0; i < ys.length; i++) {
+					ys[i] = polygon.vertices()[i].y();
+				}
+				faces.add(ys);
+			}
+		});
+		if (faces.isEmpty()) {
+			return;   // a build with no such layer (a bone has no second layer)
+		}
+		String name = kind + " " + part.id() + " " + what;
+		float top = part.isArm() ? -2.0F : 0.0F;
+		float cut = top + LimbMeshes.STUMP_LENGTH;
+		float minY = Float.MAX_VALUE;
+		float maxY = -Float.MAX_VALUE;
+		for (float[] ys : faces) {
+			for (float y : ys) {
+				minY = Math.min(minY, y);
+				maxY = Math.max(maxY, y);
+			}
+		}
+		if (minY < cut - 0.5F) {
+			throw new AssertionError(name + ": geometry " + (cut - minY) + " px past the cut, toward the body");
+		}
+		if (maxY < top + 12.0F - 1.0e-3F || maxY > top + 12.5F) {
+			throw new AssertionError(name + ": the far end is at " + maxY + ", expected " + (top + 12.0F));
+		}
+		boolean closedFar = false;
+		boolean closedCut = false;
+		for (float[] ys : faces) {
+			boolean allFar = true;
+			boolean allCut = true;
+			for (float y : ys) {
+				allFar &= Math.abs(y - maxY) < 1.0e-4F;
+				allCut &= Math.abs(y - minY) < 1.0e-4F;
+			}
+			closedFar |= allFar;
+			closedCut |= allCut;
+		}
+		if (!closedFar) {
+			throw new AssertionError(name + ": the far end (sole or palm) is open");
+		}
+		if (closedCut) {
+			throw new AssertionError(name + ": a face closes over the cut, hiding the cut face");
+		}
 	}
 }
