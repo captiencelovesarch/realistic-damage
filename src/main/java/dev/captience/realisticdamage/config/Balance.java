@@ -724,6 +724,21 @@ public final class Balance {
 	public static final double INJURY_SOUND_RADIUS = 24.0;
 	/** How loud someone else's injury is, against hearing your own. */
 	public static final float INJURY_SOUND_OTHERS_VOLUME = 0.4F;
+	/**
+	 * A scream carries where a crack does not (1.7): someone else's is heard at
+	 * twice the other injury cues' share, and your own a little under your own
+	 * bones (see InjuryAudio).
+	 */
+	public static final float SCREAM_OTHERS_VOLUME = 0.8F;
+	public static final float SCREAM_SELF_VOLUME = 0.85F;
+
+	/**
+	 * Longest the server keeps a dead player in the world for their death camera,
+	 * in ticks (1.7, see DeathHold). The client releases the hold itself once its
+	 * death screen is up — a few seconds at most — so this is only the backstop
+	 * for a client that never says so.
+	 */
+	public static final long DEATH_HOLD_MAX_TICKS = 400;
 
 	// Symptom ladder thresholds (spec §23) — shared by server (action locks) and client (fx).
 	public static final double SYMPTOM_VIGNETTE = 75.0;

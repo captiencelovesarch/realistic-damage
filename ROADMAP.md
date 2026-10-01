@@ -356,6 +356,21 @@ floor, rolls over and thuds on landing, the blackout holds at 60% until the body
 comes to rest, and the death screen fades in, with its buttons asleep until
 it is nearly visible. One switch, Death Camera, on by default.
 
+**Playtest fixes** (Oct 1 2026, alpha.5). "It moves a bunch and then just
+FREEZES": the server dropped the dead player from its world a second in, so every
+mob vanished and nothing updated again — the server now keeps the body while the
+death camera watches (`DeathHold`, released when the death screen is up, capped
+at 20 s). Deaths move by kind (`DeathKind` → `DeathMotion`): falls slam, blasts
+spin you while airborne, fire and lava thrash, lava takes you under face-up,
+drowning drifts, lightning convulses, freezing topples like a plank, bleed-outs
+faint; the body lands on springs, keeps settling for seconds and a violent death
+twitches. Blood is darker in the world and shades by face; under shaders the
+stain pipeline is registered with Iris (pools were missing) and the sprites are
+a hair off grey (Complementary drew drops as glowing redstone). Limb breaks yell
+and lost limbs scream — TF2 pain lines imported from the player's own install
+(`tools/import_tf2_screams.py`, gitignored). Also: a crushed chest now counts as
+full violence, and a corpse no longer heals.
+
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here
   shipped early in 1.6.2 and is ready for mobs to reuse.)

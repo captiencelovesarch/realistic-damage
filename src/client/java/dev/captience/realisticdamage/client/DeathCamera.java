@@ -3,7 +3,11 @@ package dev.captience.realisticdamage.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import dev.captience.realisticdamage.config.Balance;
+import dev.captience.realisticdamage.damage.DeathKind;
 import dev.captience.realisticdamage.damage.DeathMath;
+import dev.captience.realisticdamage.net.DeathCameraPayload;
+import dev.captience.realisticdamage.systems.DeathMotion;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -47,18 +51,35 @@ import net.minecraft.world.phys.Vec3;
  * <p>Deterministic (no RNG, which side you fall to follows the knockback) and
  * behind one switch, Death Camera, on by default. Off gives vanilla back
  * exactly: the one-second freeze and the sudden screen.
+ *
+ * <p><b>1.7, second pass.</b> The playtest: it "moves a bunch and then just
+ * FREEZES", and it should move "based on different kinds of deaths". Two
+ * causes for the first. The server removed the dead player from its world a
+ * second in, which took every mob off this client and stopped every update —
+ * fixed on the server ({@code systems.DeathHold}, asked for here while the
+ * camera watches). And the view itself stopped dead the moment the collapse
+ * curve ran out. The motion is now a {@link DeathMotion} profile chosen by the
+ * server's {@link DeathKind} and scaled by violence: springs carry the roll and
+ * pitch so the body lands and bounces instead of stopping, a blast spins the
+ * view while the body is airborne, fire and lava thrash, lightning convulses,
+ * a drowning drifts, and after landing the head keeps settling for a few
+ * seconds and a violent death twitches once or twice.
  */
 public final class DeathCamera {
 	private DeathCamera() {}
 
-	/** Ticks for the eye to drop from standing to the floor. */
-	private static final double COLLAPSE_TICKS = 15.0;
-	/** Eye height of a body lying on the ground, blocks. */
-	private static final float LYING_EYE = 0.3F;
-	/** How far the view rolls onto its side, degrees. Less than lying flat would be; that read as a bug. */
-	private static final double COLLAPSE_ROLL = 32.0;
-	/** ...and the head going limp, degrees of pitch down. */
-	private static final double COLLAPSE_SAG = 10.0;
+	/**
+	 * The body's angular springs, per tick squared and per tick. Lightly
+	 * under-damped: a roll that lands overshoots a degree or two and comes back,
+	 * which is what a body does and what a curve that simply ends does not.
+	 */
+	private static final double ANGLE_STIFFNESS = 0.55;
+	private static final double ANGLE_DAMPING = 1.15;
+	/** How hard a landing kicks the roll and pitch, degrees a tick at full thud. */
+	private static final double THUD_ROLL_KICK = 5.0;
+	private static final double THUD_PITCH_KICK = 3.0;
+	/** How hard an agonal twitch kicks, degrees a tick. */
+	private static final double TWITCH_KICK = 2.6;
 
 	/** Below this horizontal speed, blocks a tick, a body on the ground is still. */
 	private static final double STILL_SPEED = 0.05;
@@ -106,6 +127,22 @@ public final class DeathCamera {
 	private static double thudVel;
 	private static int thuds;
 
+	private static DeathKind kind = DeathKind.BLOW;
+	private static DeathMotion.Profile profile = DeathMotion.profile(DeathKind.BLOW, 0.0);
+	private static double rollPos;
+	private static double rollVel;
+	private static double pitchPos;
+	private static double pitchVel;
+	/** Accumulated airborne spin, degrees, about the roll and pitch axes. */
+	private static double tumbleRoll;
+	private static double tumblePitch;
+	private static boolean airborneSinceDeath;
+	private static double maxTumble;
+	private static boolean released;
+	/** What {@link #apply} last put on the view, for the client gametest. */
+	private static double lastRoll;
+	private static double lastPitch;
+
 	/** The switch. */
 	public static boolean enabled() {
 		return ClientEffectsConfig.get().deathCamera;
@@ -129,8 +166,25 @@ public final class DeathCamera {
 		if (!tracking) {
 			tracking = true;
 			wasOnGround = player.onGround();
+			// No knockback to fall away from (a drop, a drowning, lava): pick the
+			// side from where the body is, so it is fixed for a given death and
+			// not always the same one.
+			rollSign = ((Mth.floor(player.getX()) + Mth.floor(player.getZ())) & 1) == 0 ? 1.0 : -1.0;
+			choose();
+			// Keep me in the world while I watch it (DeathHold, server side).
+			watch(true);
+			if (profile.impactAtDeath()) {
+				// The landing that killed you happened on the tick you died; the body
+				// is already on the floor, so there is no landing left to detect.
+				impact(profile.thud(), false);
+			}
 		}
 		ticks++;
+		// The death payload is sent from the same server tick as the death and
+		// normally lands first; if it was late, take it while the fall is young.
+		if (ticks <= 4 && (kind != ClientState.deathKind() || profile != chosenFor(ClientState.deathKind()))) {
+			choose();
+		}
 
 		// The void has no floor to land on: stop the body a little below the
 		// world rather than let it fall for as long as the death screen is up.
@@ -142,7 +196,7 @@ public final class DeathCamera {
 
 		Vec3 velocity = player.getDeltaMovement();
 		// Fall to the side the blow pushed you, once the knockback has arrived.
-		if (ticks == 3) {
+		if (ticks == 3 && velocity.horizontalDistanceSqr() > 1.0e-4) {
 			Vec3 right = Vec3.directionFromRotation(0.0F, player.getYRot() + 90.0F);
 			rollSign = velocity.x * right.x + velocity.z * right.z >= 0.0 ? 1.0 : -1.0;
 		}
@@ -154,19 +208,73 @@ public final class DeathCamera {
 		wasOnGround = onGround;
 		lastFallSpeed = Math.max(0.0, -velocity.y);
 
+		// A spin only while the body is in the air; once it is down the springs
+		// carry the view round to the nearest upright turn (DeathMotion.restingTumble).
+		boolean airborne = !onGround && !player.isInLiquid();
+		if (airborne && profile.tumble() > 0.0) {
+			airborneSinceDeath = true;
+			tumbleRoll += rollSign * profile.tumble();
+			tumblePitch += 0.45 * profile.tumble();
+			maxTumble = Math.max(maxTumble, Math.abs(tumbleRoll));
+		}
+
 		double horizontal = velocity.horizontalDistance();
 		boolean moving = (!onGround && !player.isInLiquid()) || horizontal > STILL_SPEED;
 		stillTicks = ticks >= SETTLE_EARLIEST && !moving ? stillTicks + 1 : 0;
-		if (!settled && (stillTicks >= STILL_TICKS || ticks >= SETTLE_LATEST)) {
+		// Still, and down: a faint is still folding long after its body stopped
+		// sliding, and the blackout must not close on a view that is still falling.
+		boolean down = ticks >= profile.collapseTicks();
+		if (!settled && ((stillTicks >= STILL_TICKS && down) || ticks >= SETTLE_LATEST)) {
 			settled = true;
 		}
 		if (settled) {
 			restTicks++;
+			// The nerves fire once or twice after everything else has stopped.
+			for (int i = 0; i < profile.twitches(); i++) {
+				if (restTicks == DeathMotion.TWITCH_TICKS[i]) {
+					double side = i % 2 == 0 ? rollSign : -rollSign;
+					rollVel += side * TWITCH_KICK;
+					pitchVel += 0.6 * TWITCH_KICK;
+				}
+			}
 		}
 
 		screenTicksOld = screenTicks;
 		if (settled && ticks >= screenDelay()) {
 			screenTicks = Math.min(SCREEN_FADE_TICKS, screenTicks + 1);
+		}
+		// The screen is up: nothing more to watch, so the server may tidy the
+		// body away as vanilla would have (DeathHold).
+		if (screenTicks >= SCREEN_FADE_TICKS && !released) {
+			watch(false);
+		}
+	}
+
+	/** Takes the kind and violence the server sent for this death. */
+	private static void choose() {
+		kind = ClientState.deathKind();
+		profile = chosenFor(kind);
+	}
+
+	private static DeathMotion.Profile chosenProfile;
+	private static DeathKind chosenKind;
+	private static double chosenViolence = -1.0;
+
+	/** The profile for a kind at the current violence, cached so it compares by identity. */
+	private static DeathMotion.Profile chosenFor(DeathKind k) {
+		double violence = ClientState.deathViolence();
+		if (chosenProfile == null || chosenKind != k || chosenViolence != violence) {
+			chosenProfile = DeathMotion.profile(k, violence);
+			chosenKind = k;
+			chosenViolence = violence;
+		}
+		return chosenProfile;
+	}
+
+	private static void watch(boolean watching) {
+		released = !watching;
+		if (ClientPlayNetworking.canSend(DeathCameraPayload.TYPE)) {
+			ClientPlayNetworking.send(new DeathCameraPayload(watching));
 		}
 	}
 
@@ -180,23 +288,56 @@ public final class DeathCamera {
 
 	private static void thud(double fallSpeed) {
 		double s = Math.clamp((fallSpeed - THUD_MIN_SPEED) / (THUD_FULL_SPEED - THUD_MIN_SPEED), 0.15, 1.0);
-		thudVel -= THUD_DROP * s;
+		if (profile.thud() <= 0.0) {
+			return;   // water and lava take the landing
+		}
+		impact(s * profile.thud(), true);
 		thuds++;
-		Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forLocalAmbience(
-				SoundEvents.PLAYER_BIG_FALL, (float) (0.8 - 0.1 * s), (float) (0.5 + 0.5 * s)));
 	}
 
-	/** Steps the thud spring; once per rendered frame, game-time delta. */
+	/** A landing: the view drops and bounces, and the body rocks on the springs. */
+	private static void impact(double strength, boolean sound) {
+		double s = Math.min(1.6, strength);
+		thudVel -= THUD_DROP * s;
+		rollVel += rollSign * THUD_ROLL_KICK * s;
+		pitchVel += THUD_PITCH_KICK * s;
+		if (sound) {
+			double v = Math.min(1.0, s);
+			Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forLocalAmbience(
+					SoundEvents.PLAYER_BIG_FALL, (float) (0.8 - 0.1 * v), (float) (0.5 + 0.5 * v)));
+		}
+	}
+
+	/** Steps the thud and angle springs; once per rendered frame, game-time delta. */
 	public static void frame(double deltaTicks) {
-		if (deltaTicks <= 0.0 || (thudPos == 0.0 && thudVel == 0.0)) {
+		if (deltaTicks <= 0.0 || !active()) {
 			return;
 		}
+		float partial = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
+		double t = ticks + partial;
+		double s = DeathMotion.settle(DeathMotion.collapse(profile, t));
+		double loll = settled ? DeathMotion.loll(profile, restTicks + partial) : 0.0;
+		boolean spinning = airborneSinceDeath && !settled && !wasOnGround;
+		// Down: let the spin come round to the nearest upright turn.
+		double tumbleR = spinning ? tumbleRoll : DeathMotion.restingTumble(tumbleRoll);
+		double tumbleP = spinning ? tumblePitch : DeathMotion.restingTumble(tumblePitch);
+		if (!spinning && airborneSinceDeath) {
+			tumbleRoll += (tumbleR - tumbleRoll) * Math.min(1.0, 0.18 * deltaTicks);
+			tumblePitch += (tumbleP - tumblePitch) * Math.min(1.0, 0.18 * deltaTicks);
+		}
+		double rollTarget = rollSign * (profile.roll() * s + profile.loll() * loll);
+		double pitchTarget = profile.pitch() * s + Math.signum(profile.pitch()) * 0.5 * profile.loll() * loll;
+
 		double remaining = deltaTicks;
 		while (remaining > 1.0e-6) {
 			double dt = Math.min(0.25, remaining);
 			remaining -= dt;
 			thudVel += (-THUD_STIFFNESS * thudPos - THUD_DAMPING * thudVel) * dt;
 			thudPos += thudVel * dt;
+			rollVel += (ANGLE_STIFFNESS * (rollTarget - rollPos) - ANGLE_DAMPING * rollVel) * dt;
+			rollPos += rollVel * dt;
+			pitchVel += (ANGLE_STIFFNESS * (pitchTarget - pitchPos) - ANGLE_DAMPING * pitchVel) * dt;
+			pitchPos += pitchVel * dt;
 		}
 		if (Math.abs(thudPos) < 1.0e-4 && Math.abs(thudVel) < 1.0e-4) {
 			thudPos = 0.0;
@@ -204,13 +345,12 @@ public final class DeathCamera {
 		}
 	}
 
-	/** 0 at death to 1 once the body is on the floor, eased in: the knees go, then everything. */
+	/** 0 at death to 1 once the body is on the floor, on this death's curve. */
 	public static double collapse(float partialTick) {
 		if (!active()) {
 			return 0.0;
 		}
-		double t = Math.clamp((ticks + partialTick) / COLLAPSE_TICKS, 0.0, 1.0);
-		return t * t;
+		return DeathMotion.collapse(profile, ticks + partialTick);
 	}
 
 	/**
@@ -223,22 +363,28 @@ public final class DeathCamera {
 			return standing;
 		}
 		// One tick ahead so the camera's own lag does not stretch the fall.
-		double t = Math.clamp((ticks + 1.0) / COLLAPSE_TICKS, 0.0, 1.0);
-		return (float) Mth.lerp(t * t, standing, LYING_EYE);
+		return (float) Mth.lerp(DeathMotion.collapse(profile, ticks + 1.0), standing, profile.eye());
 	}
 
-	/** The roll, sag and thud, onto a view pose stack, after vanilla's own death tilt. */
+	/**
+	 * The roll, pitch and thud, onto a view pose stack, after vanilla's own death
+	 * tilt. The springs carry the body; the thrash, the convulsion and the head
+	 * snap sit on top of them unfiltered, because a spring would smooth a
+	 * convulsion into a sway.
+	 */
 	public static void apply(PoseStack poseStack) {
 		if (!active()) {
 			return;
 		}
 		float partial = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
-		double c = collapse(partial);
-		// Smoothstep on top of the ease-in, so the roll lands rather than stops.
-		double settle = c * c * (3.0 - 2.0 * c);
+		double t = ticks + partial;
+		double roll = rollPos + tumbleRoll + rollSign * DeathMotion.writheRoll(profile, t);
+		double pitch = pitchPos + tumblePitch + DeathMotion.writhePitch(profile, t) + DeathMotion.jerk(profile, t);
+		lastRoll = roll;
+		lastPitch = pitch;
 		poseStack.translate(0.0F, (float) thudPos, 0.0F);
-		poseStack.mulPose(Axis.ZP.rotationDegrees((float) (rollSign * COLLAPSE_ROLL * settle)));
-		poseStack.mulPose(Axis.XP.rotationDegrees((float) (COLLAPSE_SAG * settle)));
+		poseStack.mulPose(Axis.ZP.rotationDegrees((float) roll));
+		poseStack.mulPose(Axis.XP.rotationDegrees((float) pitch));
 	}
 
 	/** Whether the first-person hand should draw. A body on the floor is not holding anything up. */
@@ -282,8 +428,45 @@ public final class DeathCamera {
 		return thuds;
 	}
 
+	/** The kind of death being played; for the client gametest. */
+	public static DeathKind kind() {
+		return kind;
+	}
+
+	/** The roll and pitch the last frame put on the view, degrees; for the client gametest. */
+	public static double lastRoll() {
+		return lastRoll;
+	}
+
+	public static double lastPitch() {
+		return lastPitch;
+	}
+
+	/** The furthest an airborne spin has turned the view this death, degrees; for the client gametest. */
+	public static double tumbled() {
+		return maxTumble;
+	}
+
+	/** Whether the server has been told it may tidy the body away; for the client gametest. */
+	public static boolean released() {
+		return released;
+	}
+
 	public static void reset() {
 		tracking = false;
+		kind = DeathKind.BLOW;
+		profile = DeathMotion.profile(DeathKind.BLOW, 0.0);
+		rollPos = 0.0;
+		rollVel = 0.0;
+		pitchPos = 0.0;
+		pitchVel = 0.0;
+		tumbleRoll = 0.0;
+		tumblePitch = 0.0;
+		airborneSinceDeath = false;
+		maxTumble = 0.0;
+		released = false;
+		lastRoll = 0.0;
+		lastPitch = 0.0;
 		ticks = 0;
 		stillTicks = 0;
 		settled = false;

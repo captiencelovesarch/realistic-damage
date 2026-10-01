@@ -37,6 +37,13 @@ public class RealisticDamage implements ModInitializer {
 				dev.captience.realisticdamage.net.PressurePayload.TYPE,
 				(payload, context) -> dev.captience.realisticdamage.systems.RescueSystem
 						.onPressureRequest(context.player(), payload.targetId()));
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.serverboundPlay()
+				.register(dev.captience.realisticdamage.net.DeathCameraPayload.TYPE,
+						dev.captience.realisticdamage.net.DeathCameraPayload.CODEC);
+		net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.DeathCameraPayload.TYPE,
+				(payload, context) -> dev.captience.realisticdamage.systems.DeathHold
+						.request(context.player(), payload.watching()));
 		RDAttachments.init();
 		RDParticles.init();
 		RDEntities.init();
@@ -46,6 +53,7 @@ public class RealisticDamage implements ModInitializer {
 		dev.captience.realisticdamage.systems.HealingSystem.init();
 		dev.captience.realisticdamage.systems.RescueSystem.init();
 		dev.captience.realisticdamage.systems.RespawnCarryover.init();
+		dev.captience.realisticdamage.systems.DeathHold.init();
 		dev.captience.realisticdamage.damage.DamageHooks.init();
 		dev.captience.realisticdamage.command.RealisticDamageCommands.init();
 		TINNITUS = net.minecraft.core.Registry.register(
@@ -77,6 +85,9 @@ public class RealisticDamage implements ModInitializer {
 				: dev.captience.realisticdamage.net.InjurySound.values()) {
 			for (boolean visceral : new boolean[] {false, true}) {
 				String path = sound.assetPath(visceral);
+				if (INJURY_SOUNDS.containsKey(path)) {
+					continue;   // an unstyled sound (the screams) has one path for both
+				}
 				INJURY_SOUNDS.put(path, net.minecraft.core.Registry.register(
 						net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT,
 						id(path),

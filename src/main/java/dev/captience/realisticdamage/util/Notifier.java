@@ -21,6 +21,11 @@ public final class Notifier {
 	public static void limbBreaks(LivingEntity player, BodyPart part) {
 		message(player, "realisticdamage.msg.break." + part.id());
 		injurySound(player, InjurySound.FRACTURE);
+		// Not for a skull: a blow that cracks one leaves you dazed or out, not
+		// yelling about it.
+		if (part != BodyPart.HEAD) {
+			scream(player, InjurySound.SCREAM_SHARP);
+		}
 	}
 
 	/**
@@ -37,6 +42,10 @@ public final class Notifier {
 	public static void destroyed(LivingEntity player, BodyPart part, boolean stump) {
 		message(player, (stump ? "realisticdamage.msg.stump." : "realisticdamage.msg.destroyed.") + part.id());
 		injurySound(player, InjurySound.DESTRUCTION);
+		// A destroyed head or torso is a death, and the dead do not scream.
+		if (part.isLimb()) {
+			scream(player, InjurySound.SCREAM_SEVERE);
+		}
 	}
 
 	/**
@@ -52,6 +61,56 @@ public final class Notifier {
 	public static void dismembered(LivingEntity player, BodyPart part) {
 		message(player, "realisticdamage.msg.dismembered." + part.id());
 		injurySound(player, InjurySound.DESTRUCTION);
+		scream(player, InjurySound.SCREAM_SEVERE);
+	}
+
+	/** Ticks one scream holds the voice; about as long as the longest line plays. */
+	private static final long SCREAM_HOLD_TICKS = 40;
+
+	/** When each player last screamed, and how badly: {game time, ordinal}. Server thread only. */
+	private static final java.util.Map<LivingEntity, long[]> lastScreams = new java.util.WeakHashMap<>();
+
+	private static @Nullable InjurySound lastScream;
+
+	/** The last scream {@link #scream} let through; for the gametests, like {@link #lastMessageKey}. */
+	public static @Nullable InjurySound lastScream() {
+		return lastScream;
+	}
+
+	/** Forgets every scream, voices included; for the gametests. */
+	public static void clearLastScream() {
+		lastScream = null;
+		lastScreams.clear();
+	}
+
+	/** Forgets only which scream was last let through; the voices stay busy. */
+	public static void clearLastScreamHook() {
+		lastScream = null;
+	}
+
+	/**
+	 * A player screams (1.7). The fracture cue is the bone; this is the person,
+	 * and it was what the playtest said a broken limb was missing.
+	 *
+	 * <p>Players only — a zombie with a player's voice would be a joke — and only
+	 * a player who can: the unconscious and the dead make no sound. One voice,
+	 * one scream at a time: a blast that breaks three bones is one scream, not
+	 * three on top of each other, and a lost limb outranks a broken one, so it
+	 * may cut in on a yell that is still going but not the other way round.
+	 */
+	static void scream(LivingEntity victim, InjurySound sound) {
+		if (!(victim instanceof ServerPlayer player) || !player.isAlive()
+				|| dev.captience.realisticdamage.RDAttachments.get(player).unconscious()) {
+			return;
+		}
+		long now = player.level().getGameTime();
+		long[] last = lastScreams.get(player);
+		if (last != null && now - last[0] < SCREAM_HOLD_TICKS && sound.ordinal() <= last[1]) {
+			return;
+		}
+		lastScreams.put(player, new long[] {now, sound.ordinal()});
+		lastScream = sound;
+		injurySound(player, sound);
 	}
 
 	/**

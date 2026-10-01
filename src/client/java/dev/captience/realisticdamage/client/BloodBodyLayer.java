@@ -397,7 +397,7 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 			// Blood on a body dries where it lands. Wetness trails the amount,
 			// so a limb that is actively bleeding looks fresh and one that
 			// stopped an hour ago looks like it stopped an hour ago.
-			float[] colour = BloodPalette.colour(Math.min(1.0, level * 1.4), tint);
+			float[] colour = BloodPalette.world(Math.min(1.0, level * 1.4), tint);
 			int alpha = (int) Math.clamp(level * strength * 235.0, 0.0, 235.0);
 			if (alpha > 2) {
 				collector.order(ORDER_BLOOD).submitModelPart(bloodPart, poseStack,

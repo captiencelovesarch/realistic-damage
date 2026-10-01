@@ -101,6 +101,54 @@ final class BloodStainLayer {
 	 * atlas an ordinary particle draws from, and saying so this way cannot drift
 	 * from it (and does not touch the deprecated {@code TextureAtlas} constant).
 	 */
+	/**
+	 * Tells Iris what this pipeline is (1.7). With a shader pack on, Iris swaps
+	 * every pipeline it recognises for the pack's program, and it recognises
+	 * only vanilla's and the ones it is told about. Ours it did not: it logged
+	 * "Missing program realisticdamage:pipeline/blood_stain in override list"
+	 * and every pool and splat vanished under shaders. Iris keeps the
+	 * pipeline's own depth and blend state and swaps only the program, so the
+	 * no-depth-write fix above survives the swap.
+	 *
+	 * <p>By reflection, so Iris stays an optional neighbour rather than a build
+	 * dependency; a missing Iris or an older API without {@code assignPipeline}
+	 * is the expected case, not an error.
+	 */
+	static void registerWithShaderLoader() {
+		if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("iris")) {
+			return;
+		}
+		try {
+			Class<?> api = Class.forName("net.irisshaders.iris.api.v0.IrisApi");
+			Object iris = api.getMethod("getInstance").invoke(null);
+			Class<?> program = Class.forName("net.irisshaders.iris.api.v0.IrisProgram");
+			api.getMethod("assignPipeline", RenderPipeline.class, program)
+					.invoke(iris, PIPELINE, enumConstant(program, "PARTICLES_TRANSLUCENT"));
+			// The shadow pass draws particles too; with no program there it logs
+			// the same complaint. A decal a centimetre off the floor throws no
+			// shadow worth having, but it must have a program to be skipped by.
+			Class<?> shadowProgram = Class.forName("net.irisshaders.iris.api.v0.IrisShadowProgram");
+			api.getMethod("assignPipelineShadow", RenderPipeline.class, shadowProgram)
+					.invoke(iris, PIPELINE, enumConstant(shadowProgram, "SHADOW"));
+			assignedToIris = true;
+		} catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+			RealisticDamage.LOGGER.warn("Could not register the blood stain pipeline with Iris; "
+					+ "stains may not draw with a shader pack on", e);
+		}
+	}
+
+	private static boolean assignedToIris;
+
+	/** Whether {@link #registerWithShaderLoader} reached Iris; for the log and the tests. */
+	static boolean assignedToIris() {
+		return assignedToIris;
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static Object enumConstant(Class<?> type, String name) {
+		return Enum.valueOf((Class) type, name);
+	}
+
 	static final SingleQuadParticle.Layer LAYER = new SingleQuadParticle.Layer(
 			SingleQuadParticle.Layer.TRANSLUCENT.translucent(),
 			SingleQuadParticle.Layer.TRANSLUCENT.textureAtlasLocation(),

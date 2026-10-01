@@ -199,8 +199,12 @@ public class BloodStain extends SingleQuadParticle {
 
 	private void applyLook() {
 		double life = (double) age / lifetime;
-		float[] colour = BloodPalette.colour(BloodFlow.stainWetness(life), tint);
-		setColor(colour[0], colour[1], colour[2]);
+		float[] colour = BloodPalette.particle(BloodFlow.stainWetness(life), tint);
+		// The face shading every block face gets and a particle does not (1.7): a
+		// mark on a wall was drawn at full top-face brightness, a step brighter
+		// than the stone it was painted on.
+		float shade = level.cardinalLighting().byFace(face);
+		setColor(colour[0] * shade, colour[1] * shade, colour[2] * shade);
 		setAlpha((float) (BloodFlow.stainAlpha(life)
 				* ClientEffectsConfig.get().bloodIntensity()
 				* ClientEffectsConfig.get().bloodStainIntensity));

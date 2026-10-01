@@ -93,7 +93,7 @@ public class BloodDrop extends SingleQuadParticle {
 		this.lifetime = Balance.DROP_MAX_AGE_TICKS;
 		this.quadSize = (float) (0.028 + 0.062 * scale);
 		this.oQuadSize = this.quadSize;
-		float[] colour = BloodPalette.colour(1.0, tint);
+		float[] colour = BloodPalette.particle(1.0, tint);
 		setColor(colour[0], colour[1], colour[2]);
 		setAlpha((float) Math.clamp(ClientEffectsConfig.get().bloodIntensity(), 0.0, 1.0));
 	}
@@ -184,7 +184,7 @@ public class BloodDrop extends SingleQuadParticle {
 		}
 		// Blood in water reads darker than blood on a surface: the water takes
 		// the highlights off it.
-		float[] colour = BloodPalette.colour(1.0, tint);
+		float[] colour = BloodPalette.particle(1.0, tint);
 		setColor(colour[0] * 0.80F, colour[1] * 0.80F, colour[2] * 0.80F);
 	}
 

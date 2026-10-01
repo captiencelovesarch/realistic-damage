@@ -23,6 +23,8 @@ public class RealisticDamageClient implements ClientModInitializer {
 		// this is the only point at which a SpriteSet for it is handed out.
 		net.fabricmc.fabric.api.client.particle.v1.ParticleProviderRegistry.getInstance().register(
 				dev.captience.realisticdamage.RDParticles.BLOOD, BloodDrop.Provider::new);
+		// Shader packs swap pipelines by name, and ours has to be on their list.
+		BloodStainLayer.registerWithShaderLoader();
 
 		// Blood on the body, for every player renderer including the skin variants.
 		net.fabricmc.fabric.api.client.rendering.v1.LivingEntityRenderLayerRegistrationCallback.EVENT
@@ -80,7 +82,10 @@ public class RealisticDamageClient implements ClientModInitializer {
 				(payload, context) -> TriageHud.setTarget(payload.targetId()));
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.DeathPayload.TYPE,
-				(payload, context) -> ClientState.setDeathViolence(payload.violence()));
+				(payload, context) -> {
+					ClientState.setDeathViolence(payload.violence());
+					ClientState.setDeathKind(payload.kind());
+				});
 
 		// Reachable without Mod Menu, per the "no config-file editing" rule.
 		KeyMapping.Category category = KeyMapping.Category.register(RealisticDamage.id("main"));

@@ -10,26 +10,56 @@
 	},
 	"fracture_muted": {
 		"subtitle": "realisticdamage.subtitle.fracture",
-		"sounds": ["realisticdamage:fracture_muted"]
+		"sounds": [
+			"realisticdamage:fracture_muted"
+		]
 	},
 	"fracture_visceral": {
 		"subtitle": "realisticdamage.subtitle.fracture",
-		"sounds": ["realisticdamage:fracture_visceral"]
+		"sounds": [
+			"realisticdamage:fracture_visceral"
+		]
 	},
 	"destruction_muted": {
 		"subtitle": "realisticdamage.subtitle.destruction",
-		"sounds": ["realisticdamage:destruction_muted"]
+		"sounds": [
+			"realisticdamage:destruction_muted"
+		]
 	},
 	"destruction_visceral": {
 		"subtitle": "realisticdamage.subtitle.destruction",
-		"sounds": ["realisticdamage:destruction_visceral"]
+		"sounds": [
+			"realisticdamage:destruction_visceral"
+		]
 	},
 	"collapse_muted": {
 		"subtitle": "realisticdamage.subtitle.collapse",
-		"sounds": ["realisticdamage:collapse_muted"]
+		"sounds": [
+			"realisticdamage:collapse_muted"
+		]
 	},
 	"collapse_visceral": {
 		"subtitle": "realisticdamage.subtitle.collapse",
-		"sounds": ["realisticdamage:collapse_visceral"]
+		"sounds": [
+			"realisticdamage:collapse_visceral"
+		]
+	},
+	"scream_sharp": {
+		"subtitle": "realisticdamage.subtitle.scream",
+		"sounds": [
+			"realisticdamage:scream/spy_sharp_01",
+			"realisticdamage:scream/spy_sharp_02",
+			"realisticdamage:scream/spy_sharp_03",
+			"realisticdamage:scream/spy_sharp_04",
+			"realisticdamage:scream/spy_sharp_05"
+		]
+	},
+	"scream_severe": {
+		"subtitle": "realisticdamage.subtitle.scream",
+		"sounds": [
+			"realisticdamage:scream/spy_severe_01",
+			"realisticdamage:scream/spy_severe_02",
+			"realisticdamage:scream/spy_severe_03"
+		]
 	}
 }

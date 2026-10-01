@@ -36,6 +36,17 @@ public final class TickDispatcher {
 			return;
 		}
 		RealisticDamageData data = RDAttachments.get(player);
+		// A corpse does not heal (1.7 fix). Dead players stay in the player list
+		// until they respawn — and since 1.7 in the world too, while the death
+		// camera watches — so the body systems kept running on them: the healing
+		// clock mended a dead man's burns and said so on the action bar. Death
+		// freezes the body where it fell; the client freezes its vitals the same
+		// way. Rescue still ticks, because a pressure hold on the dead has to be
+		// let go.
+		if (player.isDeadOrDying()) {
+			RescueSystem.tick(player, data);
+			return;
+		}
 		for (BodyPartData part : data.allParts()) {
 			part.tickStrain();
 		}

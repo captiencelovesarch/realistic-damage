@@ -46,8 +46,16 @@ public final class DamageHooks {
 		// source and amount, before the totem check, which is why this only
 		// *scores* the death rather than announcing it.
 		ServerLivingEntityEvents.ALLOW_DEATH.register((entity, source, amount) -> {
-			if (entity instanceof ServerPlayer player && participates(player) && !isInternal(source)) {
-				scoreDeathViolence(player, RDAttachments.get(player), source, amount);
+			if (entity instanceof ServerPlayer player && participates(player)) {
+				if (!isInternal(source)) {
+					scoreDeathViolence(player, RDAttachments.get(player), source, amount);
+				} else if (source.is(RDDamageTypes.SKULL_CRUSHED) || source.is(RDDamageTypes.CHEST_CRUSHED)) {
+					// A destroyed head or torso is the mod's own damage, so the scoring
+					// above never saw it and "crushed beyond saving" by an iron golem
+					// got a bleed-out's slow fade (1.7 fix). There is no more violent
+					// way to die in this mod.
+					RDAttachments.get(player).stashDeathViolence(1.0, player.tickCount);
+				}
 			}
 			return true;
 		});
@@ -62,11 +70,13 @@ public final class DamageHooks {
 				return;
 			}
 			double violence = RDAttachments.get(player).consumeDeathViolence(player.tickCount);
-			if (violence > 0.01 && player.connection != null
+			lastDeathKind = DeathKind.of(source);
+			lastDeathViolence = violence;
+			if (player.connection != null
 					&& net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
 							player, dev.captience.realisticdamage.net.DeathPayload.TYPE)) {
 				net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-						new dev.captience.realisticdamage.net.DeathPayload((float) violence));
+						new dev.captience.realisticdamage.net.DeathPayload((float) violence, lastDeathKind));
 			}
 		});
 	}
@@ -91,6 +101,20 @@ public final class DamageHooks {
 				: DeathMath.violenceFromBlow(amount, player.getMaxHealth());
 		data.stashDeathViolence(violence, player.tickCount);
 		return violence;
+	}
+
+	private static @org.jspecify.annotations.Nullable DeathKind lastDeathKind;
+
+	private static double lastDeathViolence;
+
+	/** The kind of the last player death AFTER_DEATH saw; for the gametests. Server thread only. */
+	public static @org.jspecify.annotations.Nullable DeathKind lastDeathKind() {
+		return lastDeathKind;
+	}
+
+	/** ...and the violence it sent with it. */
+	public static double lastDeathViolence() {
+		return lastDeathViolence;
 	}
 
 	/** Damage the mod deals to itself must never re-enter the trauma pipeline (spec §51). */

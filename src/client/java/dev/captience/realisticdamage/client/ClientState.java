@@ -48,6 +48,13 @@ public final class ClientState {
 	 * so deaths the server says nothing about get the slow ending.
 	 */
 	private static double deathViolence;
+	/**
+	 * What kind of death it was (1.7), from the same payload, for the death
+	 * camera's motion. BLOW when the server said nothing — the collapse the death
+	 * camera always had.
+	 */
+	private static dev.captience.realisticdamage.damage.DeathKind deathKind =
+			dev.captience.realisticdamage.damage.DeathKind.BLOW;
 
 	/** Eases toward a target, quickly when it worsens and slowly when it recovers. */
 	private static double approach(double current, double target, double worseRate, double betterRate) {
@@ -92,6 +99,7 @@ public final class ClientState {
 			// violence.
 			deathFade = 0.0;
 			deathViolence = 0.0;
+			deathKind = dev.captience.realisticdamage.damage.DeathKind.BLOW;
 			HEART.reset();
 		}
 		BodySnapshot snapshot = snapshot();
@@ -161,6 +169,14 @@ public final class ClientState {
 
 	public static double deathViolence() {
 		return deathViolence;
+	}
+
+	public static void setDeathKind(dev.captience.realisticdamage.damage.DeathKind kind) {
+		deathKind = kind;
+	}
+
+	public static dev.captience.realisticdamage.damage.DeathKind deathKind() {
+		return deathKind;
 	}
 
 	/**

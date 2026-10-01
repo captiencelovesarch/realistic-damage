@@ -214,6 +214,13 @@ public final class ClientEffectsConfig {
 
 	/** Fracture, destruction and collapse audio. */
 	public double injurySoundVolume = 1.0;
+
+	/**
+	 * Players yell when a bone breaks and scream when a limb goes (1.7), heard
+	 * at the Injury Volume. Yours and everyone else's: the switch is about what
+	 * this client plays, like every other sound setting here. On by default.
+	 */
+	public boolean screams = true;
 	/** Real colour drain through vanilla's post-processing. */
 	public double desaturationIntensity = 1.0;
 	/** Real world-space warping, riding vanilla's nausea distortion. */

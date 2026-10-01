@@ -197,6 +197,11 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						.create(0, 0, 150, 20,
 								Component.translatable("realisticdamage.config.sound_style"),
 								(button, value) -> config.visceralInjurySounds = value));
+		this.list.addSmall(
+				CycleButton.onOffBuilder(config.screams)
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.screams"),
+								(button, value) -> config.screams = value),
+				null);
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.everything"));
 		this.list.addBig(Button.builder(Component.translatable("realisticdamage.config.disable_all_effects"),

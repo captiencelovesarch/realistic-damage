@@ -114,6 +114,13 @@ visceral, and is **routed rather than played as a world sound**: the server send
 non-positional for your own body, 40% and positional for anybody else's. Style is
 presentation, so the server never decides it.
 
+**The one sampled exception (1.7): screams.** A synthesised scream is a kazoo, and the
+playtest asked for TF2's by name, so a player's yell on a fracture and scream on a lost
+limb are TF2 pain lines — imported from the player's own TF2 install by
+`tools/import_tf2_screams.py` into a gitignored directory, never committed. A clean
+checkout builds without them; the events stay registered and simply play nothing.
+Players only, never the unconscious or the dead, never a skull, one voice at a time.
+
 Every damage type the mod inflicts carries the `realisticdamage:internal` tag, and the
 recursion guards (spec §51) test that tag rather than listing keys, so a damage type
 added later cannot be forgotten in one of two places. Core destruction split into
@@ -245,7 +252,9 @@ three distress causes separately instead of collapsing them, and two things read
 Textures are synthesised by `tools/generate_blood.py`, white with a shaped alpha channel so
 the renderer supplies the colour — a stain is drawn wet on the tick it lands and brown four
 seconds later from the same sprite, and a texture with the red baked in could only do half
-of that.
+of that. (Since 1.7 the particle sprites are a hair off white, 255/251/248: Complementary
+Reimagined treats a *grayscale* particle tinted red as redstone dust and draws it at full
+emission. `BloodPalette.particle` divides the cast back out.)
 
 **Body blood is baked geometry, not re-submitted model parts.** In the current player
 model the skin's overlay layer is a *child* of each base part — the hat sits +0.5 off the

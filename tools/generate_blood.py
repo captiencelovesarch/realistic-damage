@@ -88,8 +88,18 @@ def _streak(size, cx, cy, angle, length, width, taper_power=0.7):
     return np.where(inside, t * t * (3.0 - 2.0 * t), 0.0)
 
 
+# Particle sprites are written a hair off white (1.7). Shader packs cannot ask a
+# particle what it is, so some guess from its colour, and the guess that bit
+# blood is Complementary Reimagined's: a *grayscale* sprite tinted strongly red
+# "is" redstone dust and is drawn at full emission - every falling drop glowed
+# like a coal. The test is exact (channel spread under 0.001), so a warm cast
+# of a few levels is enough to fall out of it while staying invisible against
+# the tint, which BloodPalette divides back out (see SPRITE_RGB there).
+PARTICLE_RGB = (255, 251, 248)
+
+
 def _write(mask, path, rgb=(255, 255, 255)):
-    """Writes a white-RGB, shaped-alpha PNG. Colour is the renderer's job."""
+    """Writes a near-white-RGB, shaped-alpha PNG. Colour is the renderer's job."""
     alpha = np.clip(mask, 0.0, 1.0)
     height, width = alpha.shape
     out = np.zeros((height, width, 4), dtype=np.uint8)
@@ -121,7 +131,7 @@ def drop_sprites(size=8, count=4):
         # Squash horizontally: a drop in flight is not a ball.
         _, _, gx, _ = _grid(size)
         mask = mask * np.clip(1.25 - 0.30 * np.abs(gx), 0.0, 1.0)
-        _write(np.clip(mask, 0.0, 1.0), OUT / "particle" / f"blood_{index}.png")
+        _write(np.clip(mask, 0.0, 1.0), OUT / "particle" / f"blood_{index}.png", rgb=PARTICLE_RGB)
 
 
 def splat_sprites(cell=32):
@@ -176,7 +186,7 @@ def splat_sprites(cell=32):
             mask = np.maximum(mask, _blob(
                 cell, cx, cy, rng.uniform(0.055, 0.125), wobble=0.35, rng=rng, softness=1.4 / cell))
 
-        _write(mask, OUT / "particle" / f"blood_splat_{index}.png")
+        _write(mask, OUT / "particle" / f"blood_splat_{index}.png", rgb=PARTICLE_RGB)
 
 
 def pool_sprites(cell=32):
@@ -248,7 +258,7 @@ def pool_sprites(cell=32):
         mask = np.clip(mask * 1.35, 0.0, 1.0)
         # Nothing on the outermost ring, for the mipmap reason in the docstring.
         mask[0, :] = mask[-1, :] = mask[:, 0] = mask[:, -1] = 0.0
-        _write(mask, OUT / "particle" / f"blood_pool_{index}.png")
+        _write(mask, OUT / "particle" / f"blood_pool_{index}.png", rgb=PARTICLE_RGB)
 
 
 def lens_atlas(cell=32):
