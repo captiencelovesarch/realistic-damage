@@ -131,7 +131,7 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 
 	/** Translucent buckets, drawn in ascending order. See the class javadoc. */
 	private static final int ORDER_SCARS = 1;
-	private static final int ORDER_BLOOD = 2;
+	static final int ORDER_BLOOD = 2;
 
 	// A mark is faint; a region that was lost and came back is not. Both are
 	// still shares of the Blood on Bodies strength, never absolutes. The gap is

@@ -83,6 +83,9 @@ public final class ExplosiveDismemberment {
 		if (source.getEntity() instanceof ServerPlayer) {
 			scale *= config.pvpTraumaMultiplier;
 		}
+		// The size rule is the pipeline's, and must be: the same blast cannot be
+		// a fifth as bad for the trauma and full strength for the limb (1.7 slice 3).
+		scale /= dev.captience.realisticdamage.systems.MobAnatomy.vitalityScale(player);
 		double primaryShare = 0.0;
 		for (double share : shares.values()) {
 			primaryShare = Math.max(primaryShare, share);

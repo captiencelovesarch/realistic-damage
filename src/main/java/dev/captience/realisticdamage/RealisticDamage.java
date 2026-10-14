@@ -57,6 +57,9 @@ public class RealisticDamage implements ModInitializer {
 		dev.captience.realisticdamage.systems.DeathHold.init();
 		dev.captience.realisticdamage.damage.DamageHooks.init();
 		dev.captience.realisticdamage.command.RealisticDamageCommands.init();
+		// Body plans are cached per type; a /reload or a client's tag sync can change them.
+		net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents.TAGS_LOADED.register(
+				(registries, client) -> dev.captience.realisticdamage.systems.MobAnatomy.tagsReloaded());
 		TINNITUS = net.minecraft.core.Registry.register(
 				net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT,
 				id("tinnitus"),

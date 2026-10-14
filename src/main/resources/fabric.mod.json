@@ -31,6 +31,7 @@
 			"dev.captience.realisticdamage.client.gametest.ScarClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.InjuryPoseClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.MobAnatomyClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.MobBodiesClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.AfflictionsClientGameTest"
 		],
 		"fabric-gametest": [
@@ -57,6 +58,7 @@
 			"dev.captience.realisticdamage.gametest.InjuryAggroGameTest",
 			"dev.captience.realisticdamage.gametest.SeveredLimbGameTest",
 			"dev.captience.realisticdamage.gametest.MobAnatomyGameTest",
+			"dev.captience.realisticdamage.gametest.AllMobsGameTest",
 			"dev.captience.realisticdamage.gametest.ScreamGameTest",
 			"dev.captience.realisticdamage.gametest.AfflictionsGameTest"
 		]

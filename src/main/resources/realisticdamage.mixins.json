@@ -5,7 +5,9 @@
 	"mixins": [
 		"ClientLoadTimeoutAccessor",
 		"DeathHoldMixin",
+		"EnderDragonHitMixin",
 		"FoodPropertiesMixin",
+		"GolemLimbsMixin",
 		"LivingEntityFallMixin",
 		"LivingEntityHealMixin",
 		"LivingEntityUseItemMixin",
@@ -14,6 +16,7 @@
 		"OffhandSwapMixin",
 		"PlayerPoseMixin",
 		"ServerExplosionMixin",
+		"SnowGolemThrowMixin",
 		"SkeletonShootMixin",
 		"TotemDeathProtectionMixin"
 	],

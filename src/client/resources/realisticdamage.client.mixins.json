@@ -20,6 +20,8 @@
 		"LivingEntityRendererMixin",
 		"LivingRenderStateMixin",
 		"LocalPlayerDeathMixin",
+		"ModelFeatureRendererMixin",
+		"ModelPartAccessor",
 		"InventoryLayoutAccessor",
 		"ItemInHandRendererMixin",
 		"MouseHandlerMixin",

@@ -87,6 +87,18 @@ public final class HealingSystem {
 		grantRecovery(player, data, amount);
 	}
 
+	/**
+	 * A mob healed by vanilla (1.7 slice 3), already clamped to what it was
+	 * missing. Scaled by size like the trauma was, so twenty-five HP of iron on a
+	 * golem mends what five would on a person.
+	 */
+	public static void onMobHeal(LivingEntity mob, float amount) {
+		RealisticDamageData data = RDAttachments.get(mob);
+		grantRecovery(mob, data, amount / MobAnatomy.vitalityScale(mob));
+		data.restoreBlood(amount / MobAnatomy.vitalityScale(mob) * Balance.BLOOD_PER_NUTRITION);
+		RDAttachments.pushSnapshot(mob);
+	}
+
 	/** Called from the eat mixin when a food item is fully consumed (spec §18, §40). */
 	public static void onEat(ServerPlayer player, ItemStack stack, FoodProperties food) {
 		if (player.isCreative() || player.isSpectator()) {

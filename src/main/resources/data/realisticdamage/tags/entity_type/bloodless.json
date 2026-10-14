@@ -7,6 +7,27 @@
 		{
 			"id": "minecraft:parched",
 			"required": false
+		},
+		"minecraft:skeleton_horse",
+		"minecraft:wither",
+		"minecraft:iron_golem",
+		"minecraft:snow_golem",
+		{
+			"id": "minecraft:copper_golem",
+			"required": false
+		},
+		{
+			"id": "minecraft:creaking",
+			"required": false
+		},
+		"minecraft:blaze",
+		"minecraft:breeze",
+		"minecraft:vex",
+		"minecraft:allay",
+		"minecraft:ghast",
+		{
+			"id": "minecraft:happy_ghast",
+			"required": false
 		}
 	]
 }

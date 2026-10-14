@@ -5,6 +5,7 @@ import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.RealisticDamage;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyPartData;
+import dev.captience.realisticdamage.body.BodyPlan;
 import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.config.Balance;
@@ -35,6 +36,7 @@ public final class ImpairmentSystem {
 
 	private static final Identifier LEG_SPEED_ID = RealisticDamage.id("leg_speed");
 	private static final Identifier LEG_JUMP_ID = RealisticDamage.id("leg_jump");
+	private static final Identifier WING_SPEED_ID = RealisticDamage.id("wing_speed");
 	private static final Identifier ARM_ATTACK_SPEED_ID = RealisticDamage.id("arm_attack_speed");
 	private static final Identifier ARM_MINING_ID = RealisticDamage.id("arm_mining");
 	private static final Identifier ARM_DAMAGE_ID = RealisticDamage.id("arm_damage");
@@ -54,15 +56,17 @@ public final class ImpairmentSystem {
 	}
 
 	public static void tick(LivingEntity player, RealisticDamageData data) {
-		double leftLeg = legPenalty(data.part(BodyPart.LEFT_LEG));
-		double rightLeg = legPenalty(data.part(BodyPart.RIGHT_LEG));
-		double movement = ImpairmentMath.combinedLegPenalty(leftLeg, rightLeg);
+		BodyPlan plan = MobAnatomy.plan(player);
+		double movement = walkingPenalty(plan, data);
 		double jump = ImpairmentMath.jumpPenalty(movement);
 		BodyPartData mainArm = data.part(armFor(player, true));
 		// A limp main arm (1.7) swings like a missing one: you are fighting with
-		// whatever the other hand and your shoulder can manage.
-		boolean oneHanded = mainArm.destroyed() || !canGrip(mainArm);
-		double armPenalty = oneHanded
+		// whatever the other hand and your shoulder can manage. A body without
+		// hands (1.7 slice 3) fights with its head, and its arm slots are legs
+		// or wings, read above and below.
+		boolean hands = plan.hasHands();
+		boolean oneHanded = hands && (mainArm.destroyed() || !canGrip(mainArm));
+		double armPenalty = !hands ? 0.0 : oneHanded
 				? Balance.ONE_HANDED_PENALTY
 				: ImpairmentMath.armPenalty(mainArm.fraction(), mainArm.broken());
 		// Adrenaline (1.7) pushes the pain to the back for a few seconds. It does
@@ -82,7 +86,7 @@ public final class ImpairmentSystem {
 		double cap = oneHanded ? Balance.ONE_HANDED_PENALTY : Balance.ARM_PENALTY_TOTAL_CAP;
 		double actionPenalty = Math.max(sluggish, Math.min(cap, armPenalty + sluggish));
 
-		if (data.legless()) {
+		if (crawling(plan, data)) {
 			// Dragging yourself along: slow, and you certainly cannot jump.
 			movement = Math.max(movement, Balance.CRAWL_MOVEMENT_PENALTY);
 			jump = 1.0;
@@ -126,6 +130,17 @@ public final class ImpairmentSystem {
 			jump = 1.0;
 		}
 
+		if (plan.hasWings()) {
+			// A broken wing flies slower where the game has a flight speed; a
+			// destroyed one does not fly at all (MobAnatomy brings it down).
+			double flight = wingsGone(plan, data) ? 1.0
+					: ImpairmentMath.combinedLegPenalty(legPenalty(data.part(BodyPart.LEFT_ARM)),
+							legPenalty(data.part(BodyPart.RIGHT_ARM)));
+			if (data.unconscious() || data.knockedDown()) {
+				flight = 1.0;
+			}
+			apply(player, Attributes.FLYING_SPEED, WING_SPEED_ID, -flight);
+		}
 		apply(player, Attributes.MOVEMENT_SPEED, LEG_SPEED_ID, -movement);
 		apply(player, Attributes.JUMP_STRENGTH, LEG_JUMP_ID, -jump);
 		apply(player, Attributes.ATTACK_SPEED, ARM_ATTACK_SPEED_ID, -actionPenalty);
@@ -179,11 +194,57 @@ public final class ImpairmentSystem {
 	public static void clear(LivingEntity player) {
 		remove(player, Attributes.MOVEMENT_SPEED, LEG_SPEED_ID);
 		remove(player, Attributes.JUMP_STRENGTH, LEG_JUMP_ID);
+		remove(player, Attributes.FLYING_SPEED, WING_SPEED_ID);
 		remove(player, Attributes.ATTACK_SPEED, ARM_ATTACK_SPEED_ID);
 		remove(player, Attributes.BLOCK_BREAK_SPEED, ARM_MINING_ID);
 		remove(player, Attributes.ATTACK_DAMAGE, ARM_DAMAGE_ID);
 		remove(player, Attributes.MOVEMENT_SPEED, ADRENALINE_SPEED_ID);
 		remove(player, Attributes.ATTACK_SPEED, ADRENALINE_ATTACK_ID);
+	}
+
+	/**
+	 * What the walking limbs cost this body's movement (1.7 slice 3). Two legs
+	 * are the 1.0 rule, unchanged. Four share the load: the worst counts most,
+	 * the next less, the third a little, so a three-legged dog still runs and a
+	 * cow with both hind legs gone does not. Bodies that swim, fly or ooze have
+	 * nothing here to read.
+	 */
+	public static double walkingPenalty(BodyPlan plan, RealisticDamageData data) {
+		int walking = plan.walkingLimbs();
+		if (walking == 0) {
+			return 0.0;
+		}
+		double leftLeg = legPenalty(data.part(BodyPart.LEFT_LEG));
+		double rightLeg = legPenalty(data.part(BodyPart.RIGHT_LEG));
+		if (walking == 2) {
+			return ImpairmentMath.combinedLegPenalty(leftLeg, rightLeg);
+		}
+		return ImpairmentMath.fourLegPenalty(legPenalty(data.part(BodyPart.LEFT_ARM)),
+				legPenalty(data.part(BodyPart.RIGHT_ARM)), leftLeg, rightLeg);
+	}
+
+	/** Down to dragging itself: both legs of two, or three legs of four. */
+	public static boolean crawling(BodyPlan plan, RealisticDamageData data) {
+		int walking = plan.walkingLimbs();
+		if (walking == 2) {
+			return data.legless();
+		}
+		if (walking == 4) {
+			int gone = 0;
+			for (BodyPart part : BodyPart.values()) {
+				if (plan.walks(part) && data.part(part).destroyed()) {
+					gone++;
+				}
+			}
+			return gone >= 3;
+		}
+		return false;
+	}
+
+	/** A wing is gone: this body is not flying any more. */
+	public static boolean wingsGone(BodyPlan plan, RealisticDamageData data) {
+		return plan.hasWings()
+				&& (data.part(BodyPart.LEFT_ARM).destroyed() || data.part(BodyPart.RIGHT_ARM).destroyed());
 	}
 
 	public static boolean sprintBlocked(RealisticDamageData data) {

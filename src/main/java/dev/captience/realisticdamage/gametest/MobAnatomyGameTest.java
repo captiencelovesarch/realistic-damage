@@ -18,7 +18,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.EntityTypes;
-import net.minecraft.world.entity.animal.pig.Pig;
 import net.minecraft.world.entity.monster.skeleton.Skeleton;
 import net.minecraft.world.entity.monster.illager.Pillager;
 import net.minecraft.world.entity.monster.zombie.Zombie;
@@ -73,15 +72,19 @@ public class MobAnatomyGameTest {
 		helper.succeed();
 	}
 
+	/**
+	 * Since slice three every vanilla mob is in the tag, so "untagged" is tested
+	 * on the one living thing that is not a mob: an armour stand.
+	 */
 	@GameTest(environment = "realisticdamage:isolated")
-	public void anUntaggedMobIsLeftAlone(GameTestHelper helper) {
-		Pig pig = spawnStill(helper, EntityTypes.PIG);
+	public void anythingOutsideTheTagIsLeftAlone(GameTestHelper helper) {
+		var stand = helper.spawn(EntityTypes.ARMOR_STAND, new BlockPos(1, 1, 1));
 		try {
-			pig.hurtServer(helper.getLevel(), helper.getLevel().damageSources().playerAttack(mockPlayer(helper)), 4.0F);
-			helper.assertTrue(pig.getAttached(RDAttachments.DATA) == null, "a pig is not in the tag and has no body");
-			helper.assertTrue(!MobAnatomy.isTracked(pig), "and is not ticked");
+			stand.hurtServer(helper.getLevel(), helper.getLevel().damageSources().playerAttack(mockPlayer(helper)), 0.5F);
+			helper.assertTrue(stand.getAttached(RDAttachments.DATA) == null, "an armour stand has no body");
+			helper.assertTrue(!MobAnatomy.participates(stand), "and takes no part");
 		} finally {
-			pig.discard();
+			stand.discard();
 		}
 		helper.succeed();
 	}

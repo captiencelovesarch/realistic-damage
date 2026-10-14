@@ -1,0 +1,14 @@
+{
+	"values": [
+		"minecraft:turtle",
+		"minecraft:armadillo",
+		{
+			"id": "minecraft:nautilus",
+			"required": false
+		},
+		{
+			"id": "minecraft:zombie_nautilus",
+			"required": false
+		}
+	]
+}

@@ -312,6 +312,19 @@ public final class Balance {
 	/** Multipliers on a ranged mob's shot inaccuracy: a dazed head, a broken drawing arm. */
 	public static final double MOB_DAZE_AIM_SPREAD = 3.0;
 	public static final double MOB_BROKEN_ARM_AIM_SPREAD = 2.0;
+	/**
+	 * A body's size against a person's (1.7 slice 3): max health over this.
+	 * Trauma and blood loss are divided by the ratio (never below one).
+	 */
+	public static final double VITALITY_BASELINE_HP = 20.0;
+	/** What a shell takes off torso trauma (turtle, armadillo, nautilus). */
+	public static final double SHELL_TORSO_REDUCTION = 0.5;
+	/** Worn body armour on a mob (horse armour, wolf armour): head and torso fully, limbs by half. */
+	public static final double MOB_BODY_ARMOR_LIMB_COVERAGE = 0.5;
+	/** Worst-first weights for four walking legs; sums to 1. One destroyed leg of four (0.45) costs ~0.2. */
+	public static final double[] FOUR_LEG_WEIGHTS = {0.45, 0.30, 0.15, 0.10};
+	/** Downward speed a flyer with a lost wing is held to while airborne, blocks/tick. */
+	public static final double GROUNDED_FALL_SPEED = 0.18;
 
 	// Stains: what a drop leaves on the surface it hits.
 	/** Hard cap on tracked stains. Oldest are evicted first (spec §56: no unbounded state). */

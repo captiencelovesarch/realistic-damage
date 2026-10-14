@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.body.BodyPlan;
+import dev.captience.realisticdamage.systems.MobAnatomy;
 import dev.captience.realisticdamage.config.Balance;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
@@ -43,6 +45,13 @@ public final class BodyHitResolver {
 				// rather than resolving to some arbitrary region.
 				return classifyPoint(target, clipOrFallback(box, supplied, box.getCenter(), supplied));
 			}
+		}
+		// The dragon is hit through its parts (1.7 slice 3), and the part vanilla
+		// routed the blow through is a better answer than any ray against a
+		// sixteen-block box that is mostly air.
+		BodyPart viaPart = DragonHits.consume(target);
+		if (viaPart != null) {
+			return viaPart;
 		}
 		Entity direct = source.getDirectEntity();
 		if (direct instanceof Projectile projectile) {
@@ -85,6 +94,16 @@ public final class BodyHitResolver {
 		return classifyPoint(target, point);
 	}
 
+	/**
+	 * Which way a body faces. The yaw for nearly everything; the ender dragon
+	 * flies backwards by its own yaw — vanilla places its head at minus the look
+	 * vector — so its facing is flipped to match the head.
+	 */
+	public static Vec3 facing(LivingEntity target) {
+		Vec3 look = Vec3.directionFromRotation(0.0F, target.yBodyRot);
+		return target instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon ? look.scale(-1.0) : look;
+	}
+
 	private static Vec3 clipOrFallback(AABB box, Vec3 from, Vec3 to, Vec3 fallback) {
 		Optional<Vec3> hit = box.clip(from, to);
 		if (hit.isPresent()) {
@@ -102,10 +121,18 @@ public final class BodyHitResolver {
 	public static BodyPart classifyPoint(LivingEntity target, Vec3 point) {
 		AABB box = target.getBoundingBox();
 		Vec3 center = box.getCenter();
-		Vec3 forward = Vec3.directionFromRotation(0.0F, target.yBodyRot);
+		Vec3 forward = facing(target);
 		Vec3 right = forward.yRot((float) (-Math.PI / 2.0));
 		double lateral = point.subtract(center).dot(right);
 		double halfWidth = Math.max(box.getXsize(), box.getZsize()) / 2.0;
+
+		BodyPlan plan = MobAnatomy.plan(target);
+		if (plan != BodyPlan.HUMANOID) {
+			// Every other body (1.7 slice 3) is laid out in its own plan's units.
+			double along = point.subtract(center).dot(forward) / halfWidth;
+			double heightFraction = (point.y - box.minY) / box.getYsize();
+			return plan.classify(along, lateral / halfWidth, heightFraction);
+		}
 
 		Pose pose = target.getPose();
 		if (pose == Pose.SWIMMING || pose == Pose.FALL_FLYING || pose == Pose.SPIN_ATTACK) {
@@ -149,16 +176,32 @@ public final class BodyHitResolver {
 	 * primary, the core takes secondary shock, the rest a small remainder.
 	 */
 	public static Map<BodyPart, Double> explosionShares(LivingEntity target, Vec3 center) {
+		BodyPlan plan = MobAnatomy.plan(target);
 		BodyPart primary = nearestRegion(target, center);
 		Map<BodyPart, Double> shares = new EnumMap<>(BodyPart.class);
 		BodyPart secondary = primary == BodyPart.TORSO ? BodyPart.HEAD : BodyPart.TORSO;
-		double remainder = 1.0 - Balance.EXPLOSION_PRIMARY_SHARE - Balance.EXPLOSION_SECONDARY_SHARE;
-		double each = remainder / 4.0;
+		if (!plan.has(secondary)) {
+			// A blob has nothing but a torso; the whole blast is the primary's.
+			shares.put(primary, 1.0);
+			return shares;
+		}
+		int others = 0;
 		for (BodyPart part : BodyPart.values()) {
+			if (plan.has(part) && part != primary && part != secondary) {
+				others++;
+			}
+		}
+		double remainder = 1.0 - Balance.EXPLOSION_PRIMARY_SHARE - Balance.EXPLOSION_SECONDARY_SHARE;
+		// With nothing else to take the remainder, the core does: shares still sum to one.
+		double each = others == 0 ? 0.0 : remainder / others;
+		for (BodyPart part : BodyPart.values()) {
+			if (!plan.has(part)) {
+				continue;
+			}
 			if (part == primary) {
 				shares.put(part, Balance.EXPLOSION_PRIMARY_SHARE);
 			} else if (part == secondary) {
-				shares.put(part, Balance.EXPLOSION_SECONDARY_SHARE);
+				shares.put(part, Balance.EXPLOSION_SECONDARY_SHARE + (others == 0 ? remainder : 0.0));
 			} else {
 				shares.put(part, each);
 			}
@@ -177,24 +220,43 @@ public final class BodyHitResolver {
 	 */
 	public static Vec3 regionCenter(LivingEntity target, BodyPart part) {
 		AABB box = target.getBoundingBox();
-		Vec3 forward = Vec3.directionFromRotation(0.0F, target.yBodyRot);
+		Vec3 forward = facing(target);
 		Vec3 right = forward.yRot((float) (-Math.PI / 2.0));
 		double halfWidth = Math.max(box.getXsize(), box.getZsize()) / 2.0;
+		BodyPlan plan = MobAnatomy.plan(target);
+		if (plan != BodyPlan.HUMANOID) {
+			return planCenter(plan, part, box, forward, right, halfWidth);
+		}
 		return regionCenter(part, box, box.getCenter(), right, halfWidth, box.getYsize());
+	}
+
+	/** A plan region's anchor in the world (1.7 slice 3). */
+	private static Vec3 planCenter(BodyPlan plan, BodyPart part, AABB box, Vec3 forward, Vec3 right, double halfWidth) {
+		double[] anchor = plan.anchor(part);
+		Vec3 center = box.getCenter();
+		return new Vec3(center.x, box.minY + anchor[2] * box.getYsize(), center.z)
+				.add(forward.scale(anchor[0] * halfWidth))
+				.add(right.scale(anchor[1] * halfWidth));
 	}
 
 	private static BodyPart nearestRegion(LivingEntity target, Vec3 center) {
 		AABB box = target.getBoundingBox();
 		Vec3 boxCenter = box.getCenter();
-		Vec3 forward = Vec3.directionFromRotation(0.0F, target.yBodyRot);
+		Vec3 forward = facing(target);
 		Vec3 right = forward.yRot((float) (-Math.PI / 2.0));
 		double halfWidth = Math.max(box.getXsize(), box.getZsize()) / 2.0;
 		double height = box.getYsize();
+		BodyPlan plan = MobAnatomy.plan(target);
 
 		BodyPart nearest = BodyPart.TORSO;
 		double best = Double.MAX_VALUE;
 		for (BodyPart part : BodyPart.values()) {
-			Vec3 regionCenter = regionCenter(part, box, boxCenter, right, halfWidth, height);
+			if (!plan.has(part)) {
+				continue;
+			}
+			Vec3 regionCenter = plan == BodyPlan.HUMANOID
+					? regionCenter(part, box, boxCenter, right, halfWidth, height)
+					: planCenter(plan, part, box, forward, right, halfWidth);
 			double distance = regionCenter.distanceToSqr(center);
 			if (distance < best) {
 				best = distance;

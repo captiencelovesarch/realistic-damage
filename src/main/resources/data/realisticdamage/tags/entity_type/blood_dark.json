@@ -4,6 +4,18 @@
 		"minecraft:husk",
 		"minecraft:drowned",
 		"minecraft:zombie_villager",
-		"minecraft:zombified_piglin"
+		"minecraft:zombified_piglin",
+		"minecraft:giant",
+		"minecraft:zombie_horse",
+		"minecraft:zoglin",
+		{
+			"id": "minecraft:camel_husk",
+			"required": false
+		},
+		{
+			"id": "minecraft:zombie_nautilus",
+			"required": false
+		},
+		"minecraft:phantom"
 	]
 }

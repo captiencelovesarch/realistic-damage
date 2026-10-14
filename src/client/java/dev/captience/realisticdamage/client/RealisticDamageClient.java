@@ -25,6 +25,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 				dev.captience.realisticdamage.RDParticles.BLOOD, BloodDrop.Provider::new);
 		// Shader packs swap pipelines by name, and ours has to be on their list.
 		BloodStainLayer.registerWithShaderLoader();
+		ModelBlood.registerWithShaderLoader();
 
 		// Blood on the body, for every player renderer including the skin variants.
 		net.fabricmc.fabric.api.client.rendering.v1.LivingEntityRenderLayerRegistrationCallback.EVENT
@@ -60,6 +61,13 @@ public class RealisticDamageClient implements ClientModInitializer {
 								net.minecraft.client.renderer.entity.state.LivingEntityRenderState,
 								net.minecraft.client.model.EntityModel<net.minecraft.client.renderer.entity.state.LivingEntityRenderState>>) living;
 						helper.register(new FigureBloodLayer<>(parent, LimbMeshes.Kind.VILLAGER));
+					} else if (renderer instanceof net.minecraft.client.renderer.entity.LivingEntityRenderer<?, ?, ?> living) {
+						// Everything else (1.7 slice 3): the model's own parts, by name.
+						@SuppressWarnings("unchecked")
+						var parent = (net.minecraft.client.renderer.entity.RenderLayerParent<
+								net.minecraft.client.renderer.entity.state.LivingEntityRenderState,
+								net.minecraft.client.model.EntityModel<net.minecraft.client.renderer.entity.state.LivingEntityRenderState>>) living;
+						helper.register(new ModelBloodLayer<>(parent));
 					}
 				});
 

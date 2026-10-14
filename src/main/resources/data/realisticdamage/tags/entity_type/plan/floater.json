@@ -1,0 +1,15 @@
+{
+	"values": [
+		"minecraft:ghast",
+		{
+			"id": "minecraft:happy_ghast",
+			"required": false
+		},
+		"minecraft:blaze",
+		"minecraft:breeze",
+		"minecraft:squid",
+		"minecraft:glow_squid",
+		"minecraft:wither",
+		"minecraft:shulker"
+	]
+}

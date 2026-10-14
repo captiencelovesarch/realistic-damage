@@ -30,6 +30,18 @@ public final class ArmorModifier {
 		total += pieceReduction(player, EquipmentSlot.CHEST, coverageChest(part), category);
 		total += pieceReduction(player, EquipmentSlot.LEGS, coverageLegs(part), category);
 		total += pieceReduction(player, EquipmentSlot.FEET, coverageFeet(part, category), category);
+		if (!(player instanceof net.minecraft.world.entity.player.Player)) {
+			// Horse armour, wolf armour (1.7 slice 3): worn over the whole body,
+			// so the head and trunk are covered and the legs half.
+			double body = part.isCore() ? 1.0 : Balance.MOB_BODY_ARMOR_LIMB_COVERAGE;
+			// A llama's carpet sits in the same slot and is decoration, not armour.
+			if (!player.getItemBySlot(EquipmentSlot.BODY).is(net.minecraft.tags.ItemTags.WOOL_CARPETS)) {
+				total += pieceReduction(player, EquipmentSlot.BODY, body, category);
+			}
+			if (part == BodyPart.TORSO && dev.captience.realisticdamage.systems.MobAnatomy.shelled(player)) {
+				total += Balance.SHELL_TORSO_REDUCTION;
+			}
+		}
 		double cap = category == DamageCategory.FALL ? Balance.ARMOR_FALL_REDUCTION_CAP : Balance.ARMOR_REDUCTION_CAP;
 		return Math.min(total, cap);
 	}

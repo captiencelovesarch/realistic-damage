@@ -7,6 +7,7 @@ import java.util.Map;
 
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.BodyPartData;
+import dev.captience.realisticdamage.body.BodyPlan;
 import dev.captience.realisticdamage.body.PendingExplosion;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.config.Balance;
@@ -103,7 +104,8 @@ public final class TraumaPipeline {
 		// outcome available here.
 		List<BodyPart> taken = List.of();
 		if (blast != null && !blocked
-				&& config.enableLimbDestruction && config.enableExplosiveDismemberment) {
+				&& config.enableLimbDestruction && config.enableExplosiveDismemberment
+				&& MobAnatomy.canLoseParts(player)) {
 			taken = ExplosiveDismemberment.evaluate(
 					player, data, config, classified, source, blast, blastShares, result);
 		}
@@ -135,6 +137,9 @@ public final class TraumaPipeline {
 		if (fall) {
 			baseTrauma *= config.fallTraumaMultiplier;
 		}
+		// A body five times a person's takes a fifth of the trauma per blow (1.7
+		// slice 3); it has five times the health for the hit to come out of.
+		baseTrauma /= MobAnatomy.vitalityScale(player);
 		if (baseTrauma <= 0.0 && taken.isEmpty()) {
 			return result;
 		}
@@ -150,8 +155,9 @@ public final class TraumaPipeline {
 				result.add(new AppliedTrauma(part, dealt, localized, true));
 				// Direct core hits shock the limbs a little (spec §8).
 				if (part.isCore() && localized > 0) {
+					BodyPlan plan = MobAnatomy.plan(player);
 					for (BodyPart limb : BodyPart.values()) {
-						if (limb.isLimb()) {
+						if (limb.isLimb() && plan.has(limb)) {
 							double attempted = localized * Balance.CORE_HIT_LIMB_SHOCK;
 							double shock = data.part(limb).damage(attempted);
 							if (attempted > 0) {
@@ -179,7 +185,7 @@ public final class TraumaPipeline {
 				applyShares(player, data, classified, baseTrauma, shares, result);
 			}
 			case FALL_LEGS -> applyShares(player, data, classified, baseTrauma,
-					FallMath.shares(fallHeight, data.pendingFallLeadingLeft()), result);
+					onAllFours(player, FallMath.shares(fallHeight, data.pendingFallLeadingLeft())), result);
 			default -> applyShares(player, data, classified, baseTrauma,
 					EnvironmentalRouter.shares(classified.routing()), result);
 		}
@@ -202,7 +208,8 @@ public final class TraumaPipeline {
 		// A blast that already took a limb counts: the dismemberment sentence must
 		// keep the frame too.
 		boolean limbLost = !taken.isEmpty();
-		if (config.enableLimbDestruction && DestructionLogic.evaluate(player, data, result, blow)) {
+		if (config.enableLimbDestruction && MobAnatomy.canLoseParts(player)
+				&& DestructionLogic.evaluate(player, data, result, blow)) {
 			limbLost = true;
 		}
 		if (config.enableLongTermInjuries && player instanceof ServerPlayer) {
@@ -221,8 +228,10 @@ public final class TraumaPipeline {
 		// bar several times over, and the concussion line would otherwise be the
 		// last thing written on every dismemberment frame there has ever been.
 		// The concussion still happens — only the sentence yields.
-		dev.captience.realisticdamage.systems.ConsciousnessSystem.onTrauma(
-				player, data, classified, profile, result, traumaSource, limbLost);
+		if (MobAnatomy.feelsConsciousness(player)) {
+			dev.captience.realisticdamage.systems.ConsciousnessSystem.onTrauma(
+					player, data, classified, profile, result, traumaSource, limbLost);
+		}
 		if (fall && fallHeight > 0.0) {
 			landed(player, data, fallHeight, config);
 		} else if (player instanceof ServerPlayer serverPlayer) {
@@ -245,7 +254,7 @@ public final class TraumaPipeline {
 	private static void landed(LivingEntity player, RealisticDamageData data, double fallHeight,
 			ServerConfig config) {
 		double effectiveHeight = fallHeight * data.pendingFallSurface();
-		if (config.enableKnockdown) {
+		if (config.enableKnockdown && !MobAnatomy.boss(player)) {
 			int ticks = FallMath.knockdownTicks(effectiveHeight);
 			if (ticks > 0) {
 				// A mob goes down too (1.7): its attributes zero its movement for
@@ -368,14 +377,62 @@ public final class TraumaPipeline {
 		}
 	}
 
+	/**
+	 * A fall lands on every leg a body stands on (1.7 slice 3): on four, each
+	 * leg's share is split with the foreleg on its side.
+	 */
+	private static Map<BodyPart, Double> onAllFours(LivingEntity player, Map<BodyPart, Double> shares) {
+		BodyPlan plan = MobAnatomy.plan(player);
+		if (plan.walkingLimbs() != 4) {
+			return shares;
+		}
+		Map<BodyPart, Double> split = new java.util.EnumMap<>(BodyPart.class);
+		for (Map.Entry<BodyPart, Double> entry : shares.entrySet()) {
+			BodyPart part = entry.getKey();
+			if (part.isLeg()) {
+				BodyPart foreleg = part == BodyPart.LEFT_LEG ? BodyPart.LEFT_ARM : BodyPart.RIGHT_ARM;
+				split.merge(part, entry.getValue() / 2.0, Double::sum);
+				split.merge(foreleg, entry.getValue() / 2.0, Double::sum);
+			} else {
+				split.merge(part, entry.getValue(), Double::sum);
+			}
+		}
+		return split;
+	}
+
+	/**
+	 * Folds every share meant for a region this body does not have into the
+	 * torso (1.7 slice 3): a fall's leg share on a fish, the arms' share of a
+	 * fire on a slime. The total is unchanged.
+	 */
+	static Map<BodyPart, Double> present(LivingEntity player, Map<BodyPart, Double> shares) {
+		BodyPlan plan = MobAnatomy.plan(player);
+		boolean whole = true;
+		for (BodyPart part : shares.keySet()) {
+			if (!plan.has(part)) {
+				whole = false;
+				break;
+			}
+		}
+		if (whole) {
+			return shares;
+		}
+		Map<BodyPart, Double> folded = new java.util.EnumMap<>(BodyPart.class);
+		for (Map.Entry<BodyPart, Double> entry : shares.entrySet()) {
+			folded.merge(plan.redirect(entry.getKey()), entry.getValue(), Double::sum);
+		}
+		return folded;
+	}
+
 	private static void applyShares(LivingEntity player, RealisticDamageData data, ClassifiedDamage classified,
 			double baseTrauma, Map<BodyPart, Double> shares, List<AppliedTrauma> result) {
+		shares = present(player, shares);
 		double primaryShare = shares.values().stream().mapToDouble(Double::doubleValue).max().orElse(0.0);
 		for (Map.Entry<BodyPart, Double> entry : shares.entrySet()) {
 			BodyPart part = entry.getKey();
 			double amount = baseTrauma * entry.getValue()
 					* (1.0 - ArmorModifier.reduction(player, part, classified.category()));
-			if (classified.category() == DamageCategory.FALL && part.isLeg()) {
+			if (classified.category() == DamageCategory.FALL && MobAnatomy.plan(player).walks(part)) {
 				// Damaged legs make further falls much more dangerous (spec §13).
 				amount *= ImpairmentMath.fallTraumaAmplifier(data.part(part).fraction());
 			}

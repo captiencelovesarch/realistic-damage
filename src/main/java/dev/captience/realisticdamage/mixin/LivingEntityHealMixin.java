@@ -18,6 +18,17 @@ public abstract class LivingEntityHealMixin {
 	@Inject(method = "heal", at = @At("HEAD"))
 	private void realisticdamage$observeHeal(float heal, CallbackInfo ci) {
 		if (!((Object) this instanceof ServerPlayer player)) {
+			// A mob vanilla heals mends by the same amount (1.7 slice 3): a fed
+			// wolf, a horse given an apple, an iron golem patched with iron. Food
+			// and time are the cure for them too.
+			LivingEntity self = (LivingEntity) (Object) this;
+			if (self.getHealth() > 0.0F && self.hasAttached(dev.captience.realisticdamage.RDAttachments.DATA)
+					&& dev.captience.realisticdamage.systems.MobAnatomy.isMobWithBody(self)) {
+				float effective = Math.min(heal, self.getMaxHealth() - self.getHealth());
+				if (effective > 0.0F) {
+					HealingSystem.onMobHeal(self, effective);
+				}
+			}
 			return;
 		}
 		// Mirror vanilla's own clamping so overheal never inflates the body budget.

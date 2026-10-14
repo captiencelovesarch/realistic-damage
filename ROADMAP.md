@@ -371,6 +371,30 @@ and lost limbs scream — TF2 pain lines imported from the player's own install
 (`tools/import_tf2_screams.py`, gitignored). Also: a crushed chest now counts as
 full violence, and a corpse no longer heals.
 
+**Slice three: every other mob** (Oct 14 2026, alpha.9). All ninety vanilla mobs
+have bodies now. The six regions stay six; a **body plan** (by entity type tag,
+`realisticdamage:plan/<id>`) says what each slot is on that body and where it
+sits — a cow's arm slots are its forelegs, a bat's are its wings, a fish has a
+head and a body and nothing else, a slime is all torso. Hit location, blood
+placement and blast routing all read the plan, the ender dragon is hit through
+the part vanilla routed the blow through, and a share meant for a region a body
+lacks lands on its torso. Four legs share the load (one lost leg of four is a
+limp, three is a crawl), a broken wing flies slower and a lost one brings the
+flyer down, and only bodies with hands lose the ability to swing, throw or shoot.
+Modifiers, all tags: bloodless (skeletons, golems, the wither, blazes, breezes,
+vexes, allays, ghasts), nine blood colours (undead dark, the End purple, slime
+and creeper green, magma orange, spider and squid blue, glow squid teal, insect
+yellow-green, warden sculk, sulfur cube yellow), mindless (golems, cubes,
+blazes, breezes, the creaking: no concussion, no knockout), bosses (dragon,
+wither, warden, elder guardian: they bleed and break but are never knocked out
+or taken apart), shells (turtle, armadillo, nautilus). Trauma and blood loss
+scale by size (max health over twenty), horse and wolf armour cover the body,
+and a mob vanilla heals — fed, or an iron golem patched with iron — mends its
+body by that heal. On screen, lost limbs vanish from any model by part name and
+blood is drawn onto the model's own surface with an equal-depth pass, so no
+mob needed hand-built shells. Not yet: stumps, severed limbs and limps for the
+non-humanoid models.
+
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here
   shipped early in 1.6.2 and is ready for mobs to reuse.)

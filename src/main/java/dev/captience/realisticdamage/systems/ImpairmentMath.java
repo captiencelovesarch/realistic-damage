@@ -68,6 +68,21 @@ public final class ImpairmentMath {
 	}
 
 	/**
+	 * Movement penalty for a body on four legs (1.7 slice 3): sorted worst first
+	 * and weighted {@link Balance#FOUR_LEG_WEIGHTS}, so one lost leg of four is a
+	 * limp and the fourth leg barely matters once three are hurt. Same cap as two.
+	 */
+	public static double fourLegPenalty(double a, double b, double c, double d) {
+		double[] legs = {a, b, c, d};
+		java.util.Arrays.sort(legs);
+		double combined = 0.0;
+		for (int i = 0; i < 4; i++) {
+			combined += legs[3 - i] * Balance.FOUR_LEG_WEIGHTS[i];
+		}
+		return Math.min(combined, Balance.LEG_PENALTY_TOTAL_CAP);
+	}
+
+	/**
 	 * Jump-strength penalty derived from the combined movement penalty, bounded so
 	 * a wrecked or lost leg can still climb one block.
 	 *

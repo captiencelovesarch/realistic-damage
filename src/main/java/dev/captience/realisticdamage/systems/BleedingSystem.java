@@ -28,8 +28,9 @@ public final class BleedingSystem {
 		if (data.bleeding()) {
 			// A hand held over the wound does not close it, it only slows what is
 			// coming out. Buying time, not a cure (1.2).
+			// A bigger body holds more blood (1.7 slice 3): the same wound empties it slower.
 			data.drainBlood(data.effectiveBleedRate() * config.bleedingRateMultiplier
-					* data.pressureMultiplier() / 20.0);
+					* data.pressureMultiplier() / 20.0 / MobAnatomy.vitalityScale(player));
 		}
 
 		// Tell the player they are heading for a bleed-out before it happens.
@@ -39,7 +40,8 @@ public final class BleedingSystem {
 		}
 		data.setLastBloodBand(band);
 
-		double hpPerSecond = bleedOutHpPerSecond(data.blood());
+		// ...and once it is empty, the end comes on the same clock as a person's.
+		double hpPerSecond = bleedOutHpPerSecond(data.blood()) * MobAnatomy.vitalityScale(player);
 		if (hpPerSecond > 0.0) {
 			// Whole-point hurts from an accumulator: no sub-half-heart spam.
 			if (data.advanceBleedHpDrain(hpPerSecond / 20.0)) {

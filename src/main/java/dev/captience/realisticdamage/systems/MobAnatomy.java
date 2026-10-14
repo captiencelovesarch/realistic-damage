@@ -8,6 +8,7 @@ import java.util.Set;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.RealisticDamage;
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.body.BodyPlan;
 import dev.captience.realisticdamage.body.BodyPartData;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.config.Balance;
@@ -67,6 +68,124 @@ public final class MobAnatomy {
 			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_dark"));
 	public static final TagKey<EntityType<?>> BLOOD_PURPLE =
 			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_purple"));
+	/** Slice three's colours (1.7): slime, magma, hemocyanin, glow, insect, sculk, sulfur. */
+	public static final TagKey<EntityType<?>> BLOOD_GREEN =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_green"));
+	public static final TagKey<EntityType<?>> BLOOD_MAGMA =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_magma"));
+	public static final TagKey<EntityType<?>> BLOOD_BLUE =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_blue"));
+	public static final TagKey<EntityType<?>> BLOOD_GLOW =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_glow"));
+	public static final TagKey<EntityType<?>> BLOOD_INSECT =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_insect"));
+	public static final TagKey<EntityType<?>> BLOOD_SCULK =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_sculk"));
+	public static final TagKey<EntityType<?>> BLOOD_SULFUR =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("blood_sulfur"));
+	/**
+	 * No mind to lose (1.7 slice 3): constructs, cubes and elementals. No
+	 * concussion, no knockout, no hypoxia — there is nothing in an iron golem
+	 * for a blow to the head to switch off.
+	 */
+	public static final TagKey<EntityType<?>> MINDLESS =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("mindless"));
+	/**
+	 * Bosses (1.7 slice 3): they bleed, break and stain like anything else, but
+	 * cannot be knocked out, dazed, knocked down, or lose a limb or a head. A
+	 * boss fight stays a fight rather than one lucky headshot.
+	 */
+	public static final TagKey<EntityType<?>> BOSS =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("boss"));
+	/** A shell over the torso (1.7 slice 3): it takes {@link Balance#SHELL_TORSO_REDUCTION} of torso trauma. */
+	public static final TagKey<EntityType<?>> SHELLED =
+			TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("shelled"));
+
+	/** One tag per non-humanoid plan, {@code realisticdamage:plan/<id>}; untagged bodies are humanoid. */
+	private static final java.util.Map<BodyPlan, TagKey<EntityType<?>>> PLAN_TAGS = planTags();
+	/** Plan by type, filled on first ask; tags can change on /reload, so it is cleared then. */
+	private static final java.util.Map<EntityType<?>, BodyPlan> planCache =
+			java.util.Collections.synchronizedMap(new IdentityHashMap<>());
+
+	private static java.util.Map<BodyPlan, TagKey<EntityType<?>>> planTags() {
+		java.util.Map<BodyPlan, TagKey<EntityType<?>>> tags = new java.util.EnumMap<>(BodyPlan.class);
+		for (BodyPlan plan : BodyPlan.values()) {
+			if (plan != BodyPlan.HUMANOID) {
+				tags.put(plan, TagKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("plan/" + plan.id())));
+			}
+		}
+		return tags;
+	}
+
+	/** The plan tag for one plan, for the gametests; null for humanoid, which is the default. */
+	public static TagKey<EntityType<?>> planTag(BodyPlan plan) {
+		return PLAN_TAGS.get(plan);
+	}
+
+	/** Forgets cached plans; tags were (re)loaded. */
+	public static void tagsReloaded() {
+		planCache.clear();
+	}
+
+	/** How this body is laid out. Players are humanoid; mobs by tag, humanoid when untagged. */
+	public static BodyPlan plan(LivingEntity entity) {
+		if (entity instanceof Player) {
+			return BodyPlan.HUMANOID;
+		}
+		return plan(entity.getType());
+	}
+
+	public static BodyPlan plan(EntityType<?> type) {
+		BodyPlan cached = planCache.get(type);
+		if (cached != null) {
+			return cached;
+		}
+		BodyPlan found = BodyPlan.HUMANOID;
+		var holder = type.builtInRegistryHolder();
+		for (var entry : PLAN_TAGS.entrySet()) {
+			if (holder.is(entry.getValue())) {
+				found = entry.getKey();
+				break;
+			}
+		}
+		planCache.put(type, found);
+		return found;
+	}
+
+	/**
+	 * How much bigger than a person this body is (1.7 slice 3): its max health
+	 * over twenty, never below one. Trauma and blood loss are divided by it and
+	 * the final bleed-out multiplied, so a hundred-HP golem is not dismembered by
+	 * the stroke that takes a zombie's arm, and a dragon still bleeds out on a
+	 * clock that ends.
+	 */
+	public static double vitalityScale(LivingEntity entity) {
+		if (entity instanceof Player) {
+			return 1.0;
+		}
+		return Math.max(1.0, entity.getMaxHealth() / Balance.VITALITY_BASELINE_HP);
+	}
+
+	public static boolean boss(LivingEntity entity) {
+		return !(entity instanceof Player) && entity.is(BOSS);
+	}
+
+	public static boolean shelled(LivingEntity entity) {
+		return !(entity instanceof Player) && entity.is(SHELLED);
+	}
+
+	/**
+	 * Whether consciousness applies to this body at all: everyone but the
+	 * mindless and the bosses. A boss can be hurt in every other way.
+	 */
+	public static boolean feelsConsciousness(LivingEntity entity) {
+		return entity instanceof Player || !(entity.is(MINDLESS) || entity.is(BOSS));
+	}
+
+	/** Whether this body can lose a part at all; bosses cannot. */
+	public static boolean canLoseParts(LivingEntity entity) {
+		return !boss(entity);
+	}
 
 	private static final Set<Mob> injured = Collections.newSetFromMap(new IdentityHashMap<>());
 	/** Mobs whose AI this class switched off, so waking switches on only those. */
@@ -151,12 +270,47 @@ public final class MobAnatomy {
 		data.tickUnconscious();
 		data.tickKnockdown(Balance.KNOCKDOWN_RECOVERY_TICKS);
 		BleedingSystem.tick(mob, data);
-		ConsciousnessSystem.tick(mob, data);
-		ConcussionSystem.tick(mob, data);
+		// The mindless and the bosses have no consciousness to run (1.7 slice 3).
+		if (feelsConsciousness(mob)) {
+			ConsciousnessSystem.tick(mob, data);
+			ConcussionSystem.tick(mob, data);
+		}
 		HealingSystem.tick(mob, data);
 		ImpairmentSystem.tick(mob, data);
 		daze(mob, data);
+		ground(mob, data);
 		RDAttachments.pushSnapshot(mob);
+	}
+
+	/**
+	 * A flyer that has lost a wing comes down (1.7 slice 3). Gravity back on and
+	 * a floor under how fast it may rise, every tick, after its own AI has had
+	 * its say — so a bee or parrot that keeps trying to climb only sinks slower.
+	 * Bats and phantoms fly by AI alone and have no flight speed to take away, so
+	 * they stop thinking for good and drop: a bat with one wing is on the floor.
+	 */
+	private static void ground(Mob mob, RealisticDamageData data) {
+		if (!ServerConfig.get().enableLimbDestruction || !ImpairmentSystem.wingsGone(plan(mob), data)) {
+			return;
+		}
+		if (mob.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.FLYING_SPEED) == null
+				&& !mob.isNoAi()) {
+			mob.setNoAi(true);
+			mob.setTarget(null);
+		}
+		mob.setNoGravity(false);
+		if (!mob.onGround() && !mob.isInWater()) {
+			var motion = mob.getDeltaMovement();
+			if (motion.y > -Balance.GROUNDED_FALL_SPEED) {
+				mob.setDeltaMovement(motion.x * 0.8, -Balance.GROUNDED_FALL_SPEED, motion.z * 0.8);
+				mob.hurtMarked = true;
+			}
+		}
+	}
+
+	/** Whether a destroyed wing has this body on the ground; for the gametests. */
+	public static boolean grounded(Mob mob) {
+		return isMobWithBody(mob) && ImpairmentSystem.wingsGone(plan(mob), RDAttachments.get(mob));
 	}
 
 	/**
@@ -208,6 +362,11 @@ public final class MobAnatomy {
 		if (!isMobWithBody(mob) || !ServerConfig.get().enableLimbDestruction) {
 			return true;
 		}
+		// A body without hands strikes with its head — a wolf with a broken
+		// foreleg still bites — so only hands can be lost to this rule.
+		if (!plan(mob).hasHands()) {
+			return true;
+		}
 		RealisticDamageData data = RDAttachments.get(mob);
 		return !(data.part(BodyPart.LEFT_ARM).destroyed() && data.part(BodyPart.RIGHT_ARM).destroyed());
 	}
@@ -215,6 +374,9 @@ public final class MobAnatomy {
 	/** Can this mob still draw a bow or aim a crossbow? Not without its main arm. */
 	public static boolean canShoot(Mob mob) {
 		if (!isMobWithBody(mob) || !ServerConfig.get().enableLimbDestruction) {
+			return true;
+		}
+		if (!plan(mob).hasHands()) {
 			return true;
 		}
 		RealisticDamageData data = RDAttachments.get(mob);
@@ -235,7 +397,7 @@ public final class MobAnatomy {
 		if (data.concussion()) {
 			spread *= Balance.MOB_DAZE_AIM_SPREAD;
 		}
-		if (data.part(ImpairmentSystem.armFor(mob, true)).broken()) {
+		if (plan(mob).hasHands() && data.part(ImpairmentSystem.armFor(mob, true)).broken()) {
 			spread *= Balance.MOB_BROKEN_ARM_AIM_SPREAD;
 		}
 		return spread;
