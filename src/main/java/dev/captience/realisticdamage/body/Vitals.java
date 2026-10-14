@@ -70,6 +70,17 @@ public final class Vitals {
 	}
 
 	/**
+	 * The graded form (1.7): the shift depends on how bad the concussion is and
+	 * how hard it is flaring. Moderate at zero flare is exactly the old flat
+	 * shift, so the boolean form above is the same answer for the default grade.
+	 */
+	public static double effectiveConsciousness(double consciousness, int concussionGrade, double flare) {
+		double shifted = consciousness
+				- dev.captience.realisticdamage.systems.ConcussionMath.symptomShift(concussionGrade, flare);
+		return Math.clamp(shifted, 0.0, Balance.CONSCIOUSNESS_MAX);
+	}
+
+	/**
 	 * Ticks between microsleeps at this consciousness, and how long each one
 	 * lasts. Both interpolate over the range below {@link
 	 * Balance#SYMPTOM_MICROSLEEP}: rare and blink-short at the top, frequent and

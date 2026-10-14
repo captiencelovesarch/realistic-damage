@@ -103,7 +103,11 @@ public final class RealisticDamageCommands {
 												.executes(RealisticDamageCommands::bleed)))))
 				.then(literal("concussion")
 						.then(argument("player", EntityArgument.player())
-								.executes(RealisticDamageCommands::concussion)))
+								.executes(RealisticDamageCommands::concussion)
+								.then(argument("grade", StringArgumentType.word())
+										.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
+												new String[] {"mild", "moderate", "severe", "none"}, builder))
+										.executes(RealisticDamageCommands::concussion))))
 				.then(literal("destroy")
 						.then(argument("player", EntityArgument.player())
 								.then(partArg().executes(RealisticDamageCommands::destroyPart))))
@@ -269,9 +273,16 @@ public final class RealisticDamageCommands {
 			statuses.add("UNCONSCIOUS (" + data.unconsciousTicks() + "t)");
 		}
 		if (data.concussion()) {
-			statuses.add(String.format(Locale.ROOT, "CONCUSSION (stable %d/%ds)",
-					data.concussionStableTicks() / 20,
-					dev.captience.realisticdamage.config.Balance.CONCUSSION_STABLE_TICKS / 20));
+			statuses.add(String.format(Locale.ROOT, "CONCUSSION (grade %d, severity %.1f, flare %.0f%s%s)",
+					data.concussionGrade(), data.concussionSeverity(), data.concussionFlare(),
+					data.vertigo() ? ", VERTIGO" : "", data.retching() ? ", RETCHING" : ""));
+		}
+		if (data.hypoxia() > 0.0) {
+			statuses.add(String.format(Locale.ROOT, "HYPOXIA (%.1fs debt)", data.hypoxia()));
+		}
+		if (data.adrenaline().phase != dev.captience.realisticdamage.systems.AdrenalineMath.Phase.NONE) {
+			statuses.add(String.format(Locale.ROOT, "ADRENALINE %s (%dt%s)", data.adrenaline().phase,
+					data.adrenaline().ticks, data.adrenaline().winded ? ", WINDED" : ""));
 		}
 		if (data.burned()) {
 			statuses.add("BURNED");
@@ -381,9 +392,29 @@ public final class RealisticDamageCommands {
 
 	private static int concussion(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
 		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
-		RDAttachments.get(player).setConcussion(true);
+		String grade;
+		try {
+			grade = StringArgumentType.getString(ctx, "grade").toLowerCase(Locale.ROOT);
+		} catch (IllegalArgumentException absent) {
+			grade = "moderate";
+		}
+		double severity = switch (grade) {
+			case "mild" -> 20.0;
+			case "moderate" -> dev.captience.realisticdamage.config.Balance.CONCUSSION_DEFAULT_SEVERITY;
+			case "severe" -> 85.0;
+			case "none" -> 0.0;
+			default -> -1.0;
+		};
+		if (severity < 0.0) {
+			ctx.getSource().sendFailure(Component.literal("Grade must be mild, moderate, severe or none"));
+			return 0;
+		}
+		RDAttachments.get(player).setConcussionSeverity(severity);
 		RDAttachments.pushSnapshot(player);
-		ctx.getSource().sendSuccess(() -> Component.literal("Concussed " + player.getName().getString()), true);
+		String said = grade;
+		ctx.getSource().sendSuccess(() -> Component.literal(severity > 0.0
+				? "Concussed " + player.getName().getString() + " (" + said + ")"
+				: "Cleared " + player.getName().getString() + "'s concussion"), true);
 		return 1;
 	}
 

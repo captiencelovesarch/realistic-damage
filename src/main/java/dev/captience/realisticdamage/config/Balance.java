@@ -1131,4 +1131,157 @@ public final class Balance {
 	public static final double SHIELD_HEAVY_SHOCK_FRACTION = 0.25;
 	/** Minimum blocked damage before any shield-arm shock happens. */
 	public static final double SHIELD_SHOCK_MIN_DAMAGE = 8.0;
+
+	// --- Hypoxia (1.7): drowning and suffocation take the mind first ---
+	/**
+	 * Consciousness drain the moment air runs out, points/sec. The drain then
+	 * climbs with how long the brain has gone without — see {@link
+	 * #HYPOXIA_DRAIN_PER_SECOND_OF_DEBT} — so from full consciousness the lights
+	 * go out about seven seconds after the last bubble, with drowning damage
+	 * still four or five seconds from killing you. That gap is the point: you
+	 * black out before you die, sink, and a friend has a few seconds to pull you
+	 * out. Before 1.7 the drain was a flat 2.5/s, which took forty seconds to
+	 * matter and so never did.
+	 */
+	public static final double HYPOXIA_DRAIN_BASE = 4.0;
+	/** Extra drain per second of accumulated oxygen debt. */
+	public static final double HYPOXIA_DRAIN_PER_SECOND_OF_DEBT = 3.0;
+	/** Ceiling on the hypoxia drain, points/sec. */
+	public static final double HYPOXIA_DRAIN_MAX = 30.0;
+	/** Oxygen debt repaid per second of breathing again. */
+	public static final double HYPOXIA_REPAY_PER_SEC = 0.6;
+	/** Debt is capped: past this the brain is as starved as it gets. */
+	public static final double HYPOXIA_DEBT_MAX = 20.0;
+
+	// --- Concussion grades (1.7 rework) ---
+	/** Severity, 0-100, at which a concussion reads as moderate rather than mild. */
+	public static final double CONCUSSION_GRADE_MODERATE = 35.0;
+	/** ...and as severe. */
+	public static final double CONCUSSION_GRADE_SEVERE = 70.0;
+	public static final double CONCUSSION_SEVERITY_MAX = 100.0;
+	/** What a first concussion is worth: base plus this much per point of head trauma. */
+	public static final double CONCUSSION_FRESH_BASE = 18.0;
+	public static final double CONCUSSION_FRESH_PER_TRAUMA = 5.0;
+	/**
+	 * Second impact: while concussed, a concussive head hit of at least this much
+	 * trauma deepens the concussion (no INJURED-head precondition, no 6.0 bar —
+	 * an already-concussed brain does not need a big hit).
+	 */
+	public static final double SECOND_IMPACT_MIN_TRAUMA = 1.5;
+	public static final double SECOND_IMPACT_BASE = 15.0;
+	public static final double SECOND_IMPACT_PER_TRAUMA = 6.0;
+	/** Head trauma that knocks a concussed player straight out, by grade (mild, moderate, severe). */
+	public static final double SECOND_IMPACT_KO_MILD = 5.0;
+	public static final double SECOND_IMPACT_KO_MODERATE = 3.5;
+	public static final double SECOND_IMPACT_KO_SEVERE = 2.0;
+	/** The flare a second impact adds on the spot. */
+	public static final double SECOND_IMPACT_FLARE = 35.0;
+	/** Severity a bare {@code setConcussion(true)} or an old save without a severity means. */
+	public static final double CONCUSSION_DEFAULT_SEVERITY = 40.0;
+	/** Symptom-ladder shift per grade (mild, moderate, severe); moderate is the old flat 18. */
+	public static final double CONCUSSION_SHIFT_MILD = 10.0;
+	public static final double CONCUSSION_SHIFT_MODERATE = 18.0;
+	public static final double CONCUSSION_SHIFT_SEVERE = 26.0;
+	/** A full flare pushes the ladder down by this much on top of the grade. */
+	public static final double CONCUSSION_FLARE_SHIFT = 14.0;
+	/** Consciousness-cap drop per grade (mild, moderate, severe); moderate is the old flat 10. */
+	public static final double CONCUSSION_CAP_DROP_MILD = 5.0;
+	public static final double CONCUSSION_CAP_DROP_SEVERE = 15.0;
+	/**
+	 * Severity healed per second, by activity. Resting means standing still (or
+	 * crouching, or riding); walking about is light; sprinting, fighting, or a
+	 * flare that is still climbing heals nothing. A mild knock clears in under
+	 * two minutes of rest; a severe one is five minutes of rest or a night's sleep.
+	 */
+	public static final double CONCUSSION_HEAL_RESTING = 0.30;
+	public static final double CONCUSSION_HEAL_LIGHT = 0.12;
+	/**
+	 * A mob's concussion heals on time alone, at this rate: a moderate one is
+	 * about forty seconds of daze. The player rates would leave a zombie
+	 * forgetting its target every two seconds for five minutes.
+	 */
+	public static final double CONCUSSION_HEAL_MOB = 1.0;
+	/** Healing multiplier while the head itself is still INJURED or worse. */
+	public static final double CONCUSSION_HEAL_BAD_HEAD = 0.5;
+	/** Dark rooms help: healing multiplier at block brightness at or below {@link #CONCUSSION_DARK_LIGHT}. */
+	public static final double CONCUSSION_HEAL_DARK_BONUS = 1.25;
+
+	// Flare: how much the concussed brain is being pushed right now, 0-100.
+	public static final double FLARE_MAX = 100.0;
+	public static final double FLARE_SPRINT_PER_SEC = 7.0;
+	public static final double FLARE_PER_JUMP = 3.5;
+	public static final double FLARE_PER_ATTACK = 4.0;
+	public static final double FLARE_PER_BLOCK_BROKEN = 1.0;
+	public static final double FLARE_PER_HIT_TAKEN = 10.0;
+	/** Bright light: flare per second per brightness level above {@link #CONCUSSION_BRIGHT_LIGHT}. */
+	public static final double FLARE_LIGHT_PER_SEC_PER_LEVEL = 0.9;
+	/**
+	 * Light can push the flare this far and no further. It hurts, it takes your
+	 * sprint away if you stay in it, but it never empties your stomach on its own
+	 * — that takes pushing on: fighting, jumping, getting hit. A severe
+	 * concussion walking about in daylight would otherwise vomit every twenty
+	 * seconds, which is a punishment for being outdoors, not for being reckless.
+	 */
+	public static final double FLARE_LIGHT_CEILING = 62.0;
+	/** Brightness (0-15, sky darkening included) at which light starts to hurt. */
+	public static final int CONCUSSION_BRIGHT_LIGHT = 12;
+	/** Brightness at or below which a dark place soothes. */
+	public static final int CONCUSSION_DARK_LIGHT = 6;
+	/** Flare shed per second when still, when moving gently, and extra in the dark. */
+	public static final double FLARE_DECAY_RESTING = 9.0;
+	public static final double FLARE_DECAY_LIGHT = 3.0;
+	public static final double FLARE_DECAY_DARK_EXTRA = 3.0;
+	/** Gain multipliers by grade (mild, moderate, severe). */
+	public static final double FLARE_GAIN_MILD = 0.6;
+	public static final double FLARE_GAIN_SEVERE = 1.5;
+	/** Flare at which sprinting is refused. */
+	public static final double FLARE_NO_SPRINT = 60.0;
+	/** Flare at which you vomit, and what it drops back to afterwards. */
+	public static final double FLARE_RETCH = 90.0;
+	public static final double FLARE_AFTER_RETCH = 50.0;
+	/** Ticks spent doubled over. */
+	public static final int RETCH_TICKS = 50;
+	/** Food points and all saturation lost to one retch. */
+	public static final int RETCH_FOOD_LOSS = 3;
+
+	// Vertigo spells: a phase accumulator, like the microsleeps.
+	/** Ticks between spells by grade at zero flare (mild, moderate, severe). */
+	public static final double VERTIGO_PERIOD_MILD = 1500.0;
+	public static final double VERTIGO_PERIOD_MODERATE = 900.0;
+	public static final double VERTIGO_PERIOD_SEVERE = 500.0;
+	/** A full flare makes spells come this many times as often. */
+	public static final double VERTIGO_FLARE_RATE = 2.0;
+	/** Spell length in ticks by grade, plus a little more the worse the flare. */
+	public static final int VERTIGO_TICKS_MILD = 50;
+	public static final int VERTIGO_TICKS_MODERATE = 70;
+	public static final int VERTIGO_TICKS_SEVERE = 100;
+	public static final double VERTIGO_TICKS_PER_FLARE = 0.4;
+	/** Movement penalty while the room is spinning. */
+	public static final double VERTIGO_MOVEMENT_PENALTY = 0.25;
+	/** Flare added per second of a spell — the spinning itself turns the stomach. */
+	public static final double FLARE_VERTIGO_PER_SEC = 2.0;
+
+	// --- Grip (1.7): a Disabled arm's hand will not close ---
+	/** Ticks between "your hand won't close" lines, so mashing use is not spam. */
+	public static final int GRIP_MESSAGE_COOLDOWN_TICKS = 40;
+
+	// --- Adrenaline (1.7): the last two hearts ---
+	/** Health fraction at or below which adrenaline surges (two hearts of ten). */
+	public static final double ADRENALINE_HP_FRACTION = 0.2;
+	/** How long the surge lasts. */
+	public static final int ADRENALINE_SURGE_TICKS = 160;
+	/** Minimum length of the crash that follows; it lasts at least this, and for as long as health stays low. */
+	public static final int ADRENALINE_CRASH_TICKS = 600;
+	/** A second surge needs this long since the first AND health back above the heartbeat line. */
+	public static final int ADRENALINE_REFRACTORY_TICKS = 2400;
+	/** Surge: movement and attack speed bonuses, and the share of limb pain it masks. */
+	public static final double ADRENALINE_SPEED_BONUS = 0.15;
+	public static final double ADRENALINE_ATTACK_SPEED_BONUS = 0.10;
+	public static final double ADRENALINE_PAIN_MASK = 0.5;
+	/** Crash: movement penalty, and the breath budget for sprinting. */
+	public static final double CRASH_MOVEMENT_PENALTY = 0.10;
+	public static final double CRASH_BREATH_MAX = 60.0;
+	/** Breath spent per sprinting tick, and recovered per tick otherwise. */
+	public static final double CRASH_BREATH_SPEND = 1.0;
+	public static final double CRASH_BREATH_RECOVER = 0.5;
 }

@@ -225,7 +225,8 @@ public final class BloodEmitter {
 	 * has, so two people watching the same casualty see the same thing.
 	 */
 	private static Cardio advanceRemoteHeart(LivingEntity player, BodySnapshot snapshot, Bleeder bleeder) {
-		double effective = Vitals.effectiveConsciousness(snapshot.consciousness(), snapshot.concussion());
+		double effective = Vitals.effectiveConsciousness(snapshot.consciousness(), snapshot.concussionGrade(),
+				snapshot.concussionFlare());
 		double maxHealth = player.getMaxHealth();
 		double healthFraction = maxHealth <= 0.0 ? 1.0 : player.getHealth() / maxHealth;
 		bleeder.heart.tick(
@@ -261,6 +262,38 @@ public final class BloodEmitter {
 				player.getId(),
 				sprites.get((int) (BloodFlow.jitter(index, 6) * DROP_SPRITE_COUNT), SPRITE_COUNT - 1),
 				BloodTint.of(player));
+		client.particleEngine.add(drop);
+	}
+
+	/**
+	 * A mouthful of vomit (1.7 concussion): the drop physics, the landing and
+	 * the stain are blood's, only the colour and where it comes from differ.
+	 * Out of the mouth, forward and down the way the head is bowed.
+	 */
+	public static void spawnBile(LivingEntity body, long index) {
+		Minecraft client = Minecraft.getInstance();
+		ClientLevel level = client.level;
+		if (level == null || sprites == null) {
+			return;
+		}
+		Vec3 look = body.getViewVector(1.0F);
+		Vec3 forward = new Vec3(look.x, 0.0, look.z);
+		forward = forward.lengthSqr() < 1.0e-6 ? new Vec3(0.0, 0.0, 1.0) : forward.normalize();
+		// Out past the chin rather than at the lips: spawned at the mouth, the
+		// first frames of every drop sat inside the first-person camera's near
+		// field and filled the screen with brown blocks.
+		Vec3 mouth = body.getEyePosition().add(forward.scale(0.55)).add(0.0, -0.5, 0.0);
+		double speed = 0.08 + BloodFlow.jitter(index, 1) * 0.06;
+		Vec3 direction = new Vec3(
+				forward.x + BloodFlow.jitterSigned(index, 2) * 0.25,
+				-0.55 + BloodFlow.jitterSigned(index, 3) * 0.2,
+				forward.z + BloodFlow.jitterSigned(index, 4) * 0.25).normalize();
+		BloodDrop drop = new BloodDrop(level,
+				mouth.x, mouth.y, mouth.z,
+				direction.x * speed, direction.y * speed, direction.z * speed,
+				body.getId(),
+				sprites.get((int) (BloodFlow.jitter(index, 6) * DROP_SPRITE_COUNT), SPRITE_COUNT - 1),
+				BloodTint.BILE);
 		client.particleEngine.add(drop);
 	}
 

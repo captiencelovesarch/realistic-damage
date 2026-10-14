@@ -320,7 +320,9 @@ public final class BodyHud {
 			}
 		}
 		if (snapshot.concussion()) {
-			return Component.translatable("realisticdamage.hud.concussion");
+			// The grade is a band, the same kind of word as "Injured" (1.7).
+			return Component.translatable("realisticdamage.hud.concussion."
+					+ Math.clamp(snapshot.concussionGrade(), 1, 3));
 		}
 		if (worstPart == null) {
 			return snapshot.burned() ? Component.translatable("realisticdamage.hud.burned") : null;

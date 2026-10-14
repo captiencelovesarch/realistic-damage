@@ -64,19 +64,23 @@ public record BodySnapshot(Regions regions, Meters meters) {
 	}
 
 	/**
-	 * Everything that is whole-body. Three pairs, nine slots free: any future
+	 * Everything that is whole-body. Six pairs, six slots free: any future
 	 * per-player mode or legend int goes HERE, never as a spare bit of
 	 * {@code statusFlags}.
 	 *
 	 * <p>Not called {@code Vitals} — {@code body.Vitals} already exists and is
 	 * imported alongside this record in three client files.
 	 */
-	public record Meters(int statusFlags, float blood, float consciousness) {
+	public record Meters(int statusFlags, float blood, float consciousness,
+	                     int concussionGrade, int concussionFlare, int adrenaline) {
 
 		public static final StreamCodec<RegistryFriendlyByteBuf, Meters> STREAM_CODEC = StreamCodec.composite(
 				ByteBufCodecs.VAR_INT, Meters::statusFlags,
 				ByteBufCodecs.FLOAT, Meters::blood,
 				ByteBufCodecs.FLOAT, Meters::consciousness,
+				ByteBufCodecs.VAR_INT, Meters::concussionGrade,
+				ByteBufCodecs.VAR_INT, Meters::concussionFlare,
+				ByteBufCodecs.VAR_INT, Meters::adrenaline,
 				Meters::new);
 	}
 
@@ -94,6 +98,14 @@ public record BodySnapshot(Regions regions, Meters meters) {
 	 * the one piece of first aid in the mod would look like it did nothing.
 	 */
 	public static final int FLAG_PRESSURE = 32;
+	/** The room is spinning (1.7 concussion). */
+	public static final int FLAG_VERTIGO = 64;
+	/** ...to the left this time; spells alternate. */
+	public static final int FLAG_VERTIGO_LEFT = 128;
+	/** Doubled over, vomiting (1.7 concussion). */
+	public static final int FLAG_RETCHING = 256;
+	/** Out of breath in the adrenaline crash (1.7). */
+	public static final int FLAG_WINDED = 512;
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, BodySnapshot> STREAM_CODEC = StreamCodec.composite(
 			Regions.STREAM_CODEC, BodySnapshot::regions,
@@ -140,7 +152,11 @@ public record BodySnapshot(Regions regions, Meters meters) {
 				| (data.burned() ? FLAG_BURNED : 0)
 				| (data.knockedDown() ? FLAG_KNOCKED_DOWN : 0)
 				| (data.microsleeping() ? FLAG_MICROSLEEP : 0)
-				| (data.underPressure() ? FLAG_PRESSURE : 0);
+				| (data.underPressure() ? FLAG_PRESSURE : 0)
+				| (data.vertigo() ? FLAG_VERTIGO : 0)
+				| (data.vertigo() && data.vertigoLeft() ? FLAG_VERTIGO_LEFT : 0)
+				| (data.retching() ? FLAG_RETCHING : 0)
+				| (data.adrenaline().winded ? FLAG_WINDED : 0);
 		return new BodySnapshot(
 				new Regions(
 						quantizeFraction(data.part(BodyPart.HEAD).fraction()),
@@ -150,7 +166,12 @@ public record BodySnapshot(Regions regions, Meters meters) {
 						quantizeFraction(data.part(BodyPart.LEFT_LEG).fraction()),
 						quantizeFraction(data.part(BodyPart.RIGHT_LEG).fraction()),
 						broken, wounds, destroyed, ceilings, scars),
-				new Meters(flags, quantizeVital(data.blood()), quantizeVital(data.consciousness())));
+				new Meters(flags, quantizeVital(data.blood()), quantizeVital(data.consciousness()),
+						data.concussionGrade(),
+						// Steps of five: the flare moves every tick, and the client
+						// only needs to know roughly how bad it is.
+						data.concussion() ? (int) Math.round(data.concussionFlare() / 5.0) * 5 : 0,
+						data.adrenaline().phase.wire()));
 	}
 
 	private static float quantizeFraction(double fraction) {
@@ -304,12 +325,43 @@ public record BodySnapshot(Regions regions, Meters meters) {
 		return (statusFlags() & FLAG_PRESSURE) != 0;
 	}
 
+	/** 0 none, 1 mild, 2 moderate, 3 severe (1.7). */
+	public int concussionGrade() {
+		return meters.concussionGrade();
+	}
+
+	/** How hard the concussion is flaring, 0-100 in steps of five (1.7). */
+	public int concussionFlare() {
+		return meters.concussionFlare();
+	}
+
+	public boolean vertigo() {
+		return (statusFlags() & FLAG_VERTIGO) != 0;
+	}
+
+	public boolean vertigoLeft() {
+		return (statusFlags() & FLAG_VERTIGO_LEFT) != 0;
+	}
+
+	public boolean retching() {
+		return (statusFlags() & FLAG_RETCHING) != 0;
+	}
+
+	public boolean winded() {
+		return (statusFlags() & FLAG_WINDED) != 0;
+	}
+
+	/** The last-two-hearts phase (1.7). */
+	public dev.captience.realisticdamage.systems.AdrenalineMath.Phase adrenaline() {
+		return dev.captience.realisticdamage.systems.AdrenalineMath.Phase.fromWire(meters.adrenaline());
+	}
+
 	/**
 	 * The attachment initializer, and what a fresh or respawned client sees. It
 	 * must stay the all-zero point for every mask: a body that has never been hurt
 	 * is not below any ceiling and carries no marks.
 	 */
 	public static BodySnapshot healthy() {
-		return new BodySnapshot(new Regions(1f, 1f, 1f, 1f, 1f, 1f, 0, 0, 0, 0, 0), new Meters(0, 100f, 100f));
+		return new BodySnapshot(new Regions(1f, 1f, 1f, 1f, 1f, 1f, 0, 0, 0, 0, 0), new Meters(0, 100f, 100f, 0, 0, 0));
 	}
 }

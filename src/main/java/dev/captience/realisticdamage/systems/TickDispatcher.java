@@ -33,6 +33,7 @@ public final class TickDispatcher {
 			// floor the moment you switch back.
 			RDAttachments.get(player).clearKnockdown();
 			RDAttachments.get(player).clearMicrosleep();
+			RDAttachments.get(player).adrenaline().reset();
 			return;
 		}
 		RealisticDamageData data = RDAttachments.get(player);
@@ -56,6 +57,8 @@ public final class TickDispatcher {
 		RescueSystem.tick(player, data);
 		BleedingSystem.tick(player, data);
 		ConsciousnessSystem.tick(player, data);
+		ConcussionSystem.tick(player, data);
+		AdrenalineSystem.tick(player, data);
 		HealingSystem.tick(player, data);
 		ImpairmentSystem.tick(player, data);
 		RDAttachments.pushSnapshot(player);

@@ -212,6 +212,58 @@ public final class ClientEffectsConfig {
 	 */
 	public boolean deathCamera = true;
 
+	/**
+	 * The blast taking your hearing (1.7): the world cut to a dull thud under a
+	 * ring for seconds after a nearby explosion, plus the dust and the shake.
+	 * Boxed and migrated: seeded from Muffling, the closest existing statement
+	 * of "let the mod take my hearing", so a silenced config stays silent.
+	 */
+	public Double blastDeafnessValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double blastDeafness() {
+		return blastDeafnessValue == null ? 1.0 : blastDeafnessValue;
+	}
+
+	/**
+	 * What a concussion does to your senses (1.7): the room spinning, glare in
+	 * bright light, the wince at a loud noise, the throb of a flare. The
+	 * gameplay (no sprint when flaring, the retch, the slower legs) is the
+	 * server's and is not this control's to take away; the drift of your feet
+	 * in a spell still answers to Stumble as well. Boxed and migrated from the
+	 * vignette.
+	 */
+	public Double concussionEffectsValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double concussionEffects() {
+		return concussionEffectsValue == null ? 1.0 : concussionEffectsValue;
+	}
+
+	/**
+	 * The last two hearts (1.7): the tunnel and the narrowed hearing of the
+	 * adrenaline surge, the shaking hands and grey edges of the crash after it.
+	 * Boxed and migrated from the vignette.
+	 */
+	public Double lowHealthEffectsValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double lowHealthEffects() {
+		return lowHealthEffectsValue == null ? 1.0 : lowHealthEffectsValue;
+	}
+
+	/**
+	 * Your own breathing (1.7): the gasp when you surface from too long under,
+	 * the heaving chest after the adrenaline wears off. Boxed and migrated from
+	 * the heartbeat volume, its nearest neighbour.
+	 */
+	public Double breathingVolumeValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double breathingVolume() {
+		return breathingVolumeValue == null ? 1.0 : breathingVolumeValue;
+	}
+
 	/** Fracture, destruction and collapse audio. */
 	public double injurySoundVolume = 1.0;
 
@@ -305,6 +357,10 @@ public final class ClientEffectsConfig {
 		visceralBlood = false;
 		deathIntensityValue = 0.75;
 		realisticDeath = false;
+		blastDeafnessValue = 0.7;
+		concussionEffectsValue = 0.7;
+		lowHealthEffectsValue = 0.8;
+		breathingVolumeValue = 0.8;
 	}
 
 	/** Heavier immersion: full blackout, camera drift, everything at full strength. */
@@ -331,6 +387,10 @@ public final class ClientEffectsConfig {
 		visceralBlood = true;
 		deathIntensityValue = 1.0;
 		realisticDeath = true;
+		blastDeafnessValue = 1.0;
+		concussionEffectsValue = 1.0;
+		lowHealthEffectsValue = 1.0;
+		breathingVolumeValue = 1.0;
 	}
 
 	/**
@@ -359,6 +419,10 @@ public final class ClientEffectsConfig {
 		bloodIntensityValue = 0.0;
 		deathIntensityValue = 0.0;
 		deathCamera = false;
+		blastDeafnessValue = 0.0;
+		concussionEffectsValue = 0.0;
+		lowHealthEffectsValue = 0.0;
+		breathingVolumeValue = 0.0;
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -418,6 +482,18 @@ public final class ClientEffectsConfig {
 		}
 		if (cameraLagIntensityValue == null) {
 			cameraLagIntensityValue = vignetteIntensity <= 0.0 ? 0.0 : 0.7 * Math.min(1.0, vignetteIntensity);
+		}
+		if (blastDeafnessValue == null) {
+			blastDeafnessValue = Math.min(1.0, mufflingIntensity);
+		}
+		if (concussionEffectsValue == null) {
+			concussionEffectsValue = Math.min(1.0, vignetteIntensity);
+		}
+		if (lowHealthEffectsValue == null) {
+			lowHealthEffectsValue = Math.min(1.0, vignetteIntensity);
+		}
+		if (breathingVolumeValue == null) {
+			breathingVolumeValue = Math.min(1.0, heartbeatVolume);
 		}
 		if (!cameraDriftSeeded) {
 			// One-time: a file from before 1.6.2 holds the old zero default. It

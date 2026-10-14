@@ -127,7 +127,11 @@ public final class Afterimage {
 		// rather than settling in. All three are behind the one slider.
 		double raw = Math.max(haze, Math.max(
 				Vitals.afterimageStrength(ClientState.effectiveConsciousness(), ClientState.concussed()),
-				ImpactEffect.doubledRaw() * 0.8));
+				Math.max(ImpactEffect.doubledRaw() * 0.8,
+						// 1.7: a blast next to you, a vertigo spell, a wince at a
+						// loud noise — the same doubled world, arriving from the
+						// head rather than the ladder.
+						Math.max(BlastShock.daze() * 0.7, ConcussionEffects.doubled()))));
 		strength = Math.clamp(raw * config.afterimageIntensity, 0.0, 1.0);
 	}
 

@@ -89,7 +89,10 @@ class RDCodecsCompatTest {
 		assertTrue(data.unconscious());
 		assertEquals(31, data.unconsciousTicks());
 		assertTrue(data.concussion());
-		assertEquals(120, data.concussionStableTicks());
+		// 1.7: a save from before concussions had a severity reads as the default
+		// (moderate) grade; the old stability clock is simply ignored.
+		assertEquals(dev.captience.realisticdamage.config.Balance.CONCUSSION_DEFAULT_SEVERITY,
+				data.concussionSeverity(), 1e-9);
 		assertTrue(data.burned());
 		assertEquals(2, data.wounds().size());
 		assertEquals(WoundSeverity.SEVERE, data.wounds().getFirst().severity());

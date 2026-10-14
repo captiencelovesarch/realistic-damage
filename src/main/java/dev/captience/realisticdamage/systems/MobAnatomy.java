@@ -152,6 +152,7 @@ public final class MobAnatomy {
 		data.tickKnockdown(Balance.KNOCKDOWN_RECOVERY_TICKS);
 		BleedingSystem.tick(mob, data);
 		ConsciousnessSystem.tick(mob, data);
+		ConcussionSystem.tick(mob, data);
 		HealingSystem.tick(mob, data);
 		ImpairmentSystem.tick(mob, data);
 		daze(mob, data);

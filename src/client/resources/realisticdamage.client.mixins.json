@@ -9,6 +9,8 @@
 		"CameraDeathMixin",
 		"ContainerLayoutAccessor",
 		"DeathScreenMixin",
+		"ExplosionPacketMixin",
+		"FieldOfViewMixin",
 		"GameRendererAccessor",
 		"GameRendererFrameMixin",
 		"HumanoidMobRendererMixin",

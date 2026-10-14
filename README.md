@@ -172,6 +172,8 @@ mod is concerned, so it bleeds, breaks, concusses and goes down exactly as you w
 | `spawnSeveredLimbs` | true | A lost limb is thrown into the world, lands, bleeds for a minute and is gone; nested under limb destruction |
 | `enableKnockdown` | true | Hard landings put you on the ground for a moment |
 | `enableMicrosleeps` | true | Consciousness cuts out in episodes on the way down |
+| `disabledArmsLoseGrip` | true | An arm driven to Disabled can't grip until it heals: no raised shield or item use in that hand, no bows/crossbows/spears, and a limp main arm fights like a missing one |
+| `enableAdrenaline` | true | Dropping to the last two hearts gives a few seconds of adrenaline (faster, pain masked), then a crash (heavy legs, short winded sprints) |
 | `softenFallLethality` | true | Compresses vanilla's lethal fall tail so long drops maim rather than delete |
 | `unconsciousAggro` | `NEARBY` | Who notices a body on the floor. `ATTACKERS` keeps whatever was already fighting you, `NEARBY` adds anything within 6 blocks that can see you, `ALL` pulls in every hostile with line of sight, `NONE` takes you off the menu entirely |
 | `preyOnWounded` | `VISIBLE` | Which visible injuries hostiles prefer: `OFF`, `DOWNED`, `LIMPING`, or `VISIBLE` (limping and bleeding) |
@@ -194,7 +196,7 @@ hunting magic numbers.
 /rdmg setconsciousness <player> <0-100>
 /rdmg break <player> <part>
 /rdmg bleed <player> <part> <severity>
-/rdmg concussion <player>
+/rdmg concussion <player> [mild|moderate|severe|none]
 /rdmg burn <player>
 /rdmg destroy <player> <part>             destroy a limb outright
 /rdmg blast <player> <part> [radius]      test a localized explosion beside a limb

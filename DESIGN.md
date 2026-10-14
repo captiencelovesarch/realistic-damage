@@ -602,6 +602,108 @@ old dark blood stays dark on the floor after the zombie has walked off.
 **Still to come in 1.7.** Villagers by default (a pack can tag them now); endermen and the
 other non-humanoid hostiles; tuning of the daze and collapse against real fights.
 
+## Added in 1.7 (alpha.8): the afflictions
+
+Five things that happened to a player without the mod having anything to say about them.
+Each was a playtest complaint of the same shape: "X happens and nothing changes".
+
+**Drowning and suffocation take the mind first.** There was a drain while out of air, but
+it was a flat 2.5 points a second from 100, and vanilla drowning kills a full-health player
+in about ten seconds — so it never mattered, and a head stuck inside a block did not count
+at all. Now the brain runs an oxygen debt (`HypoxiaMath`): seconds without air, with a
+drain that starts at 4/s and climbs 3/s for every second of debt. From full consciousness
+you black out about seven seconds after the last bubble, which is three or four seconds
+before the drowning damage would have finished you: the ladder plays on the way down
+(vignette, ringing, heartbeat, microsleeps while you are trying to swim up), you sink, and
+somebody has a few seconds to drag you out. A head in a wall (`isInWall`) is as airless as a
+head under water. Breathing repays the debt at 0.6 s a second, and while any is owed the
+normal recovery is divided by one plus the debt — you surface, gasp, and the world takes a
+while to come back. Client side (`AirHunger`): as the air bar runs out the edges close in
+dark and cold, and the chest heaves — a phase-accumulated contraction, a jerk of the whole
+view, two seconds apart at first and three a second at the end. Coming out of it plays a
+synthesised gasp and a stretch of heavy breathing sized by how far gone you got.
+
+**A blast takes your hearing — any blast, not only one that hurt you.** The blast cue rode
+the damage payload, so an explosion that did not damage you (Blast Protection, cover, range)
+was vanilla's bang and nothing else, and even a point-blank one only fed the tinnitus tone
+while the world stayed perfectly audible underneath it. `BlastShock` hooks the vanilla
+explosion packet (`ExplosionPacketMixin`, at the tail, after the bang has started) and
+judges every blast by radius and distance — `1.8r/d - 0.3`, clamped, so TNT takes your
+hearing outright at four blocks, leaves you badly muffled at ten and is just a bang at
+twenty-five — with a wall in the way costing 45% and hiding the flash. Three ticks after the
+bang (so the crack itself is heard) the low-pass filter drops almost all the highs, the
+category volumes fall by up to 90%, and the tinnitus tone fills the gap; it holds for up to
+two seconds, then hearing returns over up to twenty. A flash if you saw it, a haze of dust,
+a shake and, for the closest blasts, a moment of seeing double. Its own control, Blast
+Deafening; a blast that does hurt you still guarantees at least its damage-sized shock.
+
+**The concussion is an injury you play around, not a number you wait on.** It was a boolean
+that moved the symptom ladder 18 points and drew faint ghosting until a 25-second timer
+ran out. Now (`ConcussionMath`, `ConcussionSystem`):
+
+- *Severity 0-100, read as mild / moderate / severe.* A first knock is graded by how hard it
+  was. Moderate at no flare is exactly the old shift, so nothing tuned against it moved.
+- *Second impact.* While concussed, a concussive head hit of 1.5 trauma deepens it and flares
+  it on the spot, and past a bar that falls with the grade (5.0 / 3.5 / 2.0) it puts you
+  straight out — a severe concussion is one solid tap from the floor. The concussion is now
+  judged once per damage event on the worst candidate; it used to be asked per candidate,
+  which was harmless only while "already concussed" meant "nothing to do".
+- *Heals by rest.* 0.3 severity a second standing still, 0.12 moving gently, nothing while
+  exerting; halved while the head itself is still mending, a quarter better in the dark. A
+  mild knock is under two minutes' rest, a severe one about five, or one night's sleep. Mobs
+  mend on time alone at 1/s.
+- *The flare*, 0-100: sprinting, swimming, jumping, attacking, mining and taking hits raise
+  it; bright light raises it too, but only up to 62 — light hurts and costs you your sprint,
+  it never makes you vomit by itself. Stillness and darkness let it fall. It brings the
+  ladder further forward (up to 14 more points), refuses sprinting at 60, and at 90 you
+  vomit: doubled over for two and a half seconds, three food points and all saturation
+  gone, and the flare drops to 50. Food is the cure in this mod; losing it is the cost of
+  pushing a head injury.
+- *Vertigo spells* on a phase accumulator, like the microsleeps: every 75 / 45 / 25 seconds
+  by grade, up to twice as often at full flare, alternating direction. The horizon rolls and
+  keeps rolling, the world warps, your feet veer and stagger the way the room is turning,
+  movement drops a quarter and sprinting is refused.
+- *Light and noise sensitivity*, client side: bright light glares and you squint (lids close
+  in from top and bottom), staring toward the sun worst of all; a loud sound near you
+  (heard through vanilla's own `SoundEventListener`, so no mixin) makes you wince — a flinch,
+  a squint, a white spike, a short ring.
+
+The grade and flare travel in the snapshot's `Meters` (two new ints), and vertigo and
+retching as status flags. The HUD and body panel name the grade, and the panel gives the one
+piece of advice the mod gives anywhere: flaring means stop and get out of the light.
+
+**A Disabled arm's hand will not grip.** Driving an arm to Disabled (grey on the panel) used
+to change nothing at all if it was the off arm: only the main arm's condition fed any
+penalty. Now (`disabledArmsLoseGrip`, default on) that hand cannot use anything — a raised
+shield drops and cannot be raised, nothing can be eaten or placed with it — two-handed items
+(bows, crossbows, spears) need both arms, and a limp main arm fights at the one-handed
+penalty a lost one does. It is not a lock that lasts: it ends the moment the limb heals out of
+Disabled. The refusal says why, on a cooldown, and that line is classed with the rescue
+lines as an answer to a keypress, so the Injury Text switch cannot leave a click silently
+doing nothing. The arm hangs in third person (swing mostly taken away rather than cradled,
+which stays the pose for a break) and droops low at the edge of the first-person view.
+
+**The last two hearts.** At one heart with nothing else wrong, all that changed was the
+heartbeat. Now (`AdrenalineMath`, `enableAdrenaline`) dropping to a fifth of max health
+floods you with adrenaline for eight seconds: 15% faster, a little quicker to swing, half the
+pain of injured limbs masked; tunnel vision (the field of view narrows instead of widening
+with the speed), the world dull and distant while your own heart and breath get loud. Then
+the crash, for at least thirty seconds and for as long as health stays low: 10% slower, the
+colour leaving the edges, the hands shaking (the held item trembles, the aim shivers by a
+hair on Camera Drift), heavy breathing, and a sprint that runs out after three seconds and
+takes six to come back. It fires on the crossing, never on a roll, and cannot fire again
+until two minutes have passed *and* health has been back over the heartbeat line —
+otherwise hovering at two hearts would chain surges forever.
+
+**Breathing** is synthesised like the injury sounds (`tools/generate_sounds.py`): noise
+through a few broad formants, three inhales and three exhales so consecutive breaths are not
+the same sample, and a gasp with a quarter-second of glottal catch under the rushing air.
+They live outside `SOUNDS` and its spectral budget test — a breath is not an impact.
+
+New client controls, all boxed and seeded from their nearest existing statement so a silenced
+config stays silent: Blast Deafening (from Muffling), Concussion Symptoms and Adrenaline &
+Crash (from the vignette), Breathing (from the heartbeat).
+
 ## Deliberate non-goals
 
 Persistent blood as block/world state, medical items, and numeric HUD stats. The inventory panel may show condition figures on request;

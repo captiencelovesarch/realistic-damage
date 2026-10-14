@@ -39,9 +39,8 @@ public final class ImpactEffect {
 	private static double ring;
 	private static double ringPhase;
 	private static double doubled;
-	/** Blast: overpressure whiteout, and the ringing that outlasts it by seconds. */
+	/** Blast: overpressure whiteout. The hearing loss lives in BlastShock (1.7). */
 	private static double whiteout;
-	private static double deafness;
 
 	public static void trigger(float magnitude, float yaw, ImpactFamily impactFamily) {
 		double m = Mth.clamp(magnitude, 0.0F, 1.0F);
@@ -71,10 +70,10 @@ public final class ImpactEffect {
 			case BLAST -> {
 				whiteout = Math.max(whiteout, m);
 				// Overpressure takes your hearing with it, and takes it for far
-				// longer than it takes your sight. Routed into the existing ringing
-				// rather than a second tone, so the one accessibility control that
-				// silences ringing silences this too.
-				deafness = Math.max(deafness, m);
+				// longer than it takes your sight. Since 1.7 that is BlastShock's
+				// job — for every nearby blast, not only the ones that hurt — and
+				// a blast that did hurt makes sure it lands at least this hard.
+				BlastShock.onBlastHit(m);
 			}
 			default -> { }
 		}
@@ -116,9 +115,6 @@ public final class ImpactEffect {
 		iris = decay(iris, deltaTicks * 0.22);
 		whiteout = decay(whiteout, deltaTicks * 0.045);
 		doubled = decay(doubled, deltaTicks * 0.035);
-		// Six seconds or so. Sight comes back long before hearing does, and that
-		// gap is most of what makes a blast read as a blast.
-		deafness = decay(deafness, deltaTicks * 0.008);
 		if (ring > 0.0) {
 			ringPhase += deltaTicks;
 			ring = decay(ring, deltaTicks * 0.085);
@@ -207,11 +203,6 @@ public final class ImpactEffect {
 		return whiteout * ClientEffectsConfig.get().impactIntensity;
 	}
 
-	/** Blast: how deafened you still are, 0 to 1. Read by the audio layer. */
-	public static double deafness() {
-		return deafness * ClientEffectsConfig.get().impactIntensity;
-	}
-
 	public static void reset() {
 		shock = 0.0;
 		kickRemaining = 0.0;
@@ -221,7 +212,6 @@ public final class ImpactEffect {
 		ringPhase = 0.0;
 		doubled = 0.0;
 		whiteout = 0.0;
-		deafness = 0.0;
 		family = ImpactFamily.PLAIN;
 	}
 }

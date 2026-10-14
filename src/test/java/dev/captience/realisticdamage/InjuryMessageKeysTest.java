@@ -44,14 +44,18 @@ class InjuryMessageKeysTest {
 			"realisticdamage.msg.pressure.other",
 			"realisticdamage.msg.feed.given",
 			"realisticdamage.msg.feed.received",
-			"realisticdamage.msg.feed.full");
+			"realisticdamage.msg.feed.full",
+			"realisticdamage.msg.grip.left_arm",
+			"realisticdamage.msg.grip.right_arm",
+			"realisticdamage.msg.grip_two_handed.left_arm",
+			"realisticdamage.msg.grip_two_handed.right_arm");
 
 	/**
 	 * How many {@code realisticdamage.msg.*} lines ship. Bumped in the same
 	 * commit as the key, which is the whole mechanism: the number moving is what
 	 * forces somebody to look at this file and decide.
 	 */
-	private static final int SHIPPED_MESSAGE_KEYS = 62;
+	private static final int SHIPPED_MESSAGE_KEYS = 72;
 
 	@Test
 	void everyShippedMessageKeyIsClassifiedDeliberately() throws IOException {

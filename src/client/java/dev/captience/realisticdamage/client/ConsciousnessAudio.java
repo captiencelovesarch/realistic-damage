@@ -45,7 +45,7 @@ public final class ConsciousnessAudio {
 		// that silences ear-ringing silences it whatever caused it.
 		double ringLevel = active
 				? Math.max(ClientState.ramp(Balance.SYMPTOM_RINGING, Balance.SYMPTOM_SEVERE),
-						ImpactEffect.deafness()) * config.ringingVolume
+						Math.max(BlastShock.ring(), ConcussionEffects.ring())) * config.ringingVolume
 				: 0.0;
 		if (config.tinnitusTone) {
 			if (ringing != null) {
@@ -84,6 +84,17 @@ public final class ConsciousnessAudio {
 		// Muffle everything else as consciousness fades; restore smoothly.
 		// Gentle now: the low-pass filter does the real muffling.
 		float targetDuck = (float) (ringLevel > 0 ? Math.min(0.45, ringLevel * 0.45) : 0.0);
+		// A blast takes most of the volume as well as the highs (1.7): what is
+		// left is a distant thud. Applied at once rather than eased, because
+		// hearing does not fade out after an explosion — it goes.
+		double deaf = active ? BlastShock.deafness() : 0.0;
+		if (deaf > 0.0) {
+			float blastDuck = (float) Math.min(0.9, deaf * 0.9);
+			if (blastDuck > duckAmount) {
+				duckAmount = blastDuck;
+			}
+			targetDuck = Math.max(targetDuck, blastDuck);
+		}
 		duckAmount = Mth.lerp(0.05F, duckAmount, targetDuck);
 		float gain = 1.0F - duckAmount;
 		for (SoundSource source : SoundSource.values()) {

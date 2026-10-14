@@ -35,11 +35,16 @@ public final class AudioMuffle {
 
 	/** 0 = clear hearing, 1 = fully muffled. */
 	private static double severity() {
-		double intensity = ClientEffectsConfig.get().mufflingIntensity;
-		if (intensity <= 0.0 || !ClientState.active()) {
+		if (!ClientState.active()) {
 			return 0.0;
 		}
-		return ClientState.ramp(Balance.SYMPTOM_RINGING, 0.0) * Math.min(1.0, intensity);
+		double intensity = Math.min(1.0, ClientEffectsConfig.get().mufflingIntensity);
+		double fading = ClientState.ramp(Balance.SYMPTOM_RINGING, 0.0);
+		// 1.7: the adrenaline's narrowed hearing rides the Muffling control like
+		// the fading mind does; a blast's deafness has its own (it is already
+		// scaled by Blast Deafening) and so is not multiplied twice.
+		double mind = Math.max(fading, LowHealthEffects.muffle()) * intensity;
+		return Math.max(mind, BlastShock.deafness());
 	}
 
 	public static void tick(ChannelAccess channelAccess) {
@@ -55,7 +60,10 @@ public final class AudioMuffle {
 		}
 
 		// Keep some highs even at the worst, or it sounds broken rather than dull.
-		float gainHf = (float) Mth.lerp(severity, 1.0, 0.08);
+		// Deafness after a blast goes further than any fading mind: nearly no
+		// highs at all, which is what turns the world into a far-off thud.
+		float floorHf = (float) Mth.lerp(Math.min(1.0, BlastShock.deafness()), 0.08, 0.015);
+		float gainHf = (float) Mth.lerp(severity, 1.0, floorHf);
 		float gain = (float) Mth.lerp(severity, 1.0, 0.75);
 		if (Math.abs(gainHf - appliedGainHf) > 0.005f) {
 			EXTEfx.alFilterf(filter, EXTEfx.AL_LOWPASS_GAIN, gain);

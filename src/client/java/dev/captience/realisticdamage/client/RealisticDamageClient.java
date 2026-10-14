@@ -105,9 +105,18 @@ public class RealisticDamageClient implements ClientModInitializer {
 		HudElementRegistry.addLast(RealisticDamage.id("blackout"), ConsciousnessEffects::renderBlackout);
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			if (!noiseListening) {
+				// The sound manager is not ready when this initialiser runs; it is
+				// by the first tick. Hears every sound, for the concussed wince.
+				client.getSoundManager().addListener(ConcussionEffects.NOISE);
+				noiseListening = true;
+			}
 			ClientState.tick();
 			DeathCamera.tick();
 			ConsciousnessAudio.tick();
+			ConcussionEffects.tick();
+			AirHunger.tick();
+			Breathing.tick();
 			MouseInertia.tickFallback();
 			VisionEffects.tick();
 			RescueInput.tick(client);
@@ -136,6 +145,13 @@ public class RealisticDamageClient implements ClientModInitializer {
 			Afterimage.reset();
 			CameraMotion.reset();
 			DeathCamera.reset();
+			BlastShock.reset();
+			ConcussionEffects.reset();
+			AirHunger.reset();
+			Breathing.reset();
+			LowHealthEffects.reset();
 		});
 	}
+
+	private static boolean noiseListening;
 }

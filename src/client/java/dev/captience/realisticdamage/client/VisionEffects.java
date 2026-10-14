@@ -68,13 +68,16 @@ public final class VisionEffects {
 		// completely stable underfoot — but the warp belongs to the head, and it
 		// is the head that can drive it all the way.
 		double severity = Math.max(warpSeverity(), greyoutSeverity() * 0.45);
+		// The concussed room (1.7) swims on its own terms, not only once it is
+		// past the ladder's threshold: a vertigo spell warps at any consciousness.
+		double spell = ConcussionEffects.warp() * ClientEffectsConfig.get().distortionIntensity;
 		// Held back until things are genuinely bad; the world should not swim
 		// while you are merely scratched.
 		if (severity < 0.45) {
-			return 0.0;
+			return spell;
 		}
 		double ramped = (severity - 0.45) / 0.55;
-		return ramped * ramped * ClientEffectsConfig.get().distortionIntensity;
+		return Math.max(spell, ramped * ramped * ClientEffectsConfig.get().distortionIntensity);
 	}
 
 	public static void tick() {
@@ -125,7 +128,7 @@ public final class VisionEffects {
 		}
 		// Blood drives this outright; a fading mind contributes, but only enough
 		// that going under still dims the world rather than leaving it vivid.
-		double severity = Math.max(greyoutSeverity(), warpSeverity() * 0.6)
+		double severity = Math.max(Math.max(greyoutSeverity(), warpSeverity() * 0.6), LowHealthEffects.greyout())
 				* ClientEffectsConfig.get().desaturationIntensity;
 		if (severity < 0.45) {
 			return -1;

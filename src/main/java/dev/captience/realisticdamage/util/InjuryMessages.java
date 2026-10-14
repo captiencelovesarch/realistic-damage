@@ -30,7 +30,10 @@ public final class InjuryMessages {
 	 * more". Swallowing these would break a feature rather than quiet an effect.
 	 */
 	private static final String[] INTERACTION = {
-		PREFIX + "drag.", PREFIX + "pressure.", PREFIX + "feed."
+		PREFIX + "drag.", PREFIX + "pressure.", PREFIX + "feed.",
+		// "Your hand won't close" answers a use the player just tried (1.7);
+		// with the line silenced, the click would simply do nothing.
+		PREFIX + "grip"
 	};
 
 	/**

@@ -231,11 +231,22 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			// where the aim is, which is the property a spring has and a scripted
 			// lurch does not.
 			context.waitTicks(40);
+			// The spring alone (1.7): a mace to the head is now a severe
+			// concussion, whose ladder shift is deep enough that the sway — a
+			// symptom on purpose, not a blow still ringing — is visible on its
+			// own. This claim is about the spring, so it reads the spring.
 			double[] settled = context.computeOnClient(client -> new double[] {
-					CameraMotion.lastPitch(), CameraMotion.lastRoll()});
+					CameraMotion.springPitch(), CameraMotion.springRoll()});
 			if (Math.abs(settled[0]) > 0.3 || Math.abs(settled[1]) > 0.3) {
+				String detail = context.computeOnClient(client -> String.format(java.util.Locale.ROOT,
+						" [spring %.3f/%.3f, effective %.1f, grade %d, flare %.2f, vertigo %.2f]",
+						CameraMotion.springPitch(), CameraMotion.springRoll(),
+						dev.captience.realisticdamage.client.ClientState.effectiveConsciousness(),
+						dev.captience.realisticdamage.client.ClientState.concussionGrade(),
+						dev.captience.realisticdamage.client.ClientState.flare(),
+						dev.captience.realisticdamage.client.ConcussionEffects.vertigoEnvelope()));
 				throw new AssertionError("two seconds after a blow the view spring is still at pitch "
-						+ settled[0] + ", roll " + settled[1]);
+						+ settled[0] + ", roll " + settled[1] + detail);
 			}
 
 			// The sway: near collapse the horizon tilts on its own, and with its

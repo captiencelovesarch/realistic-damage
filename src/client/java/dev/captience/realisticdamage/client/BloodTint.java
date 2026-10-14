@@ -26,6 +26,9 @@ public record BloodTint(float[] fresh, float[] freshVisceral, float[] dried) {
 			new float[] {0.30F, 0.045F, 0.06F}, new float[] {0.40F, 0.055F, 0.07F}, new float[] {0.16F, 0.07F, 0.06F});
 	public static final BloodTint PURPLE = new BloodTint(
 			new float[] {0.42F, 0.10F, 0.55F}, new float[] {0.56F, 0.12F, 0.74F}, new float[] {0.22F, 0.10F, 0.28F});
+	/** Not blood at all (1.7): what a concussed stomach gives up. Same drop, same stain, other colour. */
+	public static final BloodTint BILE = new BloodTint(
+			new float[] {0.50F, 0.46F, 0.16F}, new float[] {0.58F, 0.54F, 0.18F}, new float[] {0.36F, 0.32F, 0.14F});
 
 	/** The tint for whatever this blood came out of; red when unknown. */
 	public static BloodTint of(@Nullable Entity entity) {

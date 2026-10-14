@@ -32,7 +32,7 @@ class BodySnapshotCodecTest {
 		BodySnapshot original = new BodySnapshot(
 				new BodySnapshot.Regions(0.11f, 0.22f, 0.33f, 0.44f, 0.55f, 0.66f,
 						0b010101, 0b001_010_011_100_001_010, 0b101010, 0x123, 0x2C9),
-				new BodySnapshot.Meters(0b010110, 71.5f, 42.5f));
+				new BodySnapshot.Meters(0b1101010110, 71.5f, 42.5f, 3, 65, 2));
 
 		RegistryFriendlyByteBuf buf = buffer();
 		BodySnapshot.STREAM_CODEC.encode(buf, original);
@@ -54,9 +54,15 @@ class BodySnapshotCodecTest {
 		assertEquals(0b101010, decoded.destroyedMask());
 		assertEquals(0x123, decoded.ceilingMask());
 		assertEquals(0x2C9, decoded.scarMask());
-		assertEquals(0b010110, decoded.statusFlags());
+		assertEquals(0b1101010110, decoded.statusFlags());
 		assertEquals(71.5f, decoded.blood());
 		assertEquals(42.5f, decoded.consciousness());
+		assertEquals(3, decoded.concussionGrade());
+		assertEquals(65, decoded.concussionFlare());
+		assertEquals(dev.captience.realisticdamage.systems.AdrenalineMath.Phase.CRASH, decoded.adrenaline());
+		assertTrue(decoded.vertigo());
+		assertTrue(decoded.retching());
+		assertTrue(decoded.winded());
 	}
 
 	@Test
@@ -83,7 +89,7 @@ class BodySnapshotCodecTest {
 			int mask = 3 << (pinned.ordinal() * 2);
 			BodySnapshot snapshot = new BodySnapshot(
 					new BodySnapshot.Regions(1f, 1f, 1f, 1f, 1f, 1f, 0, 0, 0, mask, 0),
-					new BodySnapshot.Meters(0, 100f, 100f));
+					new BodySnapshot.Meters(0, 100f, 100f, 0, 0, 0));
 			for (BodyPart part : BodyPart.values()) {
 				assertEquals(part == pinned ? 3 : 0, snapshot.ceilingBand(part),
 						pinned.id() + " pinned, reading " + part.id());
@@ -104,7 +110,7 @@ class BodySnapshotCodecTest {
 			BodySnapshot snapshot = new BodySnapshot(
 					new BodySnapshot.Regions(1f, 1f, 1f, 1f, 1f, 1f, 0, 0, 0, 0,
 							ScarMask.with(0, marked, ScarLevel.DESTROYED)),
-					new BodySnapshot.Meters(0, 100f, 100f));
+					new BodySnapshot.Meters(0, 100f, 100f, 0, 0, 0));
 			for (BodyPart part : BodyPart.values()) {
 				assertEquals(part == marked ? ScarLevel.DESTROYED : ScarLevel.NONE, snapshot.scar(part),
 						marked.id() + " marked, reading " + part.id());
@@ -136,6 +142,6 @@ class BodySnapshotCodecTest {
 		return new BodySnapshot(
 				new BodySnapshot.Regions(fraction, 1f, 1f, 1f, 1f, 1f, 0, 0, 0,
 						band << (BodyPart.HEAD.ordinal() * 2), 0),
-				new BodySnapshot.Meters(0, 100f, 100f));
+				new BodySnapshot.Meters(0, 100f, 100f, 0, 0, 0));
 	}
 }

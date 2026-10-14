@@ -158,6 +158,9 @@ public final class ConsciousnessEffects {
 		CameraDrift.frame(deltaTracker);
 		ImpactEffect.frame(deltaTracker.getGameTimeDeltaTicks());
 		LandingEffect.frame(deltaTracker.getGameTimeDeltaTicks());
+		BlastShock.frame(deltaTracker.getGameTimeDeltaTicks());
+		ConcussionEffects.frame(deltaTracker.getGameTimeDeltaTicks());
+		LowHealthEffects.frame(deltaTracker.getGameTimeDeltaTicks());
 		MouseInertia.frame(deltaTracker.getGameTimeDeltaTicks());
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		int width = graphics.guiWidth();
@@ -189,6 +192,14 @@ public final class ConsciousnessEffects {
 						ARGB.colorFromFloat(1.0F, strength * 0.10F, strength, strength));
 			}
 		}
+
+		// 1.7: the afflictions that are not a rung of the ladder — the last two
+		// hearts, air running out, and the concussed senses. Under the washout
+		// and the blur, because they are the body's state rather than the
+		// moment's event.
+		LowHealthEffects.render(graphics, width, height);
+		AirHunger.render(graphics, width, height);
+		ConcussionEffects.render(graphics, width, height);
 
 		// Exposure / washout (from 35 down): the world looks wrong, not hidden.
 		// The curve is Vitals.exposureStrength — full at 10 rather than at 0, and
@@ -288,7 +299,13 @@ public final class ConsciousnessEffects {
 
 		// Blast: overpressure whites the world out rather than reddening it, and
 		// takes far longer to clear than a blow does.
-		double whiteout = ImpactEffect.whiteout();
+		// A blast nearby (1.7): dust hanging in the air after it, browner and
+		// slower than the flash, and the flash itself whether or not it hurt.
+		double dust = BlastShock.dust() * config.impactIntensity;
+		if (dust > 0.01) {
+			graphics.fill(0, 0, width, height, ARGB.color((int) (Math.min(1.0, dust) * 150.0), 126, 112, 92));
+		}
+		double whiteout = Math.max(ImpactEffect.whiteout(), BlastShock.flash() * config.impactIntensity);
 		if (whiteout > 0.01) {
 			graphics.fill(0, 0, width, height,
 					ARGB.color((int) (Math.sqrt(whiteout) * 215.0), 252, 250, 244));

@@ -144,6 +144,18 @@ public final class InjuryPose {
 		if (LimpMath.poseWeight(rung) <= 0.0F) {
 			return;
 		}
+		if (rung == LimpMath.RUNG_RUINED) {
+			// Worn all the way to Disabled without breaking (1.7): the hand has
+			// stopped gripping, and the arm is not cradled but hangs. Whatever
+			// swing or hold vanilla gave it is mostly taken away, so it dangles
+			// at the side while the other arm moves — the third-person half of
+			// "that arm is doing nothing".
+			arm.xRot *= 0.2F;
+			arm.yRot *= 0.2F;
+			arm.zRot = arm.zRot * 0.3F + LimpMath.armCradleRoll(rung, left) * 0.35F;
+			posesByRung[rung]++;
+			return;
+		}
 		arm.zRot += LimpMath.armCradleRoll(rung, left);
 		arm.xRot += LimpMath.armCradleLift(rung);
 		posesByRung[rung]++;

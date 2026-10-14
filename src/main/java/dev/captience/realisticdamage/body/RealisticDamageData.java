@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import dev.captience.realisticdamage.config.Balance;
+import dev.captience.realisticdamage.systems.AdrenalineMath;
+import dev.captience.realisticdamage.systems.ConcussionMath;
 import dev.captience.realisticdamage.systems.WoundMath;
 import org.jspecify.annotations.Nullable;
 
@@ -22,9 +24,34 @@ public final class RealisticDamageData {
 	private double consciousness = Balance.CONSCIOUSNESS_MAX;
 	private boolean unconscious;
 	private int unconsciousTicks;
-	private boolean concussion;
-	/** Continuous stable ticks accrued toward shaking off a concussion. */
-	private int concussionStableTicks;
+	/**
+	 * How bad the concussion is, 0 (none) to 100 (1.7). Read as a grade by
+	 * {@link ConcussionMath#grade}; healed by time, deepened by further head hits.
+	 */
+	private double concussionSeverity;
+	/**
+	 * Transient concussion state (1.7). The flare is how hard the bruised brain
+	 * is being pushed right now; vertigo and retching are the episodes it
+	 * produces. None of it persists: a restart is a long sit-down.
+	 */
+	private transient double concussionFlare;
+	private transient double vertigoPhase;
+	private transient int vertigoTicks;
+	/** Spells so far, so their direction alternates without a die roll. */
+	private transient int vertigoCount;
+	private transient int retchTicks;
+	/** Seconds of oxygen debt (1.7): how long the brain has gone without air, repaid by breathing. */
+	private transient double hypoxia;
+	/** The last-two-hearts surge and crash (1.7). Players only. */
+	private final transient AdrenalineMath.State adrenaline = new AdrenalineMath.State();
+	/** Where the body was last tick and how many jumps it had made, for reading exertion (1.7). */
+	private transient double lastSeenX = Double.NaN;
+	private transient double lastSeenZ;
+	private transient int lastJumpCount = -1;
+	/** Game time of the last exertion that holds the flare up (an attack, a jump). */
+	private transient long lastExertion = -1_000_000L;
+	/** Game time of the last "your hand won't close" line, for the cooldown. */
+	private transient long lastGripMessage = -1_000_000L;
 	private boolean burned;
 	/** Transient: health captured at ALLOW_DAMAGE so AFTER_DAMAGE can compute the true post-mitigation damage. */
 	private transient double preHurtHealth = Double.NaN;
@@ -158,9 +185,9 @@ public final class RealisticDamageData {
 			case CRITICAL -> Balance.HEAD_CAP_CRITICAL;
 			case DISABLED, DESTROYED -> Balance.HEAD_CAP_DISABLED;
 		};
-		if (concussion) {
+		if (concussion()) {
 			cap = Math.max(Balance.WAKE_THRESHOLD + Balance.CONCUSSION_CAP_FLOOR_MARGIN,
-					cap - Balance.CONCUSSION_CAP_DROP);
+					cap - ConcussionMath.capDrop(concussionGrade()));
 		}
 		return cap;
 	}
@@ -440,22 +467,148 @@ public final class RealisticDamageData {
 	// --- Injuries ---
 
 	public boolean concussion() {
-		return concussion;
+		return concussionSeverity > 0.0;
 	}
 
+	/**
+	 * Kept for everything that only knows "concussed or not": true starts a
+	 * concussion of the default (moderate) severity unless one is already worse,
+	 * false clears it and everything it was doing.
+	 */
 	public void setConcussion(boolean value) {
-		if (value != concussion) {
-			concussionStableTicks = 0;
+		if (value) {
+			concussionSeverity = Math.max(concussionSeverity, Balance.CONCUSSION_DEFAULT_SEVERITY);
+		} else {
+			clearConcussion();
 		}
-		concussion = value;
 	}
 
-	public int concussionStableTicks() {
-		return concussionStableTicks;
+	public double concussionSeverity() {
+		return concussionSeverity;
 	}
 
-	public void setConcussionStableTicks(int ticks) {
-		concussionStableTicks = Math.max(0, ticks);
+	public void setConcussionSeverity(double severity) {
+		concussionSeverity = ConcussionMath.clampSeverity(severity);
+		if (concussionSeverity <= 0.0) {
+			clearConcussion();
+		}
+	}
+
+	/** 0 none, 1 mild, 2 moderate, 3 severe. A band, never a figure. */
+	public int concussionGrade() {
+		return ConcussionMath.grade(concussionSeverity);
+	}
+
+	public void clearConcussion() {
+		concussionSeverity = 0.0;
+		concussionFlare = 0.0;
+		vertigoPhase = 0.0;
+		vertigoTicks = 0;
+		retchTicks = 0;
+	}
+
+	public double concussionFlare() {
+		return concussionFlare;
+	}
+
+	public void setConcussionFlare(double flare) {
+		concussionFlare = Math.clamp(flare, 0.0, Balance.FLARE_MAX);
+	}
+
+	public double vertigoPhase() {
+		return vertigoPhase;
+	}
+
+	public void setVertigoPhase(double phase) {
+		vertigoPhase = phase;
+	}
+
+	public boolean vertigo() {
+		return vertigoTicks > 0;
+	}
+
+	public int vertigoTicks() {
+		return vertigoTicks;
+	}
+
+	/** Starts a spell; returns its direction (true = the room turns left). */
+	public boolean beginVertigo(int ticks) {
+		vertigoTicks = Math.max(vertigoTicks, ticks);
+		vertigoCount++;
+		return vertigoLeft();
+	}
+
+	/** Which way the room is turning: alternates spell by spell. */
+	public boolean vertigoLeft() {
+		return (vertigoCount & 1) == 1;
+	}
+
+	public void tickVertigo() {
+		if (vertigoTicks > 0) {
+			vertigoTicks--;
+		}
+	}
+
+	public boolean retching() {
+		return retchTicks > 0;
+	}
+
+	public void beginRetch(int ticks) {
+		retchTicks = Math.max(retchTicks, ticks);
+	}
+
+	public void tickRetch() {
+		if (retchTicks > 0) {
+			retchTicks--;
+		}
+	}
+
+	// --- Hypoxia (1.7) ---
+
+	public double hypoxia() {
+		return hypoxia;
+	}
+
+	public void setHypoxia(double seconds) {
+		hypoxia = Math.clamp(seconds, 0.0, Balance.HYPOXIA_DEBT_MAX);
+	}
+
+	// --- Adrenaline (1.7) ---
+
+	public AdrenalineMath.State adrenaline() {
+		return adrenaline;
+	}
+
+	/** Horizontal distance moved since the last call, and remembers this position. */
+	public double moveSinceLastTick(double x, double z) {
+		double moved = Double.isNaN(lastSeenX) ? 0.0 : Math.hypot(x - lastSeenX, z - lastSeenZ);
+		lastSeenX = x;
+		lastSeenZ = z;
+		return moved;
+	}
+
+	/** Jumps made since the last call, given the running total; 0 on the first call. */
+	public int jumpsSinceLastTick(int total) {
+		int jumps = lastJumpCount < 0 ? 0 : Math.max(0, total - lastJumpCount);
+		lastJumpCount = total;
+		return jumps;
+	}
+
+	public long lastExertion() {
+		return lastExertion;
+	}
+
+	public void markExertion(long gameTime) {
+		lastExertion = gameTime;
+	}
+
+	/** True when a grip refusal may be announced again; stamps the time if so. */
+	public boolean claimGripMessage(long gameTime) {
+		if (gameTime - lastGripMessage < Balance.GRIP_MESSAGE_COOLDOWN_TICKS) {
+			return false;
+		}
+		lastGripMessage = gameTime;
+		return true;
 	}
 
 	public boolean burned() {
@@ -618,8 +771,9 @@ public final class RealisticDamageData {
 		consciousness = Balance.CONSCIOUSNESS_MAX;
 		unconscious = false;
 		unconsciousTicks = 0;
-		concussion = false;
-		concussionStableTicks = 0;
+		clearConcussion();
+		hypoxia = 0.0;
+		adrenaline.reset();
 		burned = false;
 		clearKnockdown();
 		clearMicrosleep();

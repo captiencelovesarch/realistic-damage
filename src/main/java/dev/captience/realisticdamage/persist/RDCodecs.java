@@ -80,7 +80,7 @@ public final class RDCodecs {
 			boolean unconscious,
 			int unconsciousTicks,
 			boolean concussion,
-			int concussionStableTicks,
+			double concussionSeverity,
 			boolean burned,
 			List<WoundState> wounds
 	) {
@@ -91,7 +91,10 @@ public final class RDCodecs {
 				Codec.BOOL.optionalFieldOf("unconscious", false).forGetter(DataState::unconscious),
 				Codec.INT.optionalFieldOf("unconscious_ticks", 0).forGetter(DataState::unconsciousTicks),
 				Codec.BOOL.optionalFieldOf("concussion", false).forGetter(DataState::concussion),
-				Codec.INT.optionalFieldOf("concussion_stable", 0).forGetter(DataState::concussionStableTicks),
+				// 1.7: the concussion has a severity. "concussion" is still written so
+				// an older build reading a newer save at least knows you are concussed;
+				// a save from before 1.7 has no severity and gets the default.
+				Codec.DOUBLE.optionalFieldOf("concussion_severity", 0.0).forGetter(DataState::concussionSeverity),
 				Codec.BOOL.optionalFieldOf("burned", false).forGetter(DataState::burned),
 				WoundState.CODEC.listOf().optionalFieldOf("wounds", List.of()).forGetter(DataState::wounds)
 		).apply(i, DataState::new));
@@ -105,7 +108,7 @@ public final class RDCodecs {
 				.map(w -> new WoundState(w.part(), w.severity(), w.decayProgress()))
 				.toList();
 		return new DataState(body, data.blood(), data.consciousness(), data.unconscious(),
-				data.unconsciousTicks(), data.concussion(), data.concussionStableTicks(), data.burned(), wounds);
+				data.unconsciousTicks(), data.concussion(), data.concussionSeverity(), data.burned(), wounds);
 	}
 
 	private static RealisticDamageData toData(DataState state) {
@@ -133,8 +136,11 @@ public final class RDCodecs {
 			}
 		}
 		data.setBlood(state.blood());
-		data.setConcussion(state.concussion());
-		data.setConcussionStableTicks(state.concussionStableTicks());
+		if (state.concussionSeverity() > 0.0) {
+			data.setConcussionSeverity(state.concussionSeverity());
+		} else {
+			data.setConcussion(state.concussion());
+		}
 		data.setBurned(state.burned());
 		data.setUnconscious(state.unconscious());
 		data.setUnconsciousTicks(state.unconsciousTicks());

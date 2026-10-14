@@ -122,6 +122,12 @@ public final class HealingSystem {
 			trackBrokenHeal(player, part, part.missing() * Balance.SLEEP_CONDITION_REPAIR_FRACTION);
 		}
 		decayWounds(data, 1.0);
+		if (data.concussion()) {
+			// A night's sleep is the rest a concussion wants most.
+			data.clearConcussion();
+			Notifier.message(player, "realisticdamage.msg.concussion_cleared");
+		}
+		data.setHypoxia(0.0);
 		data.restoreConsciousness(Balance.CONSCIOUSNESS_MAX);
 		clearRecoveredStatuses(player, data);
 	}
@@ -168,25 +174,8 @@ public final class HealingSystem {
 	}
 
 	private static void clearRecoveredStatuses(LivingEntity player, RealisticDamageData data) {
-		if (data.concussion()) {
-			// Stable means: head mended, consciousness sitting at its ceiling, not
-			// bleeding. Only then does the clock toward recovery run, and it has to
-			// run for a while — a concussion is supposed to linger.
-			//
-			// "Mended" is HEALTHY or, since 1.6, the head sitting at its own
-			// ceiling: a capped head that will never read HEALTHY again would
-			// otherwise carry a permanent concussion, and a concussion nothing can
-			// clear is a second injury the ceiling never promised.
-			BodyPartData head = data.part(BodyPart.HEAD);
-			boolean stable = (head.state() == BodyState.HEALTHY || head.atCeiling())
-					&& data.consciousness() >= data.consciousnessCap() - Balance.CONCUSSION_STABLE_MARGIN
-					&& !data.bleeding();
-			data.setConcussionStableTicks(stable ? data.concussionStableTicks() + 1 : 0);
-			if (data.concussionStableTicks() >= Balance.CONCUSSION_STABLE_TICKS) {
-				data.setConcussion(false);
-				Notifier.message(player, "realisticdamage.msg.concussion_cleared");
-			}
-		}
+		// The concussion heals on its own clock since 1.7 (ConcussionSystem):
+		// by rest, not by the head's condition sitting still for 25 seconds.
 		if (data.burned() && !player.isOnFire() && averageRecovery(data) >= Balance.BURNED_CLEAR_AVG_FRACTION) {
 			data.setBurned(false);
 			Notifier.message(player, "realisticdamage.msg.burns_healed");

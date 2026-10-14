@@ -8,6 +8,7 @@ import dev.captience.realisticdamage.body.BodyPartData;
 import dev.captience.realisticdamage.body.BodyState;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.config.Balance;
+import dev.captience.realisticdamage.config.ServerConfig;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.core.Holder;
@@ -37,6 +38,8 @@ public final class ImpairmentSystem {
 	private static final Identifier ARM_ATTACK_SPEED_ID = RealisticDamage.id("arm_attack_speed");
 	private static final Identifier ARM_MINING_ID = RealisticDamage.id("arm_mining");
 	private static final Identifier ARM_DAMAGE_ID = RealisticDamage.id("arm_damage");
+	private static final Identifier ADRENALINE_SPEED_ID = RealisticDamage.id("adrenaline_speed");
+	private static final Identifier ADRENALINE_ATTACK_ID = RealisticDamage.id("adrenaline_attack");
 
 	/** Main-arm penalty reduces melee damage "somewhat" (spec §11) — half weight. */
 	private static final double ARM_DAMAGE_FACTOR = 0.5;
@@ -56,10 +59,20 @@ public final class ImpairmentSystem {
 		double movement = ImpairmentMath.combinedLegPenalty(leftLeg, rightLeg);
 		double jump = ImpairmentMath.jumpPenalty(movement);
 		BodyPartData mainArm = data.part(armFor(player, true));
-		boolean oneHanded = mainArm.destroyed();
+		// A limp main arm (1.7) swings like a missing one: you are fighting with
+		// whatever the other hand and your shoulder can manage.
+		boolean oneHanded = mainArm.destroyed() || !canGrip(mainArm);
 		double armPenalty = oneHanded
 				? Balance.ONE_HANDED_PENALTY
 				: ImpairmentMath.armPenalty(mainArm.fraction(), mainArm.broken());
+		// Adrenaline (1.7) pushes the pain to the back for a few seconds. It does
+		// not mend anything — the vetoes below and the grip lock still apply — it
+		// only takes the edge off what an injured limb costs you.
+		AdrenalineMath.Phase rush = data.adrenaline().phase;
+		if (rush == AdrenalineMath.Phase.SURGE) {
+			movement *= 1.0 - Balance.ADRENALINE_PAIN_MASK;
+			armPenalty *= 1.0 - Balance.ADRENALINE_PAIN_MASK;
+		}
 		// Low consciousness makes actions sluggish (spec §23).
 		double sluggish = sluggishPenalty(ConsciousnessSystem.effective(data));
 		// The injury caps bound what a wrecked *limb* costs you. Fading out is not
@@ -84,6 +97,18 @@ public final class ImpairmentSystem {
 			movement = 1.0;
 			jump = 1.0;
 		}
+		if (rush == AdrenalineMath.Phase.CRASH) {
+			movement = Math.max(movement, Math.min(1.0, movement + Balance.CRASH_MOVEMENT_PENALTY));
+		}
+		if (data.vertigo()) {
+			// The floor will not stay where it is (1.7 concussion).
+			movement = Math.max(movement, Math.min(1.0, movement + Balance.VERTIGO_MOVEMENT_PENALTY));
+		}
+		if (data.retching()) {
+			// Doubled over: you can shuffle, not walk, and you are not jumping.
+			movement = Math.max(movement, 0.85);
+			jump = 1.0;
+		}
 		if (data.knockdownRecoveryTicks() > 0) {
 			// Back on your feet but not yet steady (1.4).
 			movement = Math.max(movement, Balance.KNOCKDOWN_RECOVERY_MOVEMENT_PENALTY);
@@ -106,6 +131,18 @@ public final class ImpairmentSystem {
 		apply(player, Attributes.ATTACK_SPEED, ARM_ATTACK_SPEED_ID, -actionPenalty);
 		apply(player, Attributes.BLOCK_BREAK_SPEED, ARM_MINING_ID, -actionPenalty);
 		apply(player, Attributes.ATTACK_DAMAGE, ARM_DAMAGE_ID, -armPenalty * ARM_DAMAGE_FACTOR);
+		boolean surging = rush == AdrenalineMath.Phase.SURGE && !data.unconscious();
+		applySigned(player, Attributes.MOVEMENT_SPEED, ADRENALINE_SPEED_ID,
+				surging ? Balance.ADRENALINE_SPEED_BONUS : 0.0);
+		applySigned(player, Attributes.ATTACK_SPEED, ADRENALINE_ATTACK_ID,
+				surging ? Balance.ADRENALINE_ATTACK_SPEED_BONUS : 0.0);
+
+		// A hand that has stopped gripping lets go of what it was using: the
+		// shield drops, the half-drawn bow goes slack (1.7).
+		if (player instanceof ServerPlayer serverPlayer && serverPlayer.isUsingItem()
+				&& gripBlocked(serverPlayer, serverPlayer.getUsedItemHand()) != null) {
+			serverPlayer.stopUsingItem();
+		}
 
 		// A Disabled leg (or fading consciousness) disables sprinting (spec §12, §23).
 		// The client re-requests, the server keeps vetoing; the speed bonus is
@@ -145,6 +182,8 @@ public final class ImpairmentSystem {
 		remove(player, Attributes.ATTACK_SPEED, ARM_ATTACK_SPEED_ID);
 		remove(player, Attributes.BLOCK_BREAK_SPEED, ARM_MINING_ID);
 		remove(player, Attributes.ATTACK_DAMAGE, ARM_DAMAGE_ID);
+		remove(player, Attributes.MOVEMENT_SPEED, ADRENALINE_SPEED_ID);
+		remove(player, Attributes.ATTACK_SPEED, ADRENALINE_ATTACK_ID);
 	}
 
 	public static boolean sprintBlocked(RealisticDamageData data) {
@@ -153,6 +192,10 @@ public final class ImpairmentSystem {
 				|| data.microsleeping()
 				|| data.legless()
 				|| ConsciousnessSystem.effective(data) < Balance.SYMPTOM_SPRINT_LOSS
+				|| data.vertigo()
+				|| data.retching()
+				|| data.adrenaline().winded
+				|| (data.concussion() && data.concussionFlare() >= Balance.FLARE_NO_SPRINT)
 				|| data.part(BodyPart.LEFT_LEG).state() == BodyState.DISABLED
 				|| data.part(BodyPart.RIGHT_LEG).state() == BodyState.DISABLED;
 	}
@@ -190,6 +233,54 @@ public final class ImpairmentSystem {
 		return data.part(arm).destroyed();
 	}
 
+	/**
+	 * Can this arm's hand close around anything (1.7)? Not when it is gone, and
+	 * not when it has been driven all the way to Disabled — the grey arm on the
+	 * body panel. It comes back with the arm: the moment the limb heals out of
+	 * Disabled, the hand works again.
+	 */
+	public static boolean canGrip(BodyPartData arm) {
+		if (arm.destroyed()) {
+			return false;
+		}
+		return !ServerConfig.get().disabledArmsLoseGrip || arm.state() != BodyState.DISABLED;
+	}
+
+	/**
+	 * Which hand stops this use, or null when nothing does (1.7). The hand itself
+	 * if its own arm cannot grip; the other hand if the item takes two —
+	 * a bow, a crossbow, a spear charge — and the other arm cannot help.
+	 */
+	public static net.minecraft.world.InteractionHand gripBlocked(ServerPlayer player, InteractionHand hand) {
+		if (player.isCreative() || player.isSpectator()) {
+			return null;
+		}
+		RealisticDamageData data = RDAttachments.get(player);
+		BodyPartData own = data.part(armFor(player, hand == InteractionHand.MAIN_HAND));
+		if (own.destroyed() ? ServerConfig.get().enableLimbDestruction : !canGrip(own)) {
+			return hand;
+		}
+		if (twoHanded(player.getItemInHand(hand))) {
+			InteractionHand other = hand == InteractionHand.MAIN_HAND ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
+			BodyPartData helper = data.part(armFor(player, other == InteractionHand.MAIN_HAND));
+			if (helper.destroyed() ? ServerConfig.get().enableLimbDestruction : !canGrip(helper)) {
+				return other;
+			}
+		}
+		return null;
+	}
+
+	/** Items that need both hands to use: the same set the two-handed stall applies to. */
+	public static boolean twoHanded(net.minecraft.world.item.ItemStack stack) {
+		if (stack.isEmpty()) {
+			return false;
+		}
+		net.minecraft.world.item.ItemUseAnimation animation = stack.getUseAnimation();
+		return animation == net.minecraft.world.item.ItemUseAnimation.BOW
+				|| animation == net.minecraft.world.item.ItemUseAnimation.CROSSBOW
+				|| animation == net.minecraft.world.item.ItemUseAnimation.SPEAR;
+	}
+
 	private static void strainIfSevere(Player player) {
 		if (!(player instanceof ServerPlayer serverPlayer) || serverPlayer.isCreative() || serverPlayer.isSpectator()) {
 			return;
@@ -216,6 +307,24 @@ public final class ImpairmentSystem {
 			return;
 		}
 		if (value > -1.0e-9) {
+			instance.removeModifier(id);
+			return;
+		}
+		AttributeModifier existing = instance.getModifier(id);
+		if (existing != null && Math.abs(existing.amount() - value) < 1.0e-9) {
+			return;
+		}
+		instance.addOrUpdateTransientModifier(
+				new AttributeModifier(id, value, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+	}
+
+	/** As {@link #apply}, for a modifier that may also be a bonus. */
+	private static void applySigned(LivingEntity player, Holder<Attribute> attribute, Identifier id, double value) {
+		AttributeInstance instance = player.getAttribute(attribute);
+		if (instance == null) {
+			return;
+		}
+		if (Math.abs(value) < 1.0e-9) {
 			instance.removeModifier(id);
 			return;
 		}

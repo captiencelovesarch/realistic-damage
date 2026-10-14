@@ -70,7 +70,7 @@ public final class ConsciousnessSystem {
 			return false;
 		}
 		RealisticDamageData data = RDAttachments.get(serverPlayer);
-		return data.microsleeping() || data.knockedDown();
+		return data.microsleeping() || data.knockedDown() || data.retching();
 	}
 
 	/**
@@ -88,22 +88,38 @@ public final class ConsciousnessSystem {
 			return false;
 		}
 		RealisticDamageData data = RDAttachments.get(serverPlayer);
-		if (data.microsleeping() || data.knockedDown()) {
+		if (data.microsleeping() || data.knockedDown() || data.retching()) {
 			return true;
 		}
 		return effective(data) < Balance.SYMPTOM_FEEBLE;
 	}
 
-	/** Consciousness as the body experiences it, concussion shift included. */
+	/** Consciousness as the body experiences it, concussion grade and flare included. */
 	public static double effective(RealisticDamageData data) {
-		return Vitals.effectiveConsciousness(data.consciousness(), data.concussion());
+		return Vitals.effectiveConsciousness(data.consciousness(), data.concussionGrade(), data.concussionFlare());
 	}
 
-	/** A destroyed arm's hand simply does not work any more (Arcade preset). */
+	/**
+	 * A hand that cannot close: destroyed (Arcade preset), or on an arm driven to
+	 * Disabled (1.7). Says why on the action bar, now and then, so that a use
+	 * that silently does nothing never reads as a bug.
+	 */
 	private static boolean handGone(Player player, net.minecraft.world.InteractionHand hand) {
-		return player instanceof ServerPlayer serverPlayer
-				&& ServerConfig.get().enableLimbDestruction
-				&& ImpairmentSystem.handDisabled(serverPlayer, hand);
+		if (!(player instanceof ServerPlayer serverPlayer)) {
+			return false;
+		}
+		net.minecraft.world.InteractionHand blocked = ImpairmentSystem.gripBlocked(serverPlayer, hand);
+		if (blocked == null) {
+			return false;
+		}
+		RealisticDamageData data = RDAttachments.get(serverPlayer);
+		if (data.claimGripMessage(serverPlayer.level().getGameTime())) {
+			BodyPart arm = ImpairmentSystem.armFor(serverPlayer, blocked == net.minecraft.world.InteractionHand.MAIN_HAND);
+			Notifier.message(serverPlayer, blocked == hand
+					? "realisticdamage.msg.grip." + arm.id()
+					: "realisticdamage.msg.grip_two_handed." + arm.id());
+		}
+		return true;
 	}
 
 	private static boolean locked(Player player) {
@@ -123,8 +139,15 @@ public final class ConsciousnessSystem {
 		}
 
 		double drain = bloodDrainPerSecond(data.blood());
-		if (player.getAirSupply() <= 0) {
-			drain += Balance.CONSCIOUSNESS_DRAIN_ASPHYXIA;
+		// Out of air (1.7): drowning, or a head inside a block. The drain climbs
+		// with the debt, so you black out before the drowning damage kills you —
+		// and once you breathe again the debt has to be paid back before the
+		// mind comes back properly.
+		if (starved(player)) {
+			data.setHypoxia(data.hypoxia() + 1.0 / 20.0);
+			drain += HypoxiaMath.drainPerSecond(data.hypoxia());
+		} else if (data.hypoxia() > 0.0) {
+			data.setHypoxia(data.hypoxia() - Balance.HYPOXIA_REPAY_PER_SEC / 20.0);
 		}
 		if (drain > 0.0) {
 			data.drainConsciousness(drain * config.consciousnessLossMultiplier / 20.0);
@@ -144,6 +167,7 @@ public final class ConsciousnessSystem {
 			}
 			double bloodFactor = Balance.CONSCIOUSNESS_RECOVERY_BLOOD_FLOOR
 					+ (1.0 - Balance.CONSCIOUSNESS_RECOVERY_BLOOD_FLOOR) * (data.blood() / Balance.BLOOD_MAX);
+			recovery *= HypoxiaMath.recoveryFactor(data.hypoxia());
 			data.restoreConsciousness(recovery * bloodFactor / 20.0);
 		}
 
@@ -163,6 +187,15 @@ public final class ConsciousnessSystem {
 				&& data.consciousness() >= Balance.WAKE_THRESHOLD) {
 			wake(player, data);
 		}
+	}
+
+	/**
+	 * No air reaching the lungs: under water with the air bar empty, or with the
+	 * head inside a solid block. Creatures that breathe water never run dry, so
+	 * the first test already excludes them.
+	 */
+	public static boolean starved(LivingEntity entity) {
+		return entity.getAirSupply() <= 0 || entity.isInWall();
 	}
 
 	/**
@@ -284,6 +317,15 @@ public final class ConsciousnessSystem {
 			return;
 		}
 		double drain = 0.0;
+		if (appliedDamage > 0.0) {
+			ConcussionSystem.onHitTaken(player, data);
+		}
+		// The concussion is judged once per event, on the worst candidate (1.7).
+		// It used to be asked per candidate, which was harmless while "already
+		// concussed" meant "nothing more to do" — with second impact it would
+		// have counted one blow twice.
+		double headMax = 0.0;
+		double impact = 0.0;
 		for (TraumaPipeline.AppliedTrauma trauma : traumas) {
 			if (trauma.part() == BodyPart.HEAD) {
 				// Head trauma is head trauma whether or not it was the primary
@@ -297,7 +339,7 @@ public final class ConsciousnessSystem {
 					hit *= Balance.CONCUSSION_EXTRA_HEAD_DRAIN;
 				}
 				drain += hit;
-				maybeConcuss(player, data, profile, trauma.conditionDamage(), limbLost);
+				headMax = Math.max(headMax, trauma.conditionDamage());
 			} else {
 				drain += trauma.conditionDamage() * profile.consciousnessFactor()
 						* Balance.CONSCIOUSNESS_BODY_HIT_SCALE * (trauma.primary() ? 1.0 : 0.5);
@@ -307,8 +349,9 @@ public final class ConsciousnessSystem {
 		// Hard impacts jolt the whole body, not just whichever region took the hit.
 		if (profile.concussionCapable()) {
 			drain += appliedDamage * profile.consciousnessFactor() * Balance.CONSCIOUSNESS_IMPACT_SCALE;
-			maybeConcuss(player, data, profile, appliedDamage * profile.consciousnessFactor(), limbLost);
+			impact = appliedDamage * profile.consciousnessFactor();
 		}
+		maybeConcuss(player, data, profile, headMax, impact, limbLost);
 		if (classified.routing() == ClassifiedDamage.Routing.NONE) {
 			// Sonic boom, drowning ticks: pure consciousness pressure, no limb trauma.
 			drain += appliedDamage * profile.consciousnessFactor() * Balance.CONSCIOUSNESS_BODY_HIT_SCALE;
@@ -333,18 +376,54 @@ public final class ConsciousnessSystem {
 	 *                 has room for.
 	 */
 	private static void maybeConcuss(LivingEntity player, RealisticDamageData data, DamageProfile profile,
-			double headTrauma, boolean limbLost) {
-		if (data.concussion() || !profile.concussionCapable()) {
+			double headHit, double impact, boolean limbLost) {
+		if (!profile.concussionCapable()) {
 			return;
 		}
+		if (data.concussion()) {
+			// A second impact is a blow to the head. A heavy blow anywhere else
+			// still rattles it, at half weight and only past the bar a fresh
+			// concussion would need — otherwise any zombie's punch to the ribs
+			// would floor a concussed player.
+			double jolt = impact >= Balance.CONCUSSION_HEAD_TRAUMA_THRESHOLD ? impact * 0.5 : 0.0;
+			secondImpact(player, data, Math.max(headHit, jolt), limbLost);
+			return;
+		}
+		double headTrauma = Math.max(headHit, impact);
 		boolean massive = headTrauma >= Balance.CONCUSSION_HEAD_TRAUMA_THRESHOLD;
 		boolean compounded = headTrauma >= Balance.CONCUSSION_HEAD_TRAUMA_INJURED_THRESHOLD
 				&& data.part(BodyPart.HEAD).state().isAtLeastAsBadAs(BodyState.INJURED);
 		if (massive || compounded) {
-			data.setConcussion(true);
+			data.setConcussionSeverity(ConcussionMath.freshSeverity(headTrauma));
 			if (!limbLost) {
-				Notifier.message(player, "realisticdamage.msg.concussion");
+				Notifier.message(player, "realisticdamage.msg.concussion." + data.concussionGrade());
 			}
+		}
+	}
+
+	/**
+	 * Second impact (1.7): a brain that has not healed from the last knock takes
+	 * the next one far worse. Any concussive head hit worth {@link
+	 * Balance#SECOND_IMPACT_MIN_TRAUMA} deepens the concussion and flares it on
+	 * the spot, and past a bar that drops as the grade rises it puts you
+	 * straight out — a severe concussion is one solid tap from the floor.
+	 */
+	private static void secondImpact(LivingEntity player, RealisticDamageData data, double headTrauma,
+			boolean limbLost) {
+		if (headTrauma < Balance.SECOND_IMPACT_MIN_TRAUMA) {
+			return;
+		}
+		int before = data.concussionGrade();
+		boolean knockout = ConcussionMath.secondImpactKnocksOut(before, headTrauma);
+		data.setConcussionSeverity(data.concussionSeverity() + ConcussionMath.secondImpactSeverity(headTrauma));
+		data.setConcussionFlare(data.concussionFlare() + Balance.SECOND_IMPACT_FLARE);
+		if (knockout && !data.unconscious()) {
+			data.drainConsciousness(data.consciousness());
+			collapse(player, data);
+			return;   // "everything goes black" is the line; collapse already sent it
+		}
+		if (!limbLost && data.concussionGrade() > before) {
+			Notifier.message(player, "realisticdamage.msg.second_impact");
 		}
 	}
 

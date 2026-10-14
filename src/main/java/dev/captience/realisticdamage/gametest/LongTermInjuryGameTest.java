@@ -318,38 +318,43 @@ public class LongTermInjuryGameTest {
 		helper.succeed();
 	}
 
-	/** A concussion clears when the head is as good as it will get — not only when it reads Healthy. */
+	/**
+	 * A concussion heals at full pace once the head is as good as it will get —
+	 * a capped head that will never read Healthy again is not "still mending"
+	 * (1.7: the concussion heals by rest, and only a battered head that still
+	 * has recovering to do halves that).
+	 */
 	@GameTest(environment = "realisticdamage:isolated")
-	public void concussionClearsOnceTheHeadReachesItsCeiling(GameTestHelper helper) {
+	public void concussionHealsAtFullPaceOnceTheHeadReachesItsCeiling(GameTestHelper helper) {
 		ServerPlayer player = mockPlayer(helper);
 		RealisticDamageData data = RDAttachments.get(player);
 		data.reset();
 		BodyPartData head = data.part(BodyPart.HEAD);
+		// The head's core floor is one rung: it can be capped at Hurt and no lower.
 		head.lowerCeilingTo(1);
-		head.setCondition(15.0);
-		data.setConcussion(true);
-		data.setConsciousness(Balance.CONSCIOUSNESS_MAX);
-		data.setConcussionStableTicks(Balance.CONCUSSION_STABLE_TICKS - 1);
+		head.heal(Balance.HEAD_MAX);
+		helper.assertTrue(head.atCeiling() && head.state() == BodyState.HURT,
+				"the head sits at its Hurt ceiling, never to read Healthy again, got " + head.state());
+		data.setConcussionSeverity(50.0);
 
-		HealingSystem.tick(player, data);
-		helper.assertTrue(!data.concussion(),
-				"a head sitting at its ceiling is as mended as it can be, so the clock must finish");
-
-		// Control: one point short of the ceiling is still recovering, and the clock
-		// restarts rather than finishing.
+		// Control: the same reading, short of its ceiling — still mending.
 		ServerPlayer controlPlayer = mockPlayer(helper);
 		RealisticDamageData control = RDAttachments.get(controlPlayer);
 		control.reset();
 		BodyPartData controlHead = control.part(BodyPart.HEAD);
 		controlHead.lowerCeilingTo(1);
-		controlHead.setCondition(11.0);
-		control.setConcussion(true);
-		control.setConsciousness(Balance.CONSCIOUSNESS_MAX);
-		control.setConcussionStableTicks(Balance.CONCUSSION_STABLE_TICKS - 1);
+		controlHead.setCondition(8.0);
+		helper.assertTrue(!controlHead.atCeiling() && controlHead.state() == BodyState.INJURED,
+				"the control head is Injured and still below its ceiling, got " + controlHead.state());
+		control.setConcussionSeverity(50.0);
 
-		HealingSystem.tick(controlPlayer, control);
-		helper.assertTrue(control.concussion(), "a head still short of its ceiling stays concussed");
-		helper.assertTrue(control.concussionStableTicks() == 0, "and the stability clock goes back to zero");
+		dev.captience.realisticdamage.systems.ConcussionSystem.tick(player, data);
+		dev.captience.realisticdamage.systems.ConcussionSystem.tick(controlPlayer, control);
+		double capped = 50.0 - data.concussionSeverity();
+		double mending = 50.0 - control.concussionSeverity();
+		helper.assertTrue(mending > 0.0, "a battered head still heals a concussion, only slower");
+		assertNear(helper, mending / Balance.CONCUSSION_HEAL_BAD_HEAD, capped,
+				"a head at its ceiling heals the concussion at the full resting pace");
 		helper.succeed();
 	}
 

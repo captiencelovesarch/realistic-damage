@@ -304,9 +304,79 @@ SOUNDS = {
 }
 
 
+# --- Breathing (1.7) ---------------------------------------------------------
+#
+# Not injury sounds, so they live outside SOUNDS and outside the spectral budget
+# test_sounds.py holds that set to: a breath is noise through a throat, and its
+# energy sits where a voice's does. Same rule as everything else here, though —
+# synthesised, deterministic, re-tunable by changing a number.
+
+
+def formant_noise(n: int, formants, hiss: float, salt: int) -> np.ndarray:
+    """White noise through a handful of broad resonances, plus some open hiss."""
+    noise = rng(salt).standard_normal(n)
+    out = np.zeros(n)
+    for centre, width, gain in formants:
+        out += band(noise, centre - width / 2, centre + width / 2, order=2) * gain
+    out += band(noise, 3000.0, 7000.0, order=2) * hiss
+    return out
+
+
+def breath_env(n: int, attack: float, hold: float, release: float) -> np.ndarray:
+    """A smooth swell: raised-cosine in, flat, raised-cosine out."""
+    t = np.arange(n) / SR
+    a = np.clip(t / attack, 0.0, 1.0)
+    r = np.clip((t - attack - hold) / release, 0.0, 1.0)
+    return (0.5 - 0.5 * np.cos(np.pi * a)) * (0.5 + 0.5 * np.cos(np.pi * r))
+
+
+def breath_in(variant: int) -> np.ndarray:
+    shift = 1.0 + 0.05 * (variant - 2)
+    attack, hold, release = 0.22, 0.18 + 0.03 * variant, 0.2
+    n = int(SR * (attack + hold + release + 0.05))
+    x = formant_noise(n, [(900 * shift, 700, 0.6), (1900 * shift, 1100, 0.8), (3100 * shift, 1400, 0.5)],
+                      hiss=0.55, salt=300 + variant)
+    # An inhale brightens as it goes: the throat opens and the air speeds up.
+    bright = np.linspace(0.6, 1.0, n)
+    return norm(x * breath_env(n, attack, hold, release) * bright, 0.55)
+
+
+def breath_out(variant: int) -> np.ndarray:
+    shift = 1.0 + 0.04 * (variant - 2)
+    attack, hold, release = 0.06, 0.12 + 0.03 * variant, 0.42
+    n = int(SR * (attack + hold + release + 0.05))
+    x = formant_noise(n, [(650 * shift, 500, 1.0), (1150 * shift, 800, 0.7), (2500 * shift, 1200, 0.3)],
+                      hiss=0.18, salt=320 + variant)
+    # An exhale darkens as the push runs out.
+    x = lowpass(x * breath_env(n, attack, hold, release), 3800.0)
+    return norm(x, 0.5)
+
+
+def gasp() -> np.ndarray:
+    """A sharp, catching inhale: the throat snaps open on a voiced edge, then pure rushing air."""
+    n = int(SR * 0.62)
+    t = np.arange(n) / SR
+    air = formant_noise(n, [(1000, 800, 0.6), (2100, 1300, 0.9), (3400, 1600, 0.6)], hiss=0.9, salt=340)
+    air *= breath_env(n, 0.035, 0.22, 0.32)
+    # The catch: a quarter-second of glottal buzz under the air, through the
+    # same throat, rising slightly as it opens.
+    f0 = 175.0 + 40.0 * np.clip(t / 0.2, 0.0, 1.0)
+    phase = 2 * np.pi * np.cumsum(f0) / SR
+    buzz = signal.sawtooth(phase, 0.15)
+    buzz = band(buzz, 500.0, 2600.0, order=2) * np.exp(-t / 0.09) * np.clip(t / 0.01, 0.0, 1.0)
+    return norm(air + 0.35 * buzz, 0.8)
+
+
+BREATHS = {
+    "gasp": gasp,
+    **{f"breath_in_{v}": (lambda v=v: breath_in(v)) for v in (1, 2, 3)},
+    **{f"breath_out_{v}": (lambda v=v: breath_out(v)) for v in (1, 2, 3)},
+}
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    for name, make in SOUNDS.items():
+    for name, make in {**SOUNDS, **BREATHS}.items():
         audio = make()
         if np.max(np.abs(audio)) > 1.0:
             raise SystemExit(f"{name} clips")

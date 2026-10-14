@@ -41,6 +41,20 @@ public final class ServerConfig {
 	/** Consciousness cuts out in episodes on the way down (1.4). */
 	public boolean enableMicrosleeps = true;
 	/**
+	 * An arm driven all the way to Disabled — grey on the body panel — loses its
+	 * grip until it heals (1.7): its hand cannot use anything (no raised shield,
+	 * no eating with it), two-handed items (bows, crossbows, spears) need both
+	 * arms, and a limp main arm fights like a missing one. Off, a Disabled arm
+	 * is only the strongest of the ordinary penalties, as it was before 1.7.
+	 */
+	public boolean disabledArmsLoseGrip = true;
+	/**
+	 * Dropping to the last two hearts floods you with adrenaline (1.7): a few
+	 * seconds quicker and with the pain pushed back, then a crash of heavy legs
+	 * and a breath that runs out after a short sprint.
+	 */
+	public boolean enableAdrenaline = true;
+	/**
 	 * Compress vanilla's lethal fall tail so long drops maim rather than delete
 	 * (1.4). Off, falls kill exactly as vanilla says they do and the body trauma
 	 * simply rides along on top.

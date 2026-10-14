@@ -50,6 +50,7 @@ public class RealisticDamage implements ModInitializer {
 		dev.captience.realisticdamage.systems.TickDispatcher.init();
 		dev.captience.realisticdamage.systems.ImpairmentSystem.init();
 		dev.captience.realisticdamage.systems.ConsciousnessSystem.init();
+		dev.captience.realisticdamage.systems.ConcussionSystem.init();
 		dev.captience.realisticdamage.systems.HealingSystem.init();
 		dev.captience.realisticdamage.systems.RescueSystem.init();
 		dev.captience.realisticdamage.systems.RespawnCarryover.init();
@@ -61,6 +62,9 @@ public class RealisticDamage implements ModInitializer {
 				id("tinnitus"),
 				net.minecraft.sounds.SoundEvent.createVariableRangeEvent(id("tinnitus")));
 		registerInjurySounds();
+		GASP = registerSound("gasp");
+		BREATH_IN = registerSound("breath_in");
+		BREATH_OUT = registerSound("breath_out");
 		LOGGER.info("Realistic Damage initialized");
 	}
 
@@ -71,6 +75,18 @@ public class RealisticDamage implements ModInitializer {
 	 * instead of our generated one.
 	 */
 	public static net.minecraft.sounds.SoundEvent TINNITUS;
+
+	/** Your own breathing (1.7): the gasp on surfacing, and the two halves of a heaving breath. */
+	public static net.minecraft.sounds.SoundEvent GASP;
+	public static net.minecraft.sounds.SoundEvent BREATH_IN;
+	public static net.minecraft.sounds.SoundEvent BREATH_OUT;
+
+	private static net.minecraft.sounds.SoundEvent registerSound(String path) {
+		return net.minecraft.core.Registry.register(
+				net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT,
+				id(path),
+				net.minecraft.sounds.SoundEvent.createVariableRangeEvent(id(path)));
+	}
 
 	/**
 	 * Both style variants of every injury sound, keyed by asset path. Both are

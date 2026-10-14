@@ -17,6 +17,8 @@ public final class ClientState {
 
 	private static double smoothedConsciousness = Balance.CONSCIOUSNESS_MAX;
 	private static double smoothedBlood = Balance.BLOOD_MAX;
+	/** The concussion flare, eased like the vitals so the throb swells rather than steps (1.7). */
+	private static double smoothedFlare;
 	/** Rises while unconscious, falls after waking — drives the blackout fade. */
 	private static double unconsciousFade;
 	/**
@@ -106,6 +108,7 @@ public final class ClientState {
 		if (snapshot == null) {
 			smoothedConsciousness = Balance.CONSCIOUSNESS_MAX;
 			smoothedBlood = Balance.BLOOD_MAX;
+			smoothedFlare = 0.0;
 			unconsciousFade = 0.0;
 			microsleepFade = 0.0;
 			HEART.reset();
@@ -117,6 +120,7 @@ public final class ClientState {
 		// gently, which is where smoothing actually earns its keep.
 		smoothedConsciousness = approach(smoothedConsciousness, snapshot.consciousness(), 0.85, 0.15);
 		smoothedBlood = approach(smoothedBlood, snapshot.blood(), 0.85, 0.15);
+		smoothedFlare += (snapshot.concussionFlare() - smoothedFlare) * 0.12;
 		double target = snapshot.unconscious() ? 1.0 : 0.0;
 		unconsciousFade += (target - unconsciousFade) * (target > unconsciousFade ? 0.45 : 0.12);
 		double microTarget = snapshot.microsleeping() ? 1.0 : 0.0;
@@ -286,8 +290,50 @@ public final class ClientState {
 	 */
 	public static double effectiveConsciousness() {
 		BodySnapshot snapshot = snapshot();
+		if (snapshot == null) {
+			return dev.captience.realisticdamage.body.Vitals.effectiveConsciousness(smoothedConsciousness, false);
+		}
 		return dev.captience.realisticdamage.body.Vitals.effectiveConsciousness(
-				smoothedConsciousness, snapshot != null && snapshot.concussion());
+				smoothedConsciousness, snapshot.concussionGrade(), snapshot.concussion() ? smoothedFlare : 0.0);
+	}
+
+	/** 0 none, 1 mild, 2 moderate, 3 severe (1.7). */
+	public static int concussionGrade() {
+		BodySnapshot snapshot = snapshot();
+		return snapshot == null || !snapshot.concussion() ? 0 : Math.max(1, snapshot.concussionGrade());
+	}
+
+	/** The concussion flare, smoothed, 0 to 1 (1.7). */
+	public static double flare() {
+		return concussed() ? Math.clamp(smoothedFlare / Balance.FLARE_MAX, 0.0, 1.0) : 0.0;
+	}
+
+	/** The room is spinning (1.7); and which way. */
+	public static boolean vertigo() {
+		BodySnapshot snapshot = snapshot();
+		return snapshot != null && snapshot.vertigo();
+	}
+
+	public static boolean vertigoLeft() {
+		BodySnapshot snapshot = snapshot();
+		return snapshot != null && snapshot.vertigoLeft();
+	}
+
+	public static boolean retching() {
+		BodySnapshot snapshot = snapshot();
+		return snapshot != null && snapshot.retching();
+	}
+
+	/** The last-two-hearts phase (1.7). */
+	public static dev.captience.realisticdamage.systems.AdrenalineMath.Phase adrenaline() {
+		BodySnapshot snapshot = snapshot();
+		return snapshot == null ? dev.captience.realisticdamage.systems.AdrenalineMath.Phase.NONE
+				: snapshot.adrenaline();
+	}
+
+	public static boolean winded() {
+		BodySnapshot snapshot = snapshot();
+		return snapshot != null && snapshot.winded();
 	}
 
 	/** True when the synced state says the player is concussed. */

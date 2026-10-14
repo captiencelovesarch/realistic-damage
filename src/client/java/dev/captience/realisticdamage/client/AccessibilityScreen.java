@@ -119,6 +119,21 @@ public class AccessibilityScreen extends OptionsSubScreen {
 								(button, value) -> config.deathCamera = value),
 				null);
 
+		// The four things that happen to you rather than to a limb (1.7). Their
+		// own section: none of them is a vision effect, a sound or an aim effect
+		// alone — each one is all three at once, and a player who hates one of
+		// them wants one control for it, not three.
+		this.list.addHeader(Component.translatable("realisticdamage.config.section.afflictions"));
+		this.list.addSmall(
+				slider("realisticdamage.config.blast_deafness",
+						config::blastDeafness, value -> config.blastDeafnessValue = value),
+				slider("realisticdamage.config.concussion_effects",
+						config::concussionEffects, value -> config.concussionEffectsValue = value));
+		this.list.addSmall(
+				slider("realisticdamage.config.low_health",
+						config::lowHealthEffects, value -> config.lowHealthEffectsValue = value),
+				null);
+
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.blood"));
 		// The master first and on its own row: everything under it is a share of
 		// this one, so a player who wants no blood at all has a single control to
@@ -201,7 +216,8 @@ public class AccessibilityScreen extends OptionsSubScreen {
 				CycleButton.onOffBuilder(config.screams)
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.screams"),
 								(button, value) -> config.screams = value),
-				null);
+				slider("realisticdamage.config.breathing",
+						config::breathingVolume, value -> config.breathingVolumeValue = value));
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.everything"));
 		this.list.addBig(Button.builder(Component.translatable("realisticdamage.config.disable_all_effects"),

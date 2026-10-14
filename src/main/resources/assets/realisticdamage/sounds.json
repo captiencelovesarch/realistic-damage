@@ -1,4 +1,26 @@
 {
+	"gasp": {
+		"subtitle": "realisticdamage.subtitle.gasp",
+		"sounds": [
+			"realisticdamage:gasp"
+		]
+	},
+	"breath_in": {
+		"subtitle": "realisticdamage.subtitle.breathing",
+		"sounds": [
+			"realisticdamage:breath_in_1",
+			"realisticdamage:breath_in_2",
+			"realisticdamage:breath_in_3"
+		]
+	},
+	"breath_out": {
+		"subtitle": "realisticdamage.subtitle.breathing",
+		"sounds": [
+			"realisticdamage:breath_out_1",
+			"realisticdamage:breath_out_2",
+			"realisticdamage:breath_out_3"
+		]
+	},
 	"tinnitus": {
 		"subtitle": "realisticdamage.subtitle.tinnitus",
 		"sounds": [

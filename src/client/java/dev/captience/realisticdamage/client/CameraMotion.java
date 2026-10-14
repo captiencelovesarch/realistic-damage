@@ -157,14 +157,23 @@ public final class CameraMotion {
 		return applications;
 	}
 
-	/** The last frame's total roll, for the client gametest: sway and spring together. */
+	/** The last frame's total roll, for the client gametest: sway, spring and the concussed room together. */
 	public static double lastRoll() {
-		return pos[ROLL] + swayRoll;
+		return pos[ROLL] + swayRoll + ConcussionEffects.viewRoll();
+	}
+
+	/** The spring alone — no sway, no concussed room — for tests that ask whether a blow has settled. */
+	public static double springPitch() {
+		return pos[PITCH];
+	}
+
+	public static double springRoll() {
+		return pos[ROLL];
 	}
 
 	/** The last frame's total pitch offset, degrees, positive looking down. */
 	public static double lastPitch() {
-		return pos[PITCH] + swayPitch;
+		return pos[PITCH] + swayPitch + ConcussionEffects.viewPitch();
 	}
 
 	/**
@@ -208,6 +217,49 @@ public final class CameraMotion {
 				vel[SHOVE_Y] -= BLOW_SHOVE * 0.6 * scale;
 			}
 		}
+	}
+
+	/**
+	 * A blast nearby (1.7), whether or not it hurt: the pressure wave shakes the
+	 * view and shoves the head down. {@code loud} is {@link BlastShock#loudness}
+	 * after any wall, {@code intensity} Impact Shock times Blast Deafening.
+	 */
+	public static void blast(double loud, double intensity) {
+		double scale = loud * intensity * damageTilt();
+		if (scale <= 0.0) {
+			return;
+		}
+		shake = Math.max(shake, BLAST_SHAKE * scale);
+		shakePhase = 0.0;
+		vel[PITCH] += BLOW_PITCH * 0.6 * scale;
+		vel[SHOVE_Y] -= BLOW_SHOVE * 0.8 * scale;
+	}
+
+	/**
+	 * A wince at a loud noise (1.7 concussion): the head ducks and turns a
+	 * little from it, as if from a blow that did not land.
+	 */
+	public static void flinch(double strength) {
+		double scale = strength * damageTilt();
+		if (scale <= 0.0) {
+			return;
+		}
+		vel[PITCH] += LANDING_PITCH * 0.35 * scale;
+		vel[ROLL] += BLOW_ROLL * 0.25 * scale;
+		vel[SHOVE_Y] -= BLOW_SHOVE * 0.3 * scale;
+	}
+
+	/**
+	 * The diaphragm jerking against a closed throat (1.7): what running out of
+	 * breath under water feels like, a little upward heave of the whole view.
+	 */
+	public static void contraction(double strength) {
+		double scale = strength * damageTilt();
+		if (scale <= 0.0) {
+			return;
+		}
+		vel[PITCH] -= LANDING_PITCH * 0.25 * scale;
+		vel[SHOVE_Y] += BLOW_SHOVE * 0.35 * scale;
 	}
 
 	/** The ground arrived: the eye drops and the chin goes down, then both spring back. */
@@ -389,8 +441,10 @@ public final class CameraMotion {
 			shakePitch = Math.cos(shakePhase * 2.3) * a * 0.7;
 			shakeYaw = Math.sin(shakePhase * 1.9 + 1.0) * a * 0.5;
 		}
-		double roll = pos[ROLL] + swayRoll + shakeRoll;
-		double pitch = pos[PITCH] + swayPitch + shakePitch + lagPos[LAG_PITCH];
+		// The concussed room (1.7) rides on top: the vertigo roll and the head
+		// bowed to retch, both view-only like everything else here.
+		double roll = pos[ROLL] + swayRoll + shakeRoll + ConcussionEffects.viewRoll();
+		double pitch = pos[PITCH] + swayPitch + shakePitch + lagPos[LAG_PITCH] + ConcussionEffects.viewPitch();
 		double yaw = pos[YAW] + shakeYaw + lagPos[LAG_YAW];
 		double x = pos[SHOVE_X] + swayX;
 		double y = pos[SHOVE_Y];

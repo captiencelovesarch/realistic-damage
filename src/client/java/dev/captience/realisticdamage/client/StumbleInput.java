@@ -30,10 +30,23 @@ public final class StumbleInput {
 	public static Vec2 apply(Vec2 move) {
 		double target = severityTarget();
 		severity += (target - severity) * (target > severity ? 0.25 : 0.08);
+		// A vertigo spell (1.7) pushes the feet the way the room is turning:
+		// your heading veers, and even standing still you stagger sideways.
+		double spin = ConcussionEffects.driftDegrees();
+		if (Math.abs(spin) > 0.05) {
+			double stagger = ConcussionEffects.stagger();
+			if (move.x == 0.0F && move.y == 0.0F) {
+				return new Vec2((float) -stagger, 0.0F);
+			}
+			move = rotate(move, Math.toRadians(spin));
+		}
 		if (severity < 0.002 || (move.x == 0.0F && move.y == 0.0F)) {
 			return move;
 		}
-		double angle = Math.toRadians(offsetDegrees());
+		return rotate(move, Math.toRadians(offsetDegrees()));
+	}
+
+	private static Vec2 rotate(Vec2 move, double angle) {
 		double sin = Math.sin(angle);
 		double cos = Math.cos(angle);
 		return new Vec2(

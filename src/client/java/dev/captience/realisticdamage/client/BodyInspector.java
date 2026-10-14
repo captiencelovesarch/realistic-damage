@@ -443,7 +443,15 @@ public final class BodyInspector {
 					+ wound.name().toLowerCase(Locale.ROOT)));
 		}
 		if (part == BodyPart.HEAD && snapshot.concussion()) {
-			lines.add(Component.translatable("realisticdamage.detail.concussion"));
+			lines.add(Component.translatable("realisticdamage.detail.concussion."
+					+ Math.clamp(snapshot.concussionGrade(), 1, 3)));
+			// The one piece of advice the panel gives (1.7): what the flare is
+			// telling you, in words, because nothing on screen says "stop" otherwise.
+			if (snapshot.concussionFlare() >= 40) {
+				lines.add(Component.translatable("realisticdamage.detail.concussion_flaring"));
+			} else {
+				lines.add(Component.translatable("realisticdamage.detail.concussion_rest"));
+			}
 		}
 		if (snapshot.burned()) {
 			lines.add(Component.translatable("realisticdamage.detail.burned"));
