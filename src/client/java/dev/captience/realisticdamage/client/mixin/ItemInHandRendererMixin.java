@@ -14,6 +14,8 @@ import net.minecraft.world.item.ItemStack;
 import com.mojang.math.Axis;
 import dev.captience.realisticdamage.body.BodyState;
 import net.minecraft.client.Minecraft;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.gen.Invoker;
@@ -39,26 +41,39 @@ public abstract class ItemInHandRendererMixin {
 	abstract void realisticdamage$renderPlayerArm(PoseStack poseStack, SubmitNodeCollector collector,
 			int lightCoords, float inverseArmHeight, float attackValue, HumanoidArm arm);
 
-	@Inject(method = "submitArmWithItem", at = @At("HEAD"), cancellable = true)
+	/**
+	 * A wrap rather than a HEAD inject (1.7 alpha.11): Vivecraft draws the VR
+	 * hand through this same method and cancels it at HEAD, and two HEAD
+	 * injectors run in an order neither mod controls — when Vivecraft's went
+	 * first the whole arm was drawn and this never ran. A wrap encloses every
+	 * other mod's injections, so the lost arm is decided before anyone draws.
+	 */
+	@WrapMethod(method = "submitArmWithItem")
 	private void realisticdamage$stumpForDestroyedArm(AbstractClientPlayer player, float frameInterp, float xRot,
 			InteractionHand hand, float attack, ItemStack itemStack,
 			float inverseArmHeight, PoseStack poseStack,
 			SubmitNodeCollector submitNodeCollector, int lightCoords,
-			CallbackInfo ci) {
+			Operation<Void> original) {
 		BodySnapshot snapshot = player.getAttached(RDAttachments.SNAPSHOT);
-		if (snapshot == null) {
-			return;
-		}
 		boolean mainHand = hand == InteractionHand.MAIN_HAND;
 		HumanoidArm arm = mainHand ? player.getMainArm() : player.getMainArm().getOpposite();
+		boolean vr = Vr.active() && player == Minecraft.getInstance().player;
+		if (vr && Vr.handsSwapped()) {
+			// Vivecraft's "reverse hands": the same swap it makes when drawing.
+			arm = arm.getOpposite();
+		}
 		BodyPart part = arm == HumanoidArm.RIGHT ? BodyPart.RIGHT_ARM : BodyPart.LEFT_ARM;
-		if (!snapshot.destroyed(part)) {
+		if (snapshot == null || !snapshot.destroyed(part)) {
+			original.call(player, frameInterp, xRot, hand, attack, itemStack, inverseArmHeight, poseStack,
+					submitNodeCollector, lightCoords);
 			return;
 		}
-		if (Vr.active()) {
-			// Vivecraft draws the VR hand through this same method and would draw
-			// the whole arm; a hand that is gone draws nothing at all.
-			ci.cancel();
+		if (vr) {
+			// Vivecraft draws the arm on with an empty hand: VrArmRendererMixin
+			// makes that arm a stump, and nothing is held by a hand that is gone.
+			dev.captience.realisticdamage.client.LostHands.skippedInVr();
+			original.call(player, frameInterp, xRot, hand, attack, ItemStack.EMPTY, inverseArmHeight, poseStack,
+					submitNodeCollector, lightCoords);
 			return;
 		}
 		// The same guards vanilla's own empty-hand branch applies.
@@ -67,7 +82,6 @@ public abstract class ItemInHandRendererMixin {
 			realisticdamage$renderPlayerArm(poseStack, submitNodeCollector, lightCoords, inverseArmHeight, attack, arm);
 			poseStack.popPose();
 		}
-		ci.cancel();
 	}
 
 	/** How many hands this frame were pushed into a droop or a shake and still owe a pop. */
@@ -79,8 +93,8 @@ public abstract class ItemInHandRendererMixin {
 	 * hangs: whatever it holds sits low and tilted at the edge of the view, which
 	 * is the first-person half of "this arm is not working" and the reason the
 	 * use you are about to try will fail. In the adrenaline crash both hands
-	 * tremble. Declared after the stump handler, so a destroyed arm — which
-	 * cancels there — never reaches this and never pushes.
+	 * tremble. A destroyed arm never reaches this and never pushes: the stump
+	 * wrap above does not let it into the method at all.
 	 */
 	@Inject(method = "submitArmWithItem", at = @At("HEAD"))
 	private void realisticdamage$droopAndShake(AbstractClientPlayer player, float frameInterp, float xRot,

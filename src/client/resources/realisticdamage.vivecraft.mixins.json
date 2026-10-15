@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "dev.captience.realisticdamage.client.compat.mixin",
+	"plugin": "dev.captience.realisticdamage.client.compat.VivecraftMixinPlugin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"VrArmRendererMixin",
+		"VrPlayerModelArmsMixin",
+		"VrPlayerModelLegsMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

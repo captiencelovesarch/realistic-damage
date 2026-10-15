@@ -207,7 +207,54 @@ public class MobAnatomyClientGameTest implements FabricClientGameTest {
 					throw new AssertionError("the next pillager through the same model lost its leg too");
 				}
 			});
+
+			firstWoundBleedsItsOwnColour(context, singleplayer);
 		}
+	}
+
+	/**
+	 * A mob's first wound sprays its own blood (1.7 alpha.11). The playtest
+	 * report: green-blooded mobs threw a red first spurt, then bled green. The
+	 * creeper here has never had a body snapshot sent, exactly as a wild one
+	 * has not before anyone hits it.
+	 */
+	private static void firstWoundBleedsItsOwnColour(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runOnServer(server -> {
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,
+						new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND_SWORD));
+				var creeper = EntityTypes.CREEPER.create(player.level(), EntitySpawnReason.COMMAND);
+				if (creeper == null) {
+					throw new AssertionError("could not create a creeper");
+				}
+				creeper.setPos(player.getX() - 2.0, player.getY(), player.getZ() + 2.5);
+				creeper.setNoAi(true);
+				creeper.setPersistenceRequired();
+				player.level().addFreshEntity(creeper);
+			}
+		});
+		context.waitTicks(20);
+		long before = context.computeOnClient(client -> dev.captience.realisticdamage.client.BloodDrop.Provider.thrown());
+		singleplayer.getServer().runOnServer(server -> {
+			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+				var level = player.level();
+				for (var creeper : level.getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class,
+						player.getBoundingBox().inflate(8.0))) {
+					creeper.hurtServer(level, level.damageSources().playerAttack(player), 6.0F);
+				}
+			}
+		});
+		context.waitTicks(5);
+		long after = context.computeOnClient(client -> dev.captience.realisticdamage.client.BloodDrop.Provider.thrown());
+		if (after <= before) {
+			throw new AssertionError("a sword cut on a creeper threw no spray at all");
+		}
+		var tint = context.computeOnClient(client -> dev.captience.realisticdamage.client.BloodDrop.Provider.lastTint());
+		if (tint != dev.captience.realisticdamage.client.BloodTint.GREEN) {
+			throw new AssertionError("a creeper's first wound sprayed " + (tint == dev.captience.realisticdamage.client.BloodTint.RED
+					? "red" : "the wrong colour") + "; creepers bleed green");
+		}
+		context.takeScreenshot("rd_mob_first_wound_green");
 	}
 
 	/** Spawns a still, persistent mob {@code ahead} blocks in front of and {@code aside} to the player's left, with the given body. */

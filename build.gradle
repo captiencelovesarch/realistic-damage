@@ -54,6 +54,11 @@ loom {
 	}
 }
 
+configurations {
+	// Vivecraft for the client gametest run only; see runClientGametest below.
+	vivecraftRuntime
+}
+
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
@@ -67,10 +72,8 @@ dependencies {
 	// Optional integration: Vivecraft's public API (client/compat/Vr), only
 	// touched once Vivecraft is known to be loaded.
 	clientCompileOnly "maven.modrinth:vivecraft:${project.vivecraft_version}"
-	// `./gradlew runClientGametest -PwithVivecraft` runs the suite with Vivecraft
-	// present (VivecraftClientGameTest drives it through its NullVR provider).
-	if (project.hasProperty('withVivecraft')) {
-		clientRuntimeOnly "maven.modrinth:vivecraft:${project.vivecraft_version}"
+	vivecraftRuntime("maven.modrinth:vivecraft:${project.vivecraft_version}") {
+		transitive = false
 	}
 
 	testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
@@ -81,6 +84,24 @@ dependencies {
 
 test {
 	useJUnitPlatform()
+}
+
+// `./gradlew runClientGametest -PwithVivecraft` runs the suite with Vivecraft
+// present (VivecraftClientGameTest drives it through its NullVR provider). The
+// jar goes in the run's own mods folder, not on a classpath: on the client
+// runtime classpath it also reached the unit tests, whose Knot loader then
+// tried to apply Vivecraft's mixins and failed every test class.
+tasks.matching { it.name == 'runClientGametest' }.configureEach {
+	doFirst {
+		def mods = file('build/clientgametest/mods')
+		delete fileTree(mods) { include 'vivecraft-*.jar' }
+		if (project.hasProperty('withVivecraft')) {
+			copy {
+				from configurations.vivecraftRuntime
+				into mods
+			}
+		}
+	}
 }
 
 processResources {

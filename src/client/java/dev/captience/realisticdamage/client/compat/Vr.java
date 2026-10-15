@@ -68,6 +68,11 @@ public final class Vr {
 		return active() ? Api.eye() : LEFT;
 	}
 
+	/** True if Vivecraft's "reverse hands" is on: the main hand is held in the left controller. */
+	public static boolean handsSwapped() {
+		return active() && Api.handsSwapped();
+	}
+
 	/**
 	 * A haptic pulse on one controller or both. Ignored in flat play, seated
 	 * play (Vivecraft refuses it), and for an amplitude too small to feel.
@@ -91,6 +96,10 @@ public final class Vr {
 	private static final class Api {
 		static boolean active() {
 			return VRClientAPI.instance().isVRActive();
+		}
+
+		static boolean handsSwapped() {
+			return VRClientAPI.instance().isLeftHanded();
 		}
 
 		static boolean firstPass() {

@@ -70,6 +70,10 @@
 		{
 			"config": "realisticdamage.client.mixins.json",
 			"environment": "client"
+		},
+		{
+			"config": "realisticdamage.vivecraft.mixins.json",
+			"environment": "client"
 		}
 	],
 	"depends": {

@@ -278,6 +278,18 @@ public class BloodDrop extends SingleQuadParticle {
 	/** Server-thrown drops (the spray when a wound opens) arrive through here. */
 	public static class Provider implements ParticleProvider<SimpleParticleType> {
 		private final SpriteSet sprites;
+		private static BloodTint lastTint = BloodTint.RED;
+		private static long thrown;
+
+		/** The colour the last server-thrown drop was given; read by the client gametests. */
+		public static BloodTint lastTint() {
+			return lastTint;
+		}
+
+		/** Server-thrown drops created so far; read by the client gametests. */
+		public static long thrown() {
+			return thrown;
+		}
 
 		public Provider(SpriteSet sprites) {
 			this.sprites = sprites;
@@ -295,10 +307,13 @@ public class BloodDrop extends SingleQuadParticle {
 				return null;
 			}
 			int occupant = occupantAt(level, x, y, z);
+			BloodTint tint = BloodTint.of(occupant < 0 ? null : level.getEntity(occupant));
+			lastTint = tint;
+			thrown++;
 			return new BloodDrop(level, x, y, z, xd, yd, zd, occupant,
 					sprites.get(random.nextInt(BloodEmitter.DROP_SPRITE_COUNT),
 							BloodEmitter.SPRITE_COUNT - 1),
-					BloodTint.of(occupant < 0 ? null : level.getEntity(occupant)));
+					tint);
 		}
 
 		/**
@@ -340,21 +355,33 @@ public class BloodDrop extends SingleQuadParticle {
 		private static int occupantAt(ClientLevel level, double x, double y, double z) {
 			int found = -1;
 			double best = Double.MAX_VALUE;
+			int bare = -1;
+			double bestBare = Double.MAX_VALUE;
 			// Players and, since 1.7, any living thing with a body: the spray of a
 			// zombie's wound is the zombie's, in the zombie's colour.
 			for (net.minecraft.world.entity.LivingEntity living : level.getEntitiesOfClass(
 					net.minecraft.world.entity.LivingEntity.class, new AABB(x, y, z, x, y, z).inflate(2.0))) {
-				if (living.isSpectator() || living.getAttached(dev.captience.realisticdamage.RDAttachments.SNAPSHOT) == null
+				if (living.isSpectator() || living instanceof net.minecraft.world.entity.decoration.ArmorStand
 						|| !living.getBoundingBox().contains(x, y, z)) {
 					continue;
 				}
 				double distance = living.position().distanceToSqr(x, y, z);
-				if (distance < best) {
-					best = distance;
-					found = living.getId();
+				if (living.getAttached(dev.captience.realisticdamage.RDAttachments.SNAPSHOT) != null) {
+					if (distance < best) {
+						best = distance;
+						found = living.getId();
+					}
+				} else if (distance < bestBare) {
+					bestBare = distance;
+					bare = living.getId();
 				}
 			}
-			return found;
+			// A mob's first wound (1.7 alpha.11): the spray is thrown in the same
+			// tick the wound opens, and its packet overtakes the body snapshot that
+			// would tell this client the mob has a body at all. Requiring one made
+			// every mob's first spurt nobody's — red, whatever the mob bleeds. A body
+			// with a snapshot still wins; without one, whoever the drop is inside.
+			return found >= 0 ? found : bare;
 		}
 	}
 }

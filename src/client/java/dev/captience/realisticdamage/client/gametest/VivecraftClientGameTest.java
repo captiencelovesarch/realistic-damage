@@ -110,6 +110,28 @@ public class VivecraftClientGameTest implements FabricClientGameTest {
 			context.waitTicks(60);
 			eye(context, "rd_vive_02_limp_and_shaking");
 
+			// A lost arm (1.7 alpha.11): Vivecraft drew the whole VR hand anyway.
+			long skipped = context.computeOnClient(client -> dev.captience.realisticdamage.client.LostHands.vrHandsSkipped());
+			long stumps = context.computeOnClient(client -> dev.captience.realisticdamage.client.FirstPersonBlood.stumpSubmits());
+			mutate(singleplayer, data -> data.part(BodyPart.LEFT_ARM).setDestroyed(true));
+			context.waitTicks(20);
+			if (context.computeOnClient(client -> dev.captience.realisticdamage.client.LostHands.vrHandsSkipped()) <= skipped) {
+				throw new AssertionError("lost the left arm in VR and the controller still held its item");
+			}
+			if (context.computeOnClient(client -> dev.captience.realisticdamage.client.FirstPersonBlood.stumpSubmits()) <= stumps) {
+				throw new AssertionError("lost the left arm in VR and no stump was drawn on the controller");
+			}
+			eye(context, "rd_vive_02b_lost_left_arm");
+
+			// Blood on the arm you can see: Vivecraft's hands never got it before.
+			long painted = context.computeOnClient(client -> dev.captience.realisticdamage.client.FirstPersonBlood.bloodSubmits());
+			mutate(singleplayer, data -> data.addWound(BodyPart.RIGHT_ARM, dev.captience.realisticdamage.body.WoundSeverity.CRITICAL));
+			context.waitTicks(80);
+			if (context.computeOnClient(client -> dev.captience.realisticdamage.client.FirstPersonBlood.bloodSubmits()) <= painted) {
+				throw new AssertionError("a bleeding right arm in VR and no blood was painted on the controller's arm");
+			}
+			eye(context, "rd_vive_02c_bleeding_right_arm");
+
 			// A hit and a landing: the view must not turn, the hands get it instead.
 			float yawBefore = context.computeOnClient(client -> client.player.getYRot());
 			singleplayer.getServer().runOnServer(server -> {
