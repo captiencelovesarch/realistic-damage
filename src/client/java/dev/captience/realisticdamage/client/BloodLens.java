@@ -3,8 +3,6 @@ package dev.captience.realisticdamage.client;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.systems.BloodFlow;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 
 /**
@@ -24,12 +22,6 @@ import net.minecraft.util.ARGB;
  */
 public final class BloodLens {
 	private BloodLens() {}
-
-	private static final Identifier LENS =
-			Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/blood_lens.png");
-	/** The 2x2 atlas: four 32-pixel cells in a 64-pixel texture. */
-	private static final int CELL = 32;
-	private static final int ATLAS = 64;
 
 	private static final double[] originX = new double[Balance.LENS_CAPACITY];
 	private static final double[] originY = new double[Balance.LENS_CAPACITY];
@@ -110,9 +102,7 @@ public final class BloodLens {
 				continue;
 			}
 			int colour = ARGB.color((int) (alpha * 255.0F), (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
-			graphics.blit(RenderPipelines.GUI_TEXTURED, LENS, x, y,
-					(variant[i] % 2) * CELL, (variant[i] / 2) * CELL,
-					(int) drawSize, (int) drawSize, CELL, CELL, ATLAS, ATLAS, colour);
+			Lens.drop(graphics, x, y, (int) drawSize, variant[i], colour);
 		}
 	}
 

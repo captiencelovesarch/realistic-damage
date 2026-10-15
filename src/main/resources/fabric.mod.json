@@ -32,7 +32,9 @@
 			"dev.captience.realisticdamage.client.gametest.InjuryPoseClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.MobAnatomyClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.MobBodiesClientGameTest",
-			"dev.captience.realisticdamage.client.gametest.AfflictionsClientGameTest"
+			"dev.captience.realisticdamage.client.gametest.AfflictionsClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.VrLensClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.VivecraftClientGameTest"
 		],
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
@@ -75,5 +77,8 @@
 		"minecraft": "~26.2",
 		"java": ">=25",
 		"fabric-api": "*"
+	},
+	"suggests": {
+		"vivecraft": "*"
 	}
 }

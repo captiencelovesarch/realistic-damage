@@ -1,12 +1,10 @@
 package dev.captience.realisticdamage.client;
 
+import dev.captience.realisticdamage.client.compat.Vr;
 import dev.captience.realisticdamage.systems.AdrenalineMath;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.ARGB;
 
 /**
  * The last two hearts, as they feel (1.7). The server runs the surge and the
@@ -23,9 +21,6 @@ import net.minecraft.util.ARGB;
  */
 public final class LowHealthEffects {
 	private LowHealthEffects() {}
-
-	private static final Identifier VIGNETTE =
-			Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/injury_vignette.png");
 
 	private static double surge;
 	private static double crash;
@@ -68,7 +63,10 @@ public final class LowHealthEffects {
 			double dy = yaw - lastTremorYaw;
 			double dp = pitch - lastTremorPitch;
 			if (Math.abs(dy) > 1.0e-5 || Math.abs(dp) > 1.0e-5) {
-				player.turn(dy / 0.15, dp / 0.15);
+				// In VR the view is the headset: nothing may turn it but the player's own head (1.7 alpha.10).
+				if (!Vr.active()) {
+					player.turn(dy / 0.15, dp / 0.15);
+				}
 			}
 		}
 		lastTremorYaw = yaw;
@@ -117,8 +115,7 @@ public final class LowHealthEffects {
 		double tunnel = surge * 0.9 + crash * 0.4 * (0.75 + 0.25 * ClientState.breath());
 		float s = (float) Math.min(1.0, tunnel * strength);
 		if (s > 0.004F) {
-			graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-					ARGB.colorFromFloat(1.0F, s, s, s));
+			Lens.vignette(graphics, s, s, s);
 		}
 	}
 

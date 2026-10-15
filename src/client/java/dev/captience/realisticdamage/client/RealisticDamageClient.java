@@ -120,6 +120,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 				noiseListening = true;
 			}
 			ClientState.tick();
+			VrHaptics.tick();
 			DeathCamera.tick();
 			ConsciousnessAudio.tick();
 			ConcussionEffects.tick();
@@ -151,6 +152,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			BloodStains.reset();
 			BloodLens.reset();
 			Afterimage.reset();
+			VrLens.reset();
 			CameraMotion.reset();
 			DeathCamera.reset();
 			BlastShock.reset();

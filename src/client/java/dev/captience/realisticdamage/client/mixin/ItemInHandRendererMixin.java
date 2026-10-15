@@ -3,6 +3,7 @@ package dev.captience.realisticdamage.client.mixin;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.client.compat.Vr;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
@@ -54,6 +55,12 @@ public abstract class ItemInHandRendererMixin {
 		if (!snapshot.destroyed(part)) {
 			return;
 		}
+		if (Vr.active()) {
+			// Vivecraft draws the VR hand through this same method and would draw
+			// the whole arm; a hand that is gone draws nothing at all.
+			ci.cancel();
+			return;
+		}
 		// The same guards vanilla's own empty-hand branch applies.
 		if (mainHand && !player.isInvisible() && !player.isScoping()) {
 			poseStack.pushPose();
@@ -81,8 +88,11 @@ public abstract class ItemInHandRendererMixin {
 			float inverseArmHeight, PoseStack poseStack,
 			SubmitNodeCollector submitNodeCollector, int lightCoords,
 			CallbackInfo ci) {
+		// Not in VR (1.7 alpha.10): the hand there is the controller, which a pose
+		// cannot move, and Vivecraft cancels this method at HEAD — had this pushed
+		// first, the pop at RETURN would never run and the pose stack would leak.
 		BodySnapshot snapshot = player.getAttached(RDAttachments.SNAPSHOT);
-		if (snapshot == null || player != Minecraft.getInstance().player) {
+		if (snapshot == null || player != Minecraft.getInstance().player || Vr.active()) {
 			return;
 		}
 		HumanoidArm arm = hand == InteractionHand.MAIN_HAND ? player.getMainArm() : player.getMainArm().getOpposite();

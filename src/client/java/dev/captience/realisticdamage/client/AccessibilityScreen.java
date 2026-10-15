@@ -219,6 +219,16 @@ public class AccessibilityScreen extends OptionsSubScreen {
 				slider("realisticdamage.config.breathing",
 						config::breathingVolume, value -> config.breathingVolumeValue = value));
 
+		// Only with Vivecraft installed (1.7 alpha.10): a control that can do
+		// nothing is clutter for everyone playing flat.
+		if (dev.captience.realisticdamage.client.compat.Vr.loaded()) {
+			this.list.addHeader(Component.translatable("realisticdamage.config.section.vr"));
+			this.list.addSmall(
+					slider("realisticdamage.config.vr_haptics",
+							config::vrHaptics, value -> config.vrHapticsValue = value),
+					null);
+		}
+
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.everything"));
 		this.list.addBig(Button.builder(Component.translatable("realisticdamage.config.disable_all_effects"),
 						button -> { config.disableAllEffects(); rebuildWidgets(); })

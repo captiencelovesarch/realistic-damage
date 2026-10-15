@@ -113,6 +113,7 @@ public final class BlastShock {
 
 	private static void shock(double loud, boolean seen, @org.jspecify.annotations.Nullable Vec3 center) {
 		shocks++;
+		VrHaptics.blast(loud);
 		double hearing = ClientEffectsConfig.get().blastDeafness();
 		// The loss itself waits for the bang; everything else lands now.
 		if (loud * hearing > pending) {

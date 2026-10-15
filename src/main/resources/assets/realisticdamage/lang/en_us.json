@@ -71,6 +71,8 @@
 	"realisticdamage.config.section.blood": "Blood",
 	"realisticdamage.config.section.aim": "Aim and Impact",
 	"realisticdamage.config.section.sound": "Sound",
+	"realisticdamage.config.section.vr": "VR (Vivecraft)",
+	"realisticdamage.config.vr_haptics": "Controller Haptics",
 	"realisticdamage.config.section.everything": "All Effects",
 	"realisticdamage.config.afterimages": "Afterimages",
 	"realisticdamage.config.exposure": "Exposure Shift",

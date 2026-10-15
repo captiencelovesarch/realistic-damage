@@ -14,6 +14,17 @@ repositories {
 		name = 'Terraformers'
 		url = 'https://maven.terraformersmc.com/releases'
 	}
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = 'Modrinth'
+				url = 'https://api.modrinth.com/maven'
+			}
+		}
+		filter {
+			includeGroup 'maven.modrinth'
+		}
+	}
 }
 
 loom {
@@ -53,6 +64,14 @@ dependencies {
 
 	// Optional integration: the config screen is also reachable via keybind.
 	clientCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
+	// Optional integration: Vivecraft's public API (client/compat/Vr), only
+	// touched once Vivecraft is known to be loaded.
+	clientCompileOnly "maven.modrinth:vivecraft:${project.vivecraft_version}"
+	// `./gradlew runClientGametest -PwithVivecraft` runs the suite with Vivecraft
+	// present (VivecraftClientGameTest drives it through its NullVR provider).
+	if (project.hasProperty('withVivecraft')) {
+		clientRuntimeOnly "maven.modrinth:vivecraft:${project.vivecraft_version}"
+	}
 
 	testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"

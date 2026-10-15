@@ -264,6 +264,19 @@ public final class ClientEffectsConfig {
 		return breathingVolumeValue == null ? 1.0 : breathingVolumeValue;
 	}
 
+	/**
+	 * The controllers' share of the body, in VR (1.7 alpha.10): the heartbeat in
+	 * both palms, and the thud of a blow, a landing or a blast — which in flat
+	 * play is a kick to the view, and in VR may not be. Boxed and migrated from
+	 * Impact, its nearest neighbour, so a silenced config stays silent.
+	 */
+	public Double vrHapticsValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double vrHaptics() {
+		return vrHapticsValue == null ? 1.0 : vrHapticsValue;
+	}
+
 	/** Fracture, destruction and collapse audio. */
 	public double injurySoundVolume = 1.0;
 
@@ -423,6 +436,7 @@ public final class ClientEffectsConfig {
 		concussionEffectsValue = 0.0;
 		lowHealthEffectsValue = 0.0;
 		breathingVolumeValue = 0.0;
+		vrHapticsValue = 0.0;
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -494,6 +508,9 @@ public final class ClientEffectsConfig {
 		}
 		if (breathingVolumeValue == null) {
 			breathingVolumeValue = Math.min(1.0, heartbeatVolume);
+		}
+		if (vrHapticsValue == null) {
+			vrHapticsValue = Math.min(1.0, impactIntensity);
 		}
 		if (!cameraDriftSeeded) {
 			// One-time: a file from before 1.6.2 holds the old zero default. It

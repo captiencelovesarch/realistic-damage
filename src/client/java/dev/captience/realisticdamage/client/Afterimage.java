@@ -48,11 +48,20 @@ import org.jspecify.annotations.Nullable;
  * <p>Runs before the greyout chain rather than after it, so the history holds
  * full-colour frames and a colour-drain level changing under it cannot leave a
  * two-tone smear.
+ *
+ * <p>In VR (1.7 alpha.10) each eye keeps its own history: a chain owns one
+ * persistent target, so the right eye runs an identical second chain
+ * ({@code afterimage_right.json}, kept byte-identical by a unit test). With one
+ * shared history each eye would be shown the other eye's last frame — a
+ * stereo mismatch that reads as eye strain, not as being dazed. Passes that are
+ * not an eye (the desktop mirror, the handheld camera) are left clean.
  */
 public final class Afterimage {
 	private Afterimage() {}
 
-	private static final Identifier CHAIN = RealisticDamage.id("afterimage");
+	/** One chain per history: flat play and the left eye, then the right eye (see Vr.eye). */
+	private static final Identifier[] CHAINS = {
+			RealisticDamage.id("afterimage"), RealisticDamage.id("afterimage_right")};
 	/** The uniform block, and the pass it belongs to, as written in afterimage.json. */
 	private static final String PARAMS_BLOCK = "AfterimageConfig";
 	private static final int PARAMS_PASS = 0;
@@ -73,14 +82,14 @@ public final class Afterimage {
 
 	/** What this frame asked for, 0 to 1. Held frozen while dying. */
 	private static double strength;
-	/** Whether the chain ran last frame; if not, the history is stale and must be reseeded. */
-	private static boolean ranLastFrame;
-	private static int lastWidth;
-	private static int lastHeight;
+	/** Per history: whether its chain ran last frame; if not, the history is stale and must be reseeded. */
+	private static final boolean[] ranLastFrame = new boolean[2];
+	private static final int[] lastWidth = new int[2];
+	private static final int[] lastHeight = new int[2];
 	/** Frames the chain actually processed this session; read by the client gametest. */
 	private static long framesProcessed;
 
-	private static @Nullable GpuBuffer params;
+	private static final @Nullable GpuBuffer[] params = new GpuBuffer[2];
 	private static final ByteBuffer SCRATCH = ByteBuffer.allocateDirect(16).order(ByteOrder.nativeOrder());
 
 	/** The doubled-world strength asked for on the last frame, 0 to 1. */
@@ -138,38 +147,42 @@ public final class Afterimage {
 	/**
 	 * Runs the chain on the world target if there is anything to show.
 	 * {@code realtimeDeltaTicks} is the wall-clock frame delta, which is what the
-	 * retention is corrected by.
+	 * retention is corrected by; {@code eye} is which history to use
+	 * ({@code Vr.LEFT} in flat play), and anything else draws nothing.
 	 */
-	public static void process(RenderTarget main, GraphicsResourceAllocator allocator, double realtimeDeltaTicks) {
+	public static void process(RenderTarget main, GraphicsResourceAllocator allocator, double realtimeDeltaTicks, int eye) {
+		if (eye < 0 || eye >= CHAINS.length) {
+			return;
+		}
 		if (strength < MIN_STRENGTH) {
-			ranLastFrame = false;
+			ranLastFrame[eye] = false;
 			return;
 		}
 		Minecraft client = Minecraft.getInstance();
-		PostChain chain = client.getShaderManager().getPostChain(CHAIN, LevelTargetBundle.MAIN_TARGETS);
+		PostChain chain = client.getShaderManager().getPostChain(CHAINS[eye], LevelTargetBundle.MAIN_TARGETS);
 		if (chain == null) {
-			ranLastFrame = false;
+			ranLastFrame[eye] = false;
 			return;
 		}
-		boolean resized = main.width != lastWidth || main.height != lastHeight;
-		lastWidth = main.width;
-		lastHeight = main.height;
+		boolean resized = main.width != lastWidth[eye] || main.height != lastHeight[eye];
+		lastWidth[eye] = main.width;
+		lastHeight[eye] = main.height;
 		// A stale history — the effect was off, or the window changed size and
 		// the persistent target was reallocated blank — is reseeded with a clean
 		// copy rather than blended in: the first frame of a ghost must not be a
 		// ghost of nothing.
 		double keep = 0.0;
-		if (ranLastFrame && !resized) {
+		if (ranLastFrame[eye] && !resized) {
 			double perTick = Mth.lerp(strength, Balance.AFTERIMAGE_KEEP_MIN, Balance.AFTERIMAGE_KEEP_MAX);
 			keep = Math.pow(perTick, Math.max(0.05, realtimeDeltaTicks));
 		}
-		if (!writeParams(chain, keep)) {
-			ranLastFrame = false;
+		if (!writeParams(chain, keep, eye)) {
+			ranLastFrame[eye] = false;
 			return;
 		}
 		chain.process(main, allocator);
 		framesProcessed++;
-		ranLastFrame = true;
+		ranLastFrame[eye] = true;
 	}
 
 	/**
@@ -177,7 +190,7 @@ public final class Afterimage {
 	 * writable buffer over vanilla's baked one the first time (and again after
 	 * a resource reload has rebuilt the chain).
 	 */
-	private static boolean writeParams(PostChain chain, double keep) {
+	private static boolean writeParams(PostChain chain, double keep, int eye) {
 		List<PostPass> passes = ((PostChainAccessor) chain).realisticdamage$passes();
 		if (passes.size() <= PARAMS_PASS) {
 			return false;
@@ -187,21 +200,23 @@ public final class Afterimage {
 		if (current == null) {
 			return false;   // the chain file no longer declares the block
 		}
-		if (params == null || params.isClosed() || current != params) {
+		GpuBuffer mine = params[eye];
+		if (mine == null || mine.isClosed() || current != mine) {
 			// Vanilla's buffer is uniform-only; ours also accepts copies. The one
 			// we replace is closed here, and the pass closes ours when the chain
 			// is rebuilt, which is why the closed check above has to come first.
-			params = RenderSystem.getDevice().createBuffer(() -> "realisticdamage afterimage params",
+			mine = RenderSystem.getDevice().createBuffer(() -> "realisticdamage afterimage params",
 					GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST, 16);
-			uniforms.put(PARAMS_BLOCK, params);
-			if (current != params) {
+			params[eye] = mine;
+			uniforms.put(PARAMS_BLOCK, mine);
+			if (current != mine) {
 				current.close();
 			}
 		}
 		SCRATCH.clear();
 		SCRATCH.putFloat((float) keep).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
 		SCRATCH.flip();
-		RenderSystem.getDevice().createCommandEncoder().writeToBuffer(params.slice(), SCRATCH);
+		RenderSystem.getDevice().createCommandEncoder().writeToBuffer(mine.slice(), SCRATCH);
 		return true;
 	}
 
@@ -209,6 +224,6 @@ public final class Afterimage {
 	public static void reset() {
 		haze = 0.0;
 		strength = 0.0;
-		ranLastFrame = false;
+		java.util.Arrays.fill(ranLastFrame, false);
 	}
 }

@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.client;
 
+import dev.captience.realisticdamage.client.compat.Vr;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -31,6 +32,7 @@ public final class LandingEffect {
 
 	public static void trigger(float severity, float hardness) {
 		double s = Mth.clamp(severity, 0.0F, 1.0F);
+		VrHaptics.landing(s);
 		double intensity = ClientEffectsConfig.get().impactIntensity;
 		if (intensity <= 0.0) {
 			return;
@@ -76,7 +78,10 @@ public final class LandingEffect {
 			double spend = Math.min(slamRemaining,
 					slamRemaining * Math.min(1.0, deltaTicks * 0.5) + 0.5);
 			slamRemaining -= spend;
-			player.turn(0.0, spend / 0.15);
+			// In VR the view is the headset: nothing may turn it but the player's own head (1.7 alpha.10).
+			if (!Vr.active()) {
+				player.turn(0.0, spend / 0.15);
+			}
 		}
 		if (shakeRemaining > 0.0) {
 			shakeRemaining -= deltaTicks;
@@ -85,7 +90,9 @@ public final class LandingEffect {
 			double decay = Math.max(0.0, shakeRemaining / 20.0) * shakeStrength;
 			double yaw = Math.sin(shakePhase * 1.9) * 0.55 * decay;
 			double pitch = Math.cos(shakePhase * 2.7) * 0.40 * decay;
-			player.turn(yaw / 0.15 * deltaTicks, pitch / 0.15 * deltaTicks);
+			if (!Vr.active()) {
+				player.turn(yaw / 0.15 * deltaTicks, pitch / 0.15 * deltaTicks);
+			}
 			if (shakeRemaining <= 0.0) {
 				shakeStrength = 0.0;
 			}

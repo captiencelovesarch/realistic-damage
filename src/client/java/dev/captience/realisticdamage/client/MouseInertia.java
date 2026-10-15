@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.client;
 
+import dev.captience.realisticdamage.client.compat.Vr;
 import dev.captience.realisticdamage.config.Balance;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -141,7 +142,10 @@ public final class MouseInertia {
 		velX -= outX;
 		velY -= outY;
 		if (Math.abs(outX) > 1.0e-4 || Math.abs(outY) > 1.0e-4) {
-			player.turn(outX, outY);
+			// In VR the view is the headset: nothing may turn it but the player's own head (1.7 alpha.10).
+			if (!Vr.active()) {
+				player.turn(outX, outY);
+			}
 		}
 	}
 

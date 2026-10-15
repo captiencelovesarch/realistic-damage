@@ -3,9 +3,6 @@ package dev.captience.realisticdamage.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.ARGB;
 
 /**
  * Running out of air (1.7). The server drains consciousness once the air is
@@ -23,9 +20,6 @@ import net.minecraft.util.ARGB;
  */
 public final class AirHunger {
 	private AirHunger() {}
-
-	private static final Identifier VIGNETTE =
-			Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/injury_vignette.png");
 
 	/** How badly the body wants air, 0 to 1. */
 	private static double hunger;
@@ -105,8 +99,7 @@ public final class AirHunger {
 		float s = (float) Math.min(1.0, strength * (0.75 + 0.25 * pulse));
 		// The vignette pipeline multiplies by (1 - tint): more red and green taken
 		// than blue leaves the edges a deep cold navy rather than black.
-		graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-				ARGB.colorFromFloat(1.0F, s, s * 0.92F, s * 0.62F));
+		Lens.vignette(graphics, s, s * 0.92F, s * 0.62F);
 	}
 
 	public static void reset() {

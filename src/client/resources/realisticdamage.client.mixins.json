@@ -19,6 +19,7 @@
 		"HumanoidModelMixin",
 		"LivingEntityRendererMixin",
 		"LivingRenderStateMixin",
+		"LocalPlayerInputMixin",
 		"LocalPlayerDeathMixin",
 		"ModelFeatureRendererMixin",
 		"ModelPartAccessor",

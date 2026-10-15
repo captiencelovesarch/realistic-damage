@@ -48,8 +48,6 @@ import net.minecraft.world.phys.Vec3;
 public final class ConcussionEffects {
 	private ConcussionEffects() {}
 
-	private static final net.minecraft.resources.Identifier VIGNETTE =
-			net.minecraft.resources.Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/injury_vignette.png");
 
 	/** Vertigo envelope, 0 to 1, and which way the room is going (+1 right, -1 left). */
 	private static double vertigo;
@@ -296,7 +294,7 @@ public final class ConcussionEffects {
 			return;
 		}
 		if (glare > 0.01) {
-			graphics.fill(0, 0, width, height,
+			Lens.fill(graphics, 0, 0, width, height,
 					ARGB.color((int) (Math.min(1.0, glare) * 95.0 * strength), 255, 248, 225));
 		}
 		double flare = ClientState.flare();
@@ -304,12 +302,11 @@ public final class ConcussionEffects {
 			double throb = (flare - 0.25) / 0.75 * (0.35 + 0.65 * ClientState.heartbeatEnvelope());
 			float s = (float) Math.min(1.0, throb * 0.75 * strength);
 			if (s > 0.004F) {
-				graphics.blit(net.minecraft.client.renderer.RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F,
-						width, height, width, height, ARGB.colorFromFloat(1.0F, s, s * 0.85F, s * 0.85F));
+				Lens.vignette(graphics, s, s * 0.85F, s * 0.85F);
 			}
 		}
 		if (wince > 0.01) {
-			graphics.fill(0, 0, width, height, ARGB.color((int) (wince * wince * 80.0 * strength), 255, 255, 255));
+			Lens.fill(graphics, 0, 0, width, height, ARGB.color((int) (wince * wince * 80.0 * strength), 255, 255, 255));
 		}
 		// The squint: eyelids closing in from above and below, soft-edged.
 		double lids = squint * strength;
@@ -320,10 +317,10 @@ public final class ConcussionEffects {
 			int alpha = (int) (Math.min(1.0, lids * 1.4) * 235.0);
 			int dark = ARGB.color(alpha, 8, 6, 6);
 			int clear = ARGB.color(0, 8, 6, 6);
-			graphics.fill(0, 0, width, solid, dark);
-			graphics.fillGradient(0, solid, width, solid + feather, dark, clear);
-			graphics.fill(0, height - solid, width, height, dark);
-			graphics.fillGradient(0, height - solid - feather, width, height - solid, clear, dark);
+			Lens.fill(graphics, 0, 0, width, solid, dark);
+			Lens.gradient(graphics, 0, solid, width, solid + feather, dark, clear);
+			Lens.fill(graphics, 0, height - solid, width, height, dark);
+			Lens.gradient(graphics, 0, height - solid - feather, width, height - solid, clear, dark);
 		}
 	}
 

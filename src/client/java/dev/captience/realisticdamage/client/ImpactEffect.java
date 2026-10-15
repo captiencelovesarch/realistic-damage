@@ -1,5 +1,6 @@
 package dev.captience.realisticdamage.client;
 
+import dev.captience.realisticdamage.client.compat.Vr;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -46,6 +47,7 @@ public final class ImpactEffect {
 		double m = Mth.clamp(magnitude, 0.0F, 1.0F);
 		shock = Math.max(shock, m);
 		family = impactFamily;
+		VrHaptics.impact(m, impactFamily);
 
 		LocalPlayer player = Minecraft.getInstance().player;
 		if (player == null) {
@@ -132,7 +134,10 @@ public final class ImpactEffect {
 		// Spend most of the kick immediately, then trail off.
 		double spend = Math.min(kickRemaining, kickRemaining * Math.min(1.0, deltaTicks * 0.55) + 0.4);
 		kickRemaining -= spend;
-		player.turn(kickYaw * spend / 0.15, kickPitch * spend / 0.15);
+		// In VR the view is the headset: nothing may turn it but the player's own head (1.7 alpha.10).
+		if (!Vr.active()) {
+			player.turn(kickYaw * spend / 0.15, kickPitch * spend / 0.15);
+		}
 		spendRing(deltaTicks);
 	}
 
@@ -157,7 +162,9 @@ public final class ImpactEffect {
 		}
 		double swing = Math.sin(ringPhase * 0.9) * ring * 1.4 * deltaTicks
 				* ClientEffectsConfig.get().impactIntensity;
-		player.turn(swing * 0.6, -swing);
+		if (!Vr.active()) {
+			player.turn(swing * 0.6, -swing);
+		}
 	}
 
 	/** 0 to 1, for the screen flash. */

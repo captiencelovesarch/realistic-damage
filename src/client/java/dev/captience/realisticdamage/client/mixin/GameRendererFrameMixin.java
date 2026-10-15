@@ -6,6 +6,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.captience.realisticdamage.client.Afterimage;
 import dev.captience.realisticdamage.client.CameraMotion;
 import dev.captience.realisticdamage.client.DeathCamera;
+import dev.captience.realisticdamage.client.VrLens;
+import dev.captience.realisticdamage.client.compat.Vr;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
@@ -30,6 +32,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * and never to the player's aim. Everything {@link CameraMotion} does is a
  * matrix on top of where the player is actually looking, which is what lets it
  * be violent without ever moving the crosshair.
+ *
+ * <p>Under Vivecraft (1.7 alpha.10) {@code render} runs once per eye, and again
+ * for the desktop mirror or the handheld camera. The integrators step on the
+ * first of those passes only, the afterimage keeps a history per eye, and the
+ * VR lens is laid over each eye last. Vivecraft cancels {@code bobHurt} itself
+ * in VR — the headset is the camera — and the hook below stands down too, so
+ * that stays true whichever of the two runs first.
  */
 @Mixin(GameRenderer.class)
 public abstract class GameRendererFrameMixin {
@@ -43,12 +52,20 @@ public abstract class GameRendererFrameMixin {
 	@Inject(method = "render", at = @At(value = "INVOKE",
 			target = "Lnet/minecraft/client/renderer/LevelRenderer;doEntityOutline()V", shift = At.Shift.AFTER))
 	private void realisticdamage$afterimage(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
-		Afterimage.frame(deltaTracker.getGameTimeDeltaTicks());
-		Afterimage.process(this.mainRenderTarget, this.resourcePool, deltaTracker.getRealtimeDeltaTicks());
-		// The spring is stepped here, after this frame's bobHurt has read it, so
-		// the picture lags the impulse by one frame and never by a partial one.
-		CameraMotion.frame(deltaTracker.getGameTimeDeltaTicks());
-		DeathCamera.frame(deltaTracker.getGameTimeDeltaTicks());
+		boolean first = Vr.firstPass();
+		int eye = Vr.eye();
+		if (first) {
+			VrLens.frame();
+			Afterimage.frame(deltaTracker.getGameTimeDeltaTicks());
+		}
+		Afterimage.process(this.mainRenderTarget, this.resourcePool, deltaTracker.getRealtimeDeltaTicks(), eye);
+		VrLens.process(this.mainRenderTarget, this.resourcePool, eye);
+		if (first) {
+			// The spring is stepped here, after this frame's bobHurt has read it, so
+			// the picture lags the impulse by one frame and never by a partial one.
+			CameraMotion.frame(deltaTracker.getGameTimeDeltaTicks());
+			DeathCamera.frame(deltaTracker.getGameTimeDeltaTicks());
+		}
 	}
 
 	// RETURN, not TAIL: bobHurt returns early whenever the player is not in a
@@ -58,6 +75,9 @@ public abstract class GameRendererFrameMixin {
 	// readout did not, hence CameraMotion.applications().
 	@Inject(method = "bobHurt", at = @At("RETURN"))
 	private void realisticdamage$cameraMotion(CameraRenderState cameraState, PoseStack poseStack, CallbackInfo ci) {
+		if (Vr.active()) {
+			return;
+		}
 		CameraMotion.apply(poseStack);
 		// The collapse on top (1.7): a dead body's view rolls over and sags.
 		DeathCamera.apply(poseStack);

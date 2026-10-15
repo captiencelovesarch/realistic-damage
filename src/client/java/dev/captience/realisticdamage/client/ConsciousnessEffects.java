@@ -5,8 +5,6 @@ import dev.captience.realisticdamage.config.Balance;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 
 /**
@@ -17,9 +15,6 @@ import net.minecraft.util.ARGB;
 public final class ConsciousnessEffects {
 	private ConsciousnessEffects() {}
 
-	// Our own radial falloff: vanilla's vignette texture is deliberately subtle,
-	// far too weak to read as "losing consciousness" even at full tint.
-	private static final Identifier VIGNETTE = Identifier.fromNamespaceAndPath("realisticdamage", "textures/misc/injury_vignette.png");
 
 	/**
 	 * Blur is cut while the haze is still strong, so the ghosting covers its
@@ -130,6 +125,9 @@ public final class ConsciousnessEffects {
 		blurRequested = false;
 		exposureAlpha = 0;
 		ghostStrength = 0.0;
+		// In VR the screen effects are recorded for the eyes, not drawn on the
+		// HUD panel (1.7 alpha.10); renderBlackout publishes the recording.
+		VrLens.begin(graphics);
 		// Dying gets its own pass (1.5). active() excludes dead players — rightly,
 		// for gameplay effects — but that exclusion is exactly why death used to
 		// snap the screen back to normal on the frame it happened.
@@ -188,8 +186,7 @@ public final class ConsciousnessEffects {
 			double thump = beat * (0.30 + 0.70 * distress);
 			float strength = (float) Math.min(1.0, (steady + thump) * distress);
 			if (strength > 0.004F) {
-				graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-						ARGB.colorFromFloat(1.0F, strength * 0.10F, strength, strength));
+				Lens.vignette(graphics, strength * 0.10F, strength, strength);
 			}
 		}
 
@@ -234,7 +231,7 @@ public final class ConsciousnessEffects {
 		// Vanilla's blur has no intensity, so it is kept on while the haze is
 		// strong and cut once the ghosting is heavy enough to cover its going.
 		if (Afterimage.haze() > BLUR_CUTOFF && config.afterimageIntensity > 0.0 && blurAllowed()) {
-			graphics.blurBeforeThisStratum();
+			Lens.blur(graphics);
 			blurRequested = true;
 		}
 		// Ghosting (1.6.1): no longer drawn here at all. It used to be vanilla's
@@ -280,8 +277,7 @@ public final class ConsciousnessEffects {
 		double iris = ImpactEffect.iris();
 		if (iris > 0.01) {
 			float strength = (float) Math.min(1.0, iris * 1.6);
-			graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-					ARGB.colorFromFloat(1.0F, strength * 0.55F, strength * 0.85F, strength));
+			Lens.vignette(graphics, strength * 0.55F, strength * 0.85F, strength);
 		}
 
 		// Cut: a streak of blood-dark drawn across the axis of the stroke. Thin,
@@ -293,7 +289,7 @@ public final class ConsciousnessEffects {
 			int band = (int) (height * 0.16 * smear);
 			int centre = (int) (height * 0.5 + Math.sin(radians) * height * 0.18);
 			int rgb = BloodPalette.packed(1.0);
-			graphics.fill(0, Math.max(0, centre - band), width, Math.min(height, centre + band),
+			Lens.fill(graphics, 0, Math.max(0, centre - band), width, Math.min(height, centre + band),
 					ARGB.color((int) (smear * 110.0), (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF));
 		}
 
@@ -303,11 +299,11 @@ public final class ConsciousnessEffects {
 		// slower than the flash, and the flash itself whether or not it hurt.
 		double dust = BlastShock.dust() * config.impactIntensity;
 		if (dust > 0.01) {
-			graphics.fill(0, 0, width, height, ARGB.color((int) (Math.min(1.0, dust) * 150.0), 126, 112, 92));
+			Lens.fill(graphics, 0, 0, width, height, ARGB.color((int) (Math.min(1.0, dust) * 150.0), 126, 112, 92));
 		}
 		double whiteout = Math.max(ImpactEffect.whiteout(), BlastShock.flash() * config.impactIntensity);
 		if (whiteout > 0.01) {
-			graphics.fill(0, 0, width, height,
+			Lens.fill(graphics, 0, 0, width, height,
 					ARGB.color((int) (Math.sqrt(whiteout) * 215.0), 252, 250, 244));
 		}
 
@@ -318,7 +314,7 @@ public final class ConsciousnessEffects {
 		if (shock > 0.01 && ImpactEffect.family() != ImpactFamily.BLAST
 				&& ImpactEffect.family() != ImpactFamily.CUT) {
 			double eased = shock * shock;
-			graphics.fill(0, 0, width, height,
+			Lens.fill(graphics, 0, 0, width, height,
 					ARGB.color((int) (eased * 190.0), 255, 205, 195));
 		}
 		// The landing equivalent: dimmer, and browner than a blow's bloom, because
@@ -326,7 +322,7 @@ public final class ConsciousnessEffects {
 		double landing = LandingEffect.shock();
 		if (landing > 0.01) {
 			double eased = landing * landing;
-			graphics.fill(0, 0, width, height,
+			Lens.fill(graphics, 0, 0, width, height,
 					ARGB.color((int) (eased * 150.0), 215, 190, 165));
 		}
 
@@ -340,10 +336,12 @@ public final class ConsciousnessEffects {
 	 * the crosshair and the mod's own body diagram. See {@link #topBlackout}.
 	 */
 	public static void renderBlackout(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
-		if (topBlackout > 0.004) {
-			black(graphics, graphics.guiWidth(), graphics.guiHeight(), topBlackout);
+		double level = Math.min(topBlackout, VrLens.blackCap());
+		if (level > 0.004) {
+			black(graphics, graphics.guiWidth(), graphics.guiHeight(), level);
 			blackoutDraws++;
 		}
+		VrLens.publish();
 	}
 
 	/**
@@ -362,19 +360,18 @@ public final class ConsciousnessEffects {
 
 	/** The consciousness vignette: a red-biased darkening of the edges. */
 	private static void ladderVignette(GuiGraphicsExtractor graphics, int width, int height, float strength) {
-		graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-				ARGB.colorFromFloat(1.0F, strength * 0.80F, strength, strength));
+		Lens.vignette(graphics, strength * 0.80F, strength, strength);
 	}
 
 	/** The exposure washout: a milky veil, the world looking wrong rather than gone. */
 	private static void washout(GuiGraphicsExtractor graphics, int width, int height, int alpha) {
 		if (alpha > 0) {
-			graphics.fill(0, 0, width, height, ARGB.color(alpha, 235, 232, 220));
+			Lens.fill(graphics, 0, 0, width, height, ARGB.color(alpha, 235, 232, 220));
 		}
 	}
 
 	private static void black(GuiGraphicsExtractor graphics, int width, int height, double level) {
-		graphics.fill(0, 0, width, height, ARGB.color((int) Math.ceil(Math.min(1.0, level) * 255.0), 0, 0, 0));
+		Lens.fill(graphics, 0, 0, width, height, ARGB.color((int) Math.ceil(Math.min(1.0, level) * 255.0), 0, 0, 0));
 	}
 
 	/**
@@ -413,7 +410,7 @@ public final class ConsciousnessEffects {
 		// was seeing stays up instead of snapping off on the death frame. The
 		// afterimage never stopped: it runs on the world render, not the HUD.
 		if (Afterimage.haze() > BLUR_CUTOFF && config.afterimageIntensity > 0.0 && blurAllowed()) {
-			graphics.blurBeforeThisStratum();
+			Lens.blur(graphics);
 			blurRequested = true;
 		}
 		if (floorVignette > 0.01) {
@@ -434,8 +431,7 @@ public final class ConsciousnessEffects {
 				double wanted = Math.min(1.0, fade * 1.6 + beat * 0.15);
 				float extra = (float) Math.max(0.0, wanted - floorVignette);
 				if (extra > 0.004F) {
-					graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-							ARGB.colorFromFloat(1.0F, extra, extra, extra));
+					Lens.vignette(graphics, extra, extra, extra);
 				}
 				black = Math.max(black, Math.clamp((fade - Balance.DEATH_BLACK_FROM)
 						/ (Balance.DEATH_BLACK_AT - Balance.DEATH_BLACK_FROM), 0.0, 1.0));
@@ -447,8 +443,7 @@ public final class ConsciousnessEffects {
 				float extra = (float) Math.max(0.0, squeeze - floorVignette);
 				if (extra > 0.004F) {
 					float redBias = (float) (0.55 + 0.35 * fade);
-					graphics.blit(RenderPipelines.VIGNETTE, VIGNETTE, 0, 0, 0.0F, 0.0F, width, height, width, height,
-							ARGB.colorFromFloat(1.0F, extra * redBias, extra, extra));
+					Lens.vignette(graphics, extra * redBias, extra, extra);
 				}
 				// The settle: a flat dimming that arrives late in the fade, under
 				// the death screen's own gradient. Capped well short of black — the

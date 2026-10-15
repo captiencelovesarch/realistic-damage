@@ -504,7 +504,9 @@ public final class DeathCamera {
 
 	/** The most the death look may darken the screen right now, 0 to 1. */
 	public static double blackCap() {
-		if (!active()) {
+		// In VR the view is the headset and never falls (Vivecraft cancels the
+		// bob this applies through), so there is no fall to hold the dark for.
+		if (!active() || dev.captience.realisticdamage.client.compat.Vr.active()) {
 			return 1.0;
 		}
 		if (!settled) {
