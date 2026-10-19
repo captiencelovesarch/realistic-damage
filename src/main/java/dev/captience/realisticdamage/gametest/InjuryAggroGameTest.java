@@ -6,7 +6,6 @@ import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
-import dev.captience.realisticdamage.dummy.PracticeDummy;
 import dev.captience.realisticdamage.systems.ConsciousnessSystem;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
@@ -75,7 +74,7 @@ public class InjuryAggroGameTest {
 	 * reason nobody would look for.
 	 */
 	private void assertNoLeakedDummies(GameTestHelper helper) {
-		helper.assertTrue(PracticeDummy.all(helper.getLevel().getServer()).isEmpty(),
+		helper.assertTrue(TestPlayer.all(helper.getLevel().getServer()).isEmpty(),
 				"a previous test leaked a dummy; every case must disconnect in a finally");
 	}
 
@@ -96,13 +95,13 @@ public class InjuryAggroGameTest {
 		return helper.absoluteVec(new Vec3(1.5, 2.0, 1.5 + dz));
 	}
 
-	private PracticeDummy dummyAt(GameTestHelper helper, double dz, String name) {
-		PracticeDummy dummy = PracticeDummy.spawn(helper.getLevel(), at(helper, dz), 0.0F, name);
+	private TestPlayer dummyAt(GameTestHelper helper, double dz, String name) {
+		TestPlayer dummy = TestPlayer.spawn(helper.getLevel(), at(helper, dz), 0.0F, name);
 		RDAttachments.get(dummy).reset();
 		return dummy;
 	}
 
-	private void remove(PracticeDummy dummy) {
+	private void remove(TestPlayer dummy) {
 		dummy.connection.disconnect(Component.literal("test over"));
 	}
 
@@ -178,7 +177,7 @@ public class InjuryAggroGameTest {
 	public void prefersTheBrokenLeggedPlayerOnAcquisition(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper1");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper1");
 			try {
 				breakLeg(wounded);
 				ServerPlayer healthy = mockAt(helper, 2.0);
@@ -198,7 +197,7 @@ public class InjuryAggroGameTest {
 	public void offLeavesVanillaAlone(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.OFF, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper2");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper2");
 			try {
 				breakLeg(wounded);
 				ServerPlayer healthy = mockAt(helper, 2.0);
@@ -218,7 +217,7 @@ public class InjuryAggroGameTest {
 	public void clearingAlwaysClears(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper3");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper3");
 			try {
 				breakLeg(wounded);
 				ServerPlayer healthy = mockAt(helper, 2.0);
@@ -242,7 +241,7 @@ public class InjuryAggroGameTest {
 	public void aScratchIsNotPreyButSteadyBleedingIs(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Bleeder1");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Bleeder1");
 			try {
 				scratch(wounded);
 				ServerPlayer healthy = mockAt(helper, 2.0);
@@ -273,7 +272,7 @@ public class InjuryAggroGameTest {
 	public void aHurtOrInjuredLegIsNotALimpButACriticalOneIs(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper4");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper4");
 			try {
 				ServerPlayer healthy = mockAt(helper, 2.0);
 				Zombie zombie = zombie(helper);
@@ -311,7 +310,7 @@ public class InjuryAggroGameTest {
 					helper.setBlock(new BlockPos(x, y, 3), Blocks.STONE);
 				}
 			}
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Hidden1");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Hidden1");
 			try {
 				breakLeg(wounded);
 				ServerPlayer healthy = (ServerPlayer) helper.makeMockServerPlayer(GameType.SURVIVAL);
@@ -336,8 +335,8 @@ public class InjuryAggroGameTest {
 	public void hysteresisKeepsAnEngagementAgainstBloodAlone(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy held = dummyAt(helper, 2.0, "Held1");
-			PracticeDummy slightlyWorse = dummyAt(helper, 4.0, "Worse1");
+			TestPlayer held = dummyAt(helper, 2.0, "Held1");
+			TestPlayer slightlyWorse = dummyAt(helper, 4.0, "Worse1");
 			try {
 				breakLeg(held);                                     // 200, against a sound bystander
 				Zombie zombie = zombie(helper);
@@ -365,8 +364,8 @@ public class InjuryAggroGameTest {
 	public void aTierChangeTakesAnEngagedMob(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy held = dummyAt(helper, 2.0, "Held2");
-			PracticeDummy worse = dummyAt(helper, 4.0, "Worse2");
+			TestPlayer held = dummyAt(helper, 2.0, "Held2");
+			TestPlayer worse = dummyAt(helper, 4.0, "Worse2");
 			try {
 				breakLeg(held);                                     // 200
 				Zombie zombie = zombie(helper);
@@ -399,8 +398,8 @@ public class InjuryAggroGameTest {
 	public void acquisitionHasNoMargin(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy requested = dummyAt(helper, 2.0, "Asked1");
-			PracticeDummy barelyWorse = dummyAt(helper, 4.0, "Barely1");
+			TestPlayer requested = dummyAt(helper, 2.0, "Asked1");
+			TestPlayer barelyWorse = dummyAt(helper, 4.0, "Barely1");
 			try {
 				breakLeg(requested);                                // 200
 				breakLeg(barelyWorse);
@@ -426,8 +425,8 @@ public class InjuryAggroGameTest {
 			// Knocked out before the zombie exists: a freshly spawned dummy runs
 			// keepMobsInterested once on its own tick 0, and doing it first is the
 			// safe habit even here, where under NEARBY that sweep finds nothing.
-			PracticeDummy down = dummyAt(helper, OUTSIDE_NEARBY, "Down1");
-			PracticeDummy wounded = dummyAt(helper, 3.0, "Limper5");
+			TestPlayer down = dummyAt(helper, OUTSIDE_NEARBY, "Down1");
+			TestPlayer wounded = dummyAt(helper, 3.0, "Limper5");
 			try {
 				knockOut(helper, down);                             // 600, and out of NEARBY reach
 				breakLeg(wounded);                                  // 200
@@ -449,8 +448,8 @@ public class InjuryAggroGameTest {
 	public void underAllTheBodyWinsByTier(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.ALL, () -> {
-			PracticeDummy down = dummyAt(helper, OUTSIDE_NEARBY, "Down2");
-			PracticeDummy wounded = dummyAt(helper, 3.0, "Limper6");
+			TestPlayer down = dummyAt(helper, OUTSIDE_NEARBY, "Down2");
+			TestPlayer wounded = dummyAt(helper, 3.0, "Limper6");
 			try {
 				knockOut(helper, down);
 				breakLeg(wounded);
@@ -476,8 +475,8 @@ public class InjuryAggroGameTest {
 	public void aVetoedRequestIsNotReplacedByALesserCandidate(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.ATTACKERS, () -> {
-			PracticeDummy down = dummyAt(helper, 2.0, "Down3");
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper7");
+			TestPlayer down = dummyAt(helper, 2.0, "Down3");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper7");
 			try {
 				knockOut(helper, down);
 				breakLeg(wounded);
@@ -497,8 +496,8 @@ public class InjuryAggroGameTest {
 	public void noneRefusesTheBodyAndSubstitutesNobody(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NONE, () -> {
-			PracticeDummy down = dummyAt(helper, 2.0, "Down4");
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper8");
+			TestPlayer down = dummyAt(helper, 2.0, "Down4");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper8");
 			try {
 				knockOut(helper, down);
 				breakLeg(wounded);
@@ -534,8 +533,8 @@ public class InjuryAggroGameTest {
 	public void aBodyOnTheFloorCannotBeWalkedAwayFrom(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper9");
-			PracticeDummy down = dummyAt(helper, 2.0, "Down5");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper9");
+			TestPlayer down = dummyAt(helper, 2.0, "Down5");
 			try {
 				breakLeg(wounded);
 				Zombie zombie = zombie(helper);
@@ -577,7 +576,7 @@ public class InjuryAggroGameTest {
 	public void revengeHoldsAgainstALimpButNotABrokenLeg(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper10");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper10");
 			try {
 				critLeg(wounded);
 				bleed(wounded);                                     // 60 + 10 = 70, under the grudge
@@ -608,7 +607,7 @@ public class InjuryAggroGameTest {
 	public void thePackPeelsOffToTheLimperButTheOneYouHitStaysOnYou(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper11");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper11");
 			try {
 				critLeg(wounded);                                   // 60, over nothing but under the grudge
 				ServerPlayer attacker = mockAt(helper, 2.0);
@@ -650,7 +649,7 @@ public class InjuryAggroGameTest {
 	public void aTamedWolfIsNotRedirectedOntoABystander(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper12");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper12");
 			try {
 				breakLeg(wounded);
 				ServerPlayer healthy = mockAt(helper, 2.0);
@@ -681,7 +680,7 @@ public class InjuryAggroGameTest {
 	public void aNeutralPiglinOnlyPrefersSomeoneItIsAngryAt(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper13");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper13");
 			try {
 				breakLeg(wounded);
 				ServerPlayer healthy = mockAt(helper, 2.0);
@@ -710,7 +709,7 @@ public class InjuryAggroGameTest {
 	@GameTest(environment = "realisticdamage:isolated")
 	public void limpingModeIgnoresBleeding(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
-		PracticeDummy wounded = dummyAt(helper, 4.0, "Bleeder2");
+		TestPlayer wounded = dummyAt(helper, 4.0, "Bleeder2");
 		try {
 			bleed(wounded);
 			ServerPlayer healthy = mockAt(helper, 2.0);
@@ -735,7 +734,7 @@ public class InjuryAggroGameTest {
 	@GameTest(environment = "realisticdamage:isolated")
 	public void downedModeIgnoresLegsAndBlood(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
-		PracticeDummy wounded = dummyAt(helper, 4.0, "Limper14");
+		TestPlayer wounded = dummyAt(helper, 4.0, "Limper14");
 		try {
 			breakLeg(wounded);
 			bleed(wounded);
@@ -768,7 +767,7 @@ public class InjuryAggroGameTest {
 	public void aMobVersusMobTargetIsNeverSubstituted(GameTestHelper helper) {
 		assertNoLeakedDummies(helper);
 		withPrey(ServerConfig.PreyOnWounded.VISIBLE, ServerConfig.UnconsciousAggro.NEARBY, () -> {
-			PracticeDummy wounded = dummyAt(helper, 4.0, "Limper15");
+			TestPlayer wounded = dummyAt(helper, 4.0, "Limper15");
 			try {
 				breakLeg(wounded);
 				Mob other = helper.spawnWithNoFreeWill(EntityTypes.WOLF, MOB_AT);

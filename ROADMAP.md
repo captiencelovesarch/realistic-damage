@@ -121,6 +121,8 @@ which is the whole point: every system is typed against ServerPlayer, so a real
 one inherits hit location, six regions, bleeding, breaks, consciousness and limb
 destruction with no code aware it is not a person. `fightback` makes it swing
 back, `equip` copies your own gear onto it, `heal` puts it back together.
+*Removed in 1.7: vanilla's mannequin (`minecraft:mannequin`) covers it; the
+class lives on as gametest scaffolding (`gametest/TestPlayer`).*
 Generalising the pipeline to LivingEntity instead is the 1.5 mob-anatomy work and would have
 meant refactoring twelve files to get one test target.
 

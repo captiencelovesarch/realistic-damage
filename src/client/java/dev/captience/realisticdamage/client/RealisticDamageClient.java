@@ -94,6 +94,9 @@ public class RealisticDamageClient implements ClientModInitializer {
 					ClientState.setDeathViolence(payload.violence());
 					ClientState.setDeathKind(payload.kind());
 				});
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.CorpsePayload.TYPE,
+				(payload, context) -> RemoteCorpses.start(payload));
 
 		// Reachable without Mod Menu, per the "no config-file editing" rule.
 		KeyMapping.Category category = KeyMapping.Category.register(RealisticDamage.id("main"));
@@ -122,6 +125,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			ClientState.tick();
 			VrHaptics.tick();
 			DeathCamera.tick();
+			RemoteCorpses.tick();
 			ConsciousnessAudio.tick();
 			ConcussionEffects.tick();
 			AirHunger.tick();

@@ -187,7 +187,7 @@ public final class MobAnatomy {
 		return !boss(entity);
 	}
 
-	private static final Set<Mob> injured = Collections.newSetFromMap(new IdentityHashMap<>());
+	private static final Set<LivingEntity> injured = Collections.newSetFromMap(new IdentityHashMap<>());
 	/** Mobs whose AI this class switched off, so waking switches on only those. */
 	private static final Set<Mob> putOut = Collections.newSetFromMap(new IdentityHashMap<>());
 
@@ -201,7 +201,10 @@ public final class MobAnatomy {
 
 	/** A tagged, living, server-side mob while the rule is on. */
 	public static boolean isMobWithBody(LivingEntity entity) {
-		return entity instanceof Mob && !(entity instanceof Player)
+		// The vanilla mannequin counts (1.7): it replaced the mod's own practice
+		// dummy as the thing you hit to see what a hit does.
+		return (entity instanceof Mob || entity instanceof net.minecraft.world.entity.decoration.Mannequin)
+				&& !(entity instanceof Player)
 				&& !entity.level().isClientSide()
 				&& ServerConfig.get().enableMobAnatomy
 				&& entity.is(HAS_ANATOMY);
@@ -223,8 +226,8 @@ public final class MobAnatomy {
 
 	/** Begins ticking this body; a no-op for players and untagged mobs. */
 	public static void track(LivingEntity entity) {
-		if (entity instanceof Mob mob && isMobWithBody(mob)) {
-			injured.add(mob);
+		if (isMobWithBody(entity)) {
+			injured.add(entity);
 		}
 	}
 
@@ -242,9 +245,9 @@ public final class MobAnatomy {
 		if (injured.isEmpty()) {
 			return;
 		}
-		Iterator<Mob> it = injured.iterator();
+		Iterator<LivingEntity> it = injured.iterator();
 		while (it.hasNext()) {
-			Mob mob = it.next();
+			LivingEntity mob = it.next();
 			if (mob.isRemoved() || !mob.isAlive() || !isMobWithBody(mob)) {
 				if (!mob.isRemoved() && mob.isAlive()) {
 					ImpairmentSystem.clear(mob);
@@ -263,7 +266,7 @@ public final class MobAnatomy {
 	}
 
 	/** The per-tick systems a mob body runs, in the same order a player's does. */
-	public static void tickBody(Mob mob, RealisticDamageData data) {
+	public static void tickBody(LivingEntity mob, RealisticDamageData data) {
 		for (BodyPartData part : data.allParts()) {
 			part.tickStrain();
 		}
@@ -277,8 +280,10 @@ public final class MobAnatomy {
 		}
 		HealingSystem.tick(mob, data);
 		ImpairmentSystem.tick(mob, data);
-		daze(mob, data);
-		ground(mob, data);
+		if (mob instanceof Mob thinking) {
+			daze(thinking, data);
+			ground(thinking, data);
+		}
 		RDAttachments.pushSnapshot(mob);
 	}
 

@@ -58,6 +58,7 @@ public abstract class HumanoidModelMixin implements HiddenLimbs {
 	private void realisticdamage$carryInjuredLimbs(HumanoidRenderState state, CallbackInfo ci) {
 		HumanoidModel<?> model = (HumanoidModel<?>) (Object) this;
 		InjuryPose.apply(state, model);
+		dev.captience.realisticdamage.client.RemoteCorpses.limp(state, model);
 		// A destroyed limb is gone on every humanoid (1.7). The player model
 		// hides its sleeves and pants as well in PlayerModelMixin, which runs
 		// after this; here is the base part, which is all a mob has. Through

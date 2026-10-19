@@ -12,7 +12,20 @@ import org.spongepowered.asm.mixin.Unique;
  * state — the player's, and since 1.7 every mob's, humanoid or not.
  */
 @Mixin(LivingEntityRenderState.class)
-public abstract class LivingRenderStateMixin implements LimbStateHolder, BloodStainHolder {
+public abstract class LivingRenderStateMixin implements LimbStateHolder, BloodStainHolder, dev.captience.realisticdamage.client.CorpseHolder {
+	@Unique
+	private dev.captience.realisticdamage.client.RemoteCorpses.@org.jspecify.annotations.Nullable Pose realisticdamage$corpse;
+
+	@Override
+	public dev.captience.realisticdamage.client.RemoteCorpses.@org.jspecify.annotations.Nullable Pose realisticdamage$corpse() {
+		return this.realisticdamage$corpse;
+	}
+
+	@Override
+	public void realisticdamage$setCorpse(dev.captience.realisticdamage.client.RemoteCorpses.@org.jspecify.annotations.Nullable Pose pose) {
+		this.realisticdamage$corpse = pose;
+	}
+
 	@Unique
 	private int realisticdamage$destroyedMask;
 	@Unique

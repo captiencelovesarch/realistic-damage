@@ -244,6 +244,10 @@ public final class BloodEmitter {
 			return;
 		}
 		Vec3 at = BodyHitResolver.regionCenter(player, part);
+		RemoteCorpses.Corpse corpse = RemoteCorpses.of(player);
+		if (corpse != null) {
+			at = corpse.place(player, at);
+		}
 		// Scatter the origin across the region rather than emitting from a single
 		// point: a wound is somewhere on a limb, not at its exact centre.
 		double spreadX = BloodFlow.jitterSigned(index, 1) * 0.11;

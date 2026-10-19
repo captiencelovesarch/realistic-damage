@@ -140,18 +140,14 @@ you can have one without the other, and the camera effects that never touch your
 Two presets: **Arcade** (limb destruction, readable effects) and **Grounded** (no
 destruction, full blackout, camera drift, everything at full strength).
 
-## Practice dummy
+**Something to hit:** vanilla's mannequin (`/summon minecraft:mannequin`) has a full
+body: it bleeds, breaks and loses limbs like a player. (It replaced the mod's own
+practice dummy in 1.7.)
 
-`/rdmg dummy spawn` puts down a player-equivalent target — a real player as far as the
-mod is concerned, so it bleeds, breaks, concusses and goes down exactly as you would.
-
-| Command | Effect |
-|---|---|
-| `/rdmg dummy spawn` | Spawn one in front of you, facing you |
-| `/rdmg dummy fightback <true\|false>` | Have it swing back with whatever it's holding |
-| `/rdmg dummy equip` | Copy your own held item and armour onto it |
-| `/rdmg dummy heal` | Full health and a pristine body, without respawning it |
-| `/rdmg dummy remove` | Remove them all |
+**Deaths, as everyone else sees them:** a blast that kills you takes limbs with it, the
+nearest first and all four point-blank, and other players see the body thrown, tumbling
+and landing flat with a thud, limbs flailing, instead of vanilla's stiff tip onto its
+side. It follows the **Death Camera** toggle.
 
 ## Server settings
 
@@ -204,8 +200,6 @@ hunting magic numbers.
 /rdmg scar <player> <part> <level>        set none/broken/destroyed history
 /rdmg config <setting> [value]            inspect or change any server setting
 /rdmg preset <arcade|grounded>            switch the server-side preset
-/rdmg dummy spawn|remove|heal|equip       practice target (see above)
-/rdmg dummy fightback <true|false>
 ```
 
 ## For mod authors

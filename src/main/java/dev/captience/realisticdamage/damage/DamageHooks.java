@@ -66,6 +66,7 @@ public final class DamageHooks {
 		// be taken back. The stash is tick-stamped, so one that a totem orphaned
 		// can never colour a later, calmer death.
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
+			Corpses.died(entity, source);
 			if (!(entity instanceof ServerPlayer player)) {
 				return;
 			}

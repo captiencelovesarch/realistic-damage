@@ -162,7 +162,7 @@ public final class Notifier {
 	/**
 	 * Can this player actually receive our sound cue? Asking the channel rather
 	 * than just null-checking the connection matters on a server: a client
-	 * without the mod has no receiver registered, and the practice dummy's
+	 * without the mod has no receiver registered, and a gametest TestPlayer's
 	 * connection goes nowhere at all.
 	 */
 	private static boolean canHear(ServerPlayer player) {

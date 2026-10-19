@@ -175,6 +175,9 @@ public class AllMobsGameTest {
 			Entity spawned = null;
 			try {
 				spawned = helper.spawn(type, new BlockPos(1, 2, 1));
+				if (spawned instanceof net.minecraft.world.entity.decoration.Mannequin) {
+					continue; // tagged, not a mob; MannequinGameTest covers it
+				}
 				if (!(spawned instanceof Mob mob)) {
 					failures.add(name + ": not a mob");
 					continue;

@@ -38,6 +38,7 @@
 		],
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
+			"dev.captience.realisticdamage.gametest.CorpseGameTest",
 			"dev.captience.realisticdamage.gametest.DamageRoutingGameTest",
 			"dev.captience.realisticdamage.gametest.ImpairmentGameTest",
 			"dev.captience.realisticdamage.gametest.BleedingGameTest",
@@ -45,7 +46,6 @@
 			"dev.captience.realisticdamage.gametest.HealingGameTest",
 			"dev.captience.realisticdamage.gametest.UnconsciousAggroGameTest",
 			"dev.captience.realisticdamage.gametest.RescueGameTest",
-			"dev.captience.realisticdamage.gametest.PracticeDummyGameTest",
 			"dev.captience.realisticdamage.gametest.InteropGameTest",
 			"dev.captience.realisticdamage.gametest.LandingGameTest",
 			"dev.captience.realisticdamage.gametest.MicrosleepGameTest",

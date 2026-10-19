@@ -13,7 +13,6 @@ import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.damage.TraumaPipeline;
-import dev.captience.realisticdamage.dummy.PracticeDummy;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import dev.captience.realisticdamage.systems.ExplosionMath;
 import dev.captience.realisticdamage.util.Notifier;
@@ -779,14 +778,14 @@ public class ExplosiveDismembermentGameTest {
 		// event has no unregister, and adding one purely for a test would be a
 		// worse API. Read and written inside a single synchronous body.
 		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamageTaken, damageTaken, blocked) -> {
-			if (listening && entity instanceof PracticeDummy) {
+			if (listening && entity instanceof TestPlayer) {
 				observedBaseDamage = baseDamageTaken;
 			}
 		});
 	}
 
-	private PracticeDummy dummy(GameTestHelper helper) {
-		PracticeDummy dummy = PracticeDummy.spawn(helper.getLevel(),
+	private TestPlayer dummy(GameTestHelper helper) {
+		TestPlayer dummy = TestPlayer.spawn(helper.getLevel(),
 				helper.absoluteVec(new Vec3(1.0, 2.0, 1.0)), 0.0F, "Blasted");
 		// Two hundred hearts so it survives a stick of TNT on any difficulty; the
 		// dismemberment assertions are difficulty-independent by construction, and
@@ -805,7 +804,7 @@ public class ExplosiveDismembermentGameTest {
 	 * the second blast fields no damage event at all and the test would pass or
 	 * fail for a reason that has nothing to do with the rule.
 	 */
-	private void resetForAnotherBlast(PracticeDummy dummy, Vec3 home) {
+	private void resetForAnotherBlast(TestPlayer dummy, Vec3 home) {
 		dummy.restore();
 		dummy.snapTo(home.x, home.y, home.z);
 		dummy.setDeltaMovement(Vec3.ZERO);   // the knockback would otherwise move it, and d decides everything
@@ -834,7 +833,7 @@ public class ExplosiveDismembermentGameTest {
 	@GameTest(environment = "realisticdamage:isolated")
 	public void tntAgainstTheLegOfARealPlayer(GameTestHelper helper) {
 		requireRealDifficulty(helper);
-		PracticeDummy dummy = dummy(helper);
+		TestPlayer dummy = dummy(helper);
 		try {
 			listening = true;
 			observedBaseDamage = -1.0;
@@ -875,7 +874,7 @@ public class ExplosiveDismembermentGameTest {
 	@GameTest(environment = "realisticdamage:isolated")
 	public void detonatingTwiceIsDeterministic(GameTestHelper helper) {
 		requireRealDifficulty(helper);
-		PracticeDummy dummy = dummy(helper);
+		TestPlayer dummy = dummy(helper);
 		try {
 			Vec3 home = dummy.position();
 			helper.getLevel().explode(null, home.x + 1.0, home.y, home.z, 4.0F, Level.ExplosionInteraction.NONE);
@@ -912,7 +911,7 @@ public class ExplosiveDismembermentGameTest {
 	@GameTest(environment = "realisticdamage:isolated")
 	public void blastFourNetheriteShortensACreepersReach(GameTestHelper helper) {
 		requireRealDifficulty(helper);
-		PracticeDummy dummy = dummy(helper);
+		TestPlayer dummy = dummy(helper);
 		try {
 			Vec3 home = dummy.position();
 			blastIv(helper, dummy);

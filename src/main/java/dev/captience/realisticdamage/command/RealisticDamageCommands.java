@@ -28,7 +28,6 @@ import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.damage.BodyHitResolver;
-import dev.captience.realisticdamage.dummy.PracticeDummy;
 import dev.captience.realisticdamage.systems.CeilingMath;
 import dev.captience.realisticdamage.systems.PreyMath;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -39,7 +38,6 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionLevel;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -142,71 +140,8 @@ public final class RealisticDamageCommands {
 				.then(configTree())
 				.then(literal("burn")
 						.then(argument("player", EntityArgument.player())
-								.executes(RealisticDamageCommands::burn)))
-				.then(literal("dummy")
-						.then(literal("spawn").executes(RealisticDamageCommands::dummySpawn))
-						.then(literal("remove").executes(RealisticDamageCommands::dummyRemove))
-						.then(literal("heal").executes(RealisticDamageCommands::dummyHeal))
-						.then(literal("equip").executes(RealisticDamageCommands::dummyEquip))
-						.then(literal("fightback")
-								.then(argument("enabled", BoolArgumentType.bool())
-										.executes(RealisticDamageCommands::dummyFightBack))));
-	}
+								.executes(RealisticDamageCommands::burn)));
 
-	// --- Practice dummy (1.2) ---
-
-	private static int dummySpawn(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer source = ctx.getSource().getPlayerOrException();
-		// Two blocks in front, facing back at you — where you would stand to spar.
-		Vec3 ahead = source.position().add(source.getLookAngle().multiply(1.0, 0.0, 1.0).normalize().scale(2.0));
-		PracticeDummy dummy = PracticeDummy.spawn(source.level(), ahead,
-				net.minecraft.util.Mth.wrapDegrees(source.getYRot() + 180.0F),
-				"Dummy" + (PracticeDummy.all(ctx.getSource().getServer()).size() + 1));
-		ctx.getSource().sendSuccess(() -> Component.literal(
-				"Spawned " + dummy.getName().getString() + " — a real player as far as the mod is concerned"), true);
-		return 1;
-	}
-
-	private static int dummyRemove(CommandContext<CommandSourceStack> ctx) {
-		int removed = 0;
-		for (PracticeDummy dummy : PracticeDummy.all(ctx.getSource().getServer())) {
-			dummy.connection.disconnect(Component.literal("removed"));
-			removed++;
-		}
-		int count = removed;
-		ctx.getSource().sendSuccess(() -> Component.literal("Removed " + count + " dummy(s)"), true);
-		return count;
-	}
-
-	private static int dummyHeal(CommandContext<CommandSourceStack> ctx) {
-		List<PracticeDummy> dummies = PracticeDummy.all(ctx.getSource().getServer());
-		dummies.forEach(PracticeDummy::restore);
-		ctx.getSource().sendSuccess(() -> Component.literal("Restored " + dummies.size() + " dummy(s)"), false);
-		return dummies.size();
-	}
-
-	/** Dresses every dummy in whatever the caller is holding and wearing. */
-	private static int dummyEquip(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer source = ctx.getSource().getPlayerOrException();
-		List<PracticeDummy> dummies = PracticeDummy.all(ctx.getSource().getServer());
-		for (PracticeDummy dummy : dummies) {
-			for (EquipmentSlot slot : EquipmentSlot.values()) {
-				dummy.setItemSlot(slot, source.getItemBySlot(slot).copy());
-			}
-		}
-		ctx.getSource().sendSuccess(() -> Component.literal(
-				"Copied your gear onto " + dummies.size() + " dummy(s)"), false);
-		return dummies.size();
-	}
-
-	private static int dummyFightBack(CommandContext<CommandSourceStack> ctx) {
-		boolean enabled = BoolArgumentType.getBool(ctx, "enabled");
-		List<PracticeDummy> dummies = PracticeDummy.all(ctx.getSource().getServer());
-		dummies.forEach(dummy -> dummy.setFightBack(enabled));
-		ctx.getSource().sendSuccess(() -> Component.literal(
-				(enabled ? "Dummies will swing back" : "Dummies will stand still")
-						+ " (" + dummies.size() + ")"), true);
-		return dummies.size();
 	}
 
 	private static RequiredArgumentBuilder<CommandSourceStack, String> partArg() {

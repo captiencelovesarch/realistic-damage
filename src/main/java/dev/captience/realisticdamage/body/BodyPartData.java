@@ -121,7 +121,7 @@ public final class BodyPartData {
 		scar = level == null ? ScarLevel.NONE : level;
 	}
 
-	/** The debug heal and the practice dummy are full restores. Death is not this path. */
+	/** The debug heal is a full restore. Death is not this path. */
 	public void clearScar() {
 		scar = ScarLevel.NONE;
 	}

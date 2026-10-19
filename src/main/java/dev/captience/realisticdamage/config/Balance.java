@@ -1297,4 +1297,13 @@ public final class Balance {
 	/** Breath spent per sprinting tick, and recovered per tick otherwise. */
 	public static final double CRASH_BREATH_SPEND = 1.0;
 	public static final double CRASH_BREATH_RECOVER = 0.5;
+
+	// --- The body after death, as everyone else sees it (1.7) ---
+
+	/** A lethal blast's throw on the body, blocks a tick, at violence 0 and 1. */
+	public static final double CORPSE_BLAST_SPEED_MIN = 0.30;
+	public static final double CORPSE_BLAST_SPEED_MAX = 0.75;
+	/** ...and its lift. */
+	public static final double CORPSE_BLAST_LIFT_MIN = 0.30;
+	public static final double CORPSE_BLAST_LIFT_MAX = 0.55;
 }

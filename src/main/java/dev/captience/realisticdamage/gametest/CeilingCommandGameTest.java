@@ -3,7 +3,6 @@ package dev.captience.realisticdamage.gametest;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.RealisticDamageData;
-import dev.captience.realisticdamage.dummy.PracticeDummy;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
@@ -15,7 +14,7 @@ import net.minecraft.world.phys.Vec3;
  * bypasses the toggle, the way {@code /rdmg destroy} bypasses limb destruction,
  * so a balancer can set a body up without turning the mode on for everyone.
  *
- * <p>These drive a {@link PracticeDummy} rather than a mock player because
+ * <p>These drive a {@link TestPlayer} rather than a mock player because
  * {@code EntityArgument.player()} resolves names through the player list, and
  * {@code makeMockServerPlayer} never joins it — the command would fail to find
  * its target and the test would pass or fail for a reason that has nothing to do
@@ -30,9 +29,9 @@ import net.minecraft.world.phys.Vec3;
  * for the same reason.
  */
 public class CeilingCommandGameTest {
-	private PracticeDummy spawnDummy(GameTestHelper helper, String name) {
+	private TestPlayer spawnDummy(GameTestHelper helper, String name) {
 		Vec3 pos = helper.absoluteVec(new Vec3(1.0, 2.0, 1.0));
-		return PracticeDummy.spawn(helper.getLevel(), pos, 0.0F, name);
+		return TestPlayer.spawn(helper.getLevel(), pos, 0.0F, name);
 	}
 
 	private void run(GameTestHelper helper, String command) {
@@ -44,7 +43,7 @@ public class CeilingCommandGameTest {
 	/** Set one part, then clear the whole body. Assertions are on state, never on feedback text. */
 	@GameTest(environment = "realisticdamage:isolated")
 	public void theCeilingCommandSetsAndClears(GameTestHelper helper) {
-		PracticeDummy dummy = spawnDummy(helper, "CeilingSet");
+		TestPlayer dummy = spawnDummy(helper, "CeilingSet");
 		try {
 			RealisticDamageData data = RDAttachments.get(dummy);
 			data.reset();
@@ -71,7 +70,7 @@ public class CeilingCommandGameTest {
 	/** The per-part floor is enforced in the model, so the command cannot get under it either. */
 	@GameTest(environment = "realisticdamage:isolated")
 	public void theCeilingCommandHonoursTheHeadFloor(GameTestHelper helper) {
-		PracticeDummy dummy = spawnDummy(helper, "CeilingFloor");
+		TestPlayer dummy = spawnDummy(helper, "CeilingFloor");
 		try {
 			RealisticDamageData data = RDAttachments.get(dummy);
 			data.reset();

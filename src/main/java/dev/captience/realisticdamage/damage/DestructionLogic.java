@@ -143,7 +143,7 @@ public final class DestructionLogic {
 	 *                      when there was none
 	 * @param cause         which sentence the moment gets; see {@link Cause}
 	 */
-	public static void destroy(LivingEntity player, RealisticDamageData data, BodyPart part,
+	public static @org.jspecify.annotations.Nullable SeveredLimb destroy(LivingEntity player, RealisticDamageData data, BodyPart part,
 			WoundSeverity stump, Vec3 blowDirection, Cause cause) {
 		data.part(part).setDestroyed(true);
 		if (part.isCore()) {
@@ -153,7 +153,7 @@ public final class DestructionLogic {
 			Notifier.destroyed(player, part, false);
 			ServerLevel level = (ServerLevel) player.level();
 			player.hurtServer(level, RDDamageTypes.coreDestroyed(level, part), Float.MAX_VALUE);
-			return;
+			return null;
 		}
 		boolean bleeds = ServerConfig.get().enableBleeding && MobAnatomy.bleeds(player);
 		if (bleeds) {
@@ -162,15 +162,20 @@ public final class DestructionLogic {
 		}
 		// The limb itself (1.6.2), thrown along the blow: here, at the choke
 		// point, so no way of losing a limb can forget to leave one behind.
-		SeveredLimb.throwFrom(player, part, blowDirection, cause == Cause.BLAST);
+		SeveredLimb limb = SeveredLimb.throwFrom(player, part, blowDirection, cause == Cause.BLAST);
 		// Last, so the sentence the player reads is this one — and, when it is the
 		// stump wording, it only claims a bleeding stump when one was opened. The
 		// blast wording names a cause rather than a wound, so it needs no such
 		// guard: the limb is gone whether or not anything bled.
+		// A corpse is not told what it lost (1.7: LethalBlast takes limbs after death).
+		if (player.isDeadOrDying()) {
+			return limb;
+		}
 		if (cause == Cause.BLAST) {
 			Notifier.dismembered(player, part);
 		} else {
 			Notifier.destroyed(player, part, bleeds);
 		}
+		return limb;
 	}
 }

@@ -33,10 +33,14 @@ public abstract class LivingEntityRendererMixin {
 	@Inject(method = "extractRenderState", at = @At("TAIL"))
 	private void realisticdamage$carryBody(LivingEntity entity, LivingEntityRenderState state, float partialTicks, CallbackInfo ci) {
 		LimbStateExtractor.extract(entity, state);
+		dev.captience.realisticdamage.client.RemoteCorpses.extract(entity, state, partialTicks);
 	}
 
 	@Inject(method = "setupRotations", at = @At("TAIL"))
 	private void realisticdamage$layOut(LivingEntityRenderState state, PoseStack poseStack, float bodyRot, float scale, CallbackInfo ci) {
+		if (dev.captience.realisticdamage.client.RemoteCorpses.applyRotation(state, poseStack)) {
+			return;
+		}
 		if (state instanceof AvatarRenderState || state.deathTime > 0.0F) {
 			return;
 		}

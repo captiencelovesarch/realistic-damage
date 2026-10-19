@@ -749,8 +749,8 @@ public final class RealisticDamageData {
 
 	/**
 	 * Full reset to a freshly-spawned body (spec §46; debug heal §54). Ceilings go
-	 * too: this is the pristine-body primitive behind {@code /rdmg heal} and the
-	 * practice dummy, not the death path — that is {@code RespawnCarryover}.
+	 * too: this is the pristine-body primitive behind {@code /rdmg heal} and the gametests'
+	 * TestPlayer, not the death path — that is {@code RespawnCarryover}.
 	 */
 	public void reset() {
 		for (BodyPart part : BodyPart.values()) {

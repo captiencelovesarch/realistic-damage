@@ -5,8 +5,9 @@ import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.RealisticDamageData;
 import dev.captience.realisticdamage.body.ScarLevel;
 import dev.captience.realisticdamage.body.WoundSeverity;
+import dev.captience.realisticdamage.client.RemoteCorpses;
 import dev.captience.realisticdamage.client.TriageHud;
-import dev.captience.realisticdamage.dummy.PracticeDummy;
+import dev.captience.realisticdamage.gametest.TestPlayer;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -78,9 +79,9 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 				// can be checked: remote body state, and the treating view.
 				server.runOnServer(minecraftServer -> {
 					ServerPlayer real = minecraftServer.getPlayerList().getPlayers().stream()
-							.filter(p -> !(p instanceof PracticeDummy)).findFirst().orElseThrow();
+							.filter(p -> !(p instanceof TestPlayer)).findFirst().orElseThrow();
 					Vec3 beside = real.position().add(1.0, 0.0, 0.0);
-					PracticeDummy dummy = PracticeDummy.spawn(real.level(), beside, 0.0F, "Patient");
+					TestPlayer dummy = TestPlayer.spawn(real.level(), beside, 0.0F, "Patient");
 					RealisticDamageData data = RDAttachments.get(dummy);
 					data.addWound(BodyPart.TORSO, WoundSeverity.CRITICAL);
 					data.drainConsciousness(200.0);
@@ -146,6 +147,89 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 				context.takeScreenshot("rd_mp_03_triage_view");
 				context.runOnClient(client -> TriageHud.reset());
 				context.waitTicks(5);
+
+				// 1.7: the other player is blown up in front of us. What this client
+				// must see is a body that flies, tumbles, loses limbs and lands flat
+				// (RemoteCorpses, fed by CorpsePayload), not vanilla's stiff tip on
+				// the spot. The blast is on the far side, so the body comes our way.
+				context.runOnClient(client -> dev.captience.realisticdamage.client.ClientEffectsConfig.load());
+				server.runOnServer(minecraftServer -> {
+					ServerPlayer real = minecraftServer.getPlayerList().getPlayers().stream()
+							.filter(p -> !(p instanceof TestPlayer)).findFirst().orElseThrow();
+					TestPlayer patient = TestPlayer.all(minecraftServer).getFirst();
+					patient.restore();
+					var level = (net.minecraft.server.level.ServerLevel) patient.level();
+					double x = real.getX() + 14.0;
+					patient.teleportTo(level, x, real.getY(), real.getZ(), java.util.Set.of(), 90.0F, 0.0F, false);
+				});
+				context.runOnClient(client -> {
+					client.player.setYRot(-90.0F);
+					client.player.setXRot(10.0F);
+				});
+				context.waitTicks(20);
+				double deathX = context.computeOnClient(client -> {
+					for (Player other : client.level.players()) {
+						if (other != client.player) {
+							return other.getX();
+						}
+					}
+					return Double.NaN;
+				});
+				server.runOnServer(minecraftServer -> {
+					TestPlayer patient = TestPlayer.all(minecraftServer).getFirst();
+					// The test server's difficulty scales player blast damage; the
+					// point here is the body after death, not whether this blast kills.
+					minecraftServer.setDifficulty(net.minecraft.world.Difficulty.NORMAL, true);
+					patient.setHealth(1.0F);
+					patient.invulnerableTime = 0;
+					patient.level().explode(null, patient.getX() + 0.7, patient.getY() + 0.2, patient.getZ(),
+							3.0F, net.minecraft.world.level.Level.ExplosionInteraction.NONE);
+					if (patient.isAlive()) {
+						throw new AssertionError("the blast did not kill the patient");
+					}
+					// A real player's death camera asks for this; the test player has no client.
+					dev.captience.realisticdamage.systems.DeathHold.request(patient, true);
+				});
+				context.waitTicks(3);
+				int corpses = context.computeOnClient(client -> RemoteCorpses.count());
+				if (corpses != 1) {
+					throw new AssertionError("expected one simulated corpse on this client, got " + corpses);
+				}
+				context.takeScreenshot("rd_mp_04_blast_flight");
+				context.waitTicks(4);
+				context.takeScreenshot("rd_mp_05_blast_flight_late");
+				context.waitTicks(30);
+				String landing = context.computeOnClient(client -> {
+					for (Player other : client.level.players()) {
+						RemoteCorpses.Corpse corpse = RemoteCorpses.of(other);
+						if (corpse == null) {
+							continue;
+						}
+						BodySnapshot snapshot = other.getAttached(RDAttachments.SNAPSHOT);
+						int lost = snapshot == null ? 0 : Integer.bitCount(snapshot.destroyedMask());
+						double travel = deathX - corpse.position().x;
+						double lean = Math.abs(((corpse.angle() % 180.0) + 180.0) % 180.0 - 90.0);
+						return travel + "," + lean + "," + lost;
+					}
+					return "none";
+				});
+				context.takeScreenshot("rd_mp_06_blast_landed");
+				if (landing.equals("none")) {
+					throw new AssertionError("the corpse was gone before it landed");
+				}
+				String[] parts = landing.split(",");
+				double travel = Double.parseDouble(parts[0]);
+				double lean = Double.parseDouble(parts[1]);
+				int lost = Integer.parseInt(parts[2]);
+				if (travel < 1.0) {
+					throw new AssertionError("the body was not thrown toward us by the blast: travelled " + travel);
+				}
+				if (lean > 20.0) {
+					throw new AssertionError("the body did not land flat: " + lean + " degrees off lying");
+				}
+				if (lost < 1) {
+					throw new AssertionError("a point-blank killing blast took no limbs on the remote body");
+				}
 			}
 		}
 	}
