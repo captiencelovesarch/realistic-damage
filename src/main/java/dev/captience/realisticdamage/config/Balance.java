@@ -1306,4 +1306,9 @@ public final class Balance {
 	/** ...and its lift. */
 	public static final double CORPSE_BLAST_LIFT_MIN = 0.30;
 	public static final double CORPSE_BLAST_LIFT_MAX = 0.55;
+	/**
+	 * How long a ragdolled body stays in the world, ticks, before vanilla's
+	 * removal (and its poof) may run. Vanilla's is 20: the body vanished mid-air.
+	 */
+	public static final int CORPSE_HOLD_TICKS = 100;
 }

@@ -108,4 +108,19 @@ public class CorpseGameTest {
 		helper.succeed();
 	}
 
+	/** Vanilla removes a dead body at one second; a ragdolled one has to last long enough to land. */
+	@GameTest(environment = "realisticdamage:isolated", maxTicks = 200)
+	public void aRagdolledBodyOutlastsVanillasSecond(GameTestHelper helper) {
+		Zombie zombie = helper.spawn(EntityTypes.ZOMBIE, new BlockPos(1, 1, 1));
+		zombie.setNoAi(true);
+		helper.getLevel().explode(null, zombie.getX(), zombie.getY() + 0.1, zombie.getZ(), 4.0F,
+				Level.ExplosionInteraction.NONE);
+		helper.assertTrue(!zombie.isAlive(), "the blast kills the zombie");
+		helper.runAfterDelay(40, () -> helper.assertTrue(!zombie.isRemoved(),
+				"two seconds after death the body is still there, deathTime " + zombie.deathTime));
+		helper.runAfterDelay(dev.captience.realisticdamage.config.Balance.CORPSE_HOLD_TICKS + 10, () -> {
+			helper.assertTrue(zombie.isRemoved(), "and once the hold is over vanilla removes it");
+			helper.succeed();
+		});
+	}
 }

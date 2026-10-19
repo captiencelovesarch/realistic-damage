@@ -21,6 +21,14 @@ public abstract class DeathHoldMixin {
 		if ((Object) this instanceof ServerPlayer player && DeathHold.holding(player)) {
 			player.deathTime++;
 			ci.cancel();
+			return;
+		}
+		// A body other clients are ragdolling stays long enough to be seen
+		// flying and landing (1.7): vanilla's one second is gone mid-air.
+		LivingEntity self = (LivingEntity) (Object) this;
+		if (dev.captience.realisticdamage.damage.Corpses.holding(self)) {
+			self.deathTime++;
+			ci.cancel();
 		}
 	}
 }

@@ -136,7 +136,7 @@ public final class RemoteCorpses {
 		// The name would stay hanging where they died while the body flew off.
 		state.nameTag = null;
 		((CorpseHolder) state).realisticdamage$setCorpse(new Pose(corpse.rotation(partialTicks),
-				(float) corpse.halfHeight, corpse.flail(partialTicks), corpse.age + partialTicks, corpse.id));
+				(float) corpse.halfHeight, corpse.limbs(partialTicks)));
 	}
 
 	/** From the end of {@code setupRotations}: the body's orientation about its own centre. */
@@ -153,41 +153,37 @@ public final class RemoteCorpses {
 
 	/**
 	 * What one frame of a corpse needs: its orientation about its centre, and
-	 * how hard its limbs are flailing (1 in the air, 0 lying still).
+	 * its limb angles (see {@link LimbPhysics} for the order).
 	 */
-	public record Pose(Quaternionf rotation, float pivot, float flail, float time, int seed) {}
+	public record Pose(Quaternionf rotation, float pivot, float[] limbs) {}
 
 	/**
 	 * The limbs of a body with nobody in it (from the end of HumanoidModel
-	 * setupAnim): thrown about while it flies, splayed where it lands. Arms are
-	 * set outright rather than added to, because whatever vanilla had them doing
-	 * (a swing, holding a bow) stopped when the player did.
+	 * setupAnim), as {@link LimbPhysics} left them. Set outright rather than
+	 * added to: whatever vanilla had them doing (a swing, holding a bow)
+	 * stopped when the player did.
 	 */
 	public static void limp(LivingEntityRenderState state, net.minecraft.client.model.HumanoidModel<?> model) {
 		Pose pose = ((CorpseHolder) state).realisticdamage$corpse();
 		if (pose == null) {
 			return;
 		}
-		float f = pose.flail();
-		float t = pose.time();
-		// Each body flails on its own phase, from its id: deterministic, not in step.
-		float p = (pose.seed() % 17) * 0.37F;
-		float splay = 0.45F + 0.75F * f;
-		model.head.xRot = 0.25F * (1.0F - f) + 0.6F * f * Mth.sin(t * 0.9F + p);
-		model.head.yRot = 0.35F * Mth.sin(p * 3.0F) * (1.0F - f);
-		model.rightArm.xRot = -0.4F + f * 1.8F * Mth.sin(t * 1.1F + p);
+		float[] l = pose.limbs();
+		model.head.xRot = l[LimbPhysics.HEAD_X];
+		model.head.yRot = 0.0F;
+		model.head.zRot = 0.0F;
+		model.rightArm.xRot = l[LimbPhysics.R_ARM_X];
 		model.rightArm.yRot = 0.0F;
-		model.rightArm.zRot = splay + 0.25F * f * Mth.cos(t * 1.3F + p);
-		model.leftArm.xRot = -0.25F + f * 1.8F * Mth.sin(t * 0.95F + p + 1.7F);
+		model.rightArm.zRot = l[LimbPhysics.R_ARM_Z];
+		model.leftArm.xRot = l[LimbPhysics.L_ARM_X];
 		model.leftArm.yRot = 0.0F;
-		model.leftArm.zRot = -splay - 0.25F * f * Mth.cos(t * 1.2F + p + 0.9F);
-		float legSplay = 0.12F + 0.25F * f;
-		model.rightLeg.xRot = f * 0.9F * Mth.sin(t * 0.8F + p + 0.5F);
+		model.leftArm.zRot = l[LimbPhysics.L_ARM_Z];
+		model.rightLeg.xRot = l[LimbPhysics.R_LEG_X];
 		model.rightLeg.yRot = 0.0F;
-		model.rightLeg.zRot = legSplay;
-		model.leftLeg.xRot = f * 0.9F * Mth.sin(t * 0.85F + p + 2.4F);
+		model.rightLeg.zRot = l[LimbPhysics.R_LEG_Z];
+		model.leftLeg.xRot = l[LimbPhysics.L_LEG_X];
 		model.leftLeg.yRot = 0.0F;
-		model.leftLeg.zRot = -legSplay;
+		model.leftLeg.zRot = l[LimbPhysics.L_LEG_Z];
 	}
 
 	/** One body. */
@@ -213,8 +209,7 @@ public final class RemoteCorpses {
 		boolean landed;
 		boolean toppling;
 		int age;
-		double flail;
-		double flailO;
+		final LimbPhysics limbs;
 
 		Corpse(LivingEntity body, CorpsePayload payload) {
 			this.id = body.getId();
@@ -247,11 +242,11 @@ public final class RemoteCorpses {
 			if (blast) {
 				this.angVel = SPIN_MIN + (SPIN_MAX - SPIN_MIN) * violence;
 				this.toppling = false;
-				this.flail = 1.0;
 			} else {
 				this.angVel = 1.5 + 4.0 * violence;
 				this.toppling = true;
 			}
+			this.limbs = new LimbPhysics(id);
 		}
 
 		/**
@@ -280,9 +275,26 @@ public final class RemoteCorpses {
 			return angle;
 		}
 
-		/** 1 while thrown, easing to 0 once it lies still. */
-		float flail(float partialTicks) {
-			return (float) Mth.lerp(partialTicks, flailO, flail);
+		float[] limbs(float partialTicks) {
+			return limbs.at(partialTicks);
+		}
+
+		/** For the client gametest: how far the limbs are from rest, radians, summed. */
+		public double limbSpread() {
+			return limbs.spread();
+		}
+
+		/** A world vector in the model frame of the body as it lies now. */
+		private Vec3 toModel(Vec3 v) {
+			double t = Math.toRadians(180.0 - bodyYaw);
+			Vec3 b = new Vec3(v.x * Math.cos(t) - v.z * Math.sin(t), v.y, v.x * Math.sin(t) + v.z * Math.cos(t));
+			// Undo the corpse's own rotation about its body-frame axis.
+			Vec3 k = new Vec3(axisX, 0.0, axisZ);
+			double a = -Math.toRadians(angle);
+			Vec3 rb = b.scale(Math.cos(a)).add(k.cross(b).scale(Math.sin(a)))
+					.add(k.scale(k.dot(b) * (1.0 - Math.cos(a))));
+			// Vanilla's scale(-1, -1, 1): model y points down the body.
+			return new Vec3(-rb.x, -rb.y, rb.z);
 		}
 
 		Vec3 centre(float partialTicks) {
@@ -309,11 +321,8 @@ public final class RemoteCorpses {
 			age++;
 			posO = pos;
 			angleO = angle;
-			flailO = flail;
-			// Limbs follow the body's motion: thrown about while it moves or turns,
-			// still once it stops. A topple gets a little of it on the way down.
-			double motion = Math.min(1.0, vel.length() * 2.0 + Math.abs(angVel) * 0.05);
-			flail = Math.max(motion, flail * 0.9);
+			Vec3 velBefore = vel;
+			double angVelBefore = angVel;
 
 			// --- Flight ---
 			vel = new Vec3(vel.x * AIR_DRAG, (vel.y - GRAVITY) * AIR_DRAG, vel.z * AIR_DRAG);
@@ -375,6 +384,17 @@ public final class RemoteCorpses {
 				angVel += (target2 - angle) * LAND_STIFFNESS - angVel * LAND_DAMPING;
 				angle += angVel;
 			}
+
+			// --- Limbs ---
+			// What the body did this tick is what the limbs feel: gravity minus the
+			// body's own acceleration. Free fall is weightless; a landing is a slam.
+			Vec3 accel = vel.subtract(velBefore);
+			Vec3 effective = new Vec3(0.0, -GRAVITY, 0.0).subtract(accel);
+			double spin = Math.toRadians(angVel);
+			double spinAccel = Math.toRadians(angVel - angVelBefore);
+			Vec3 axisModel = new Vec3(-axisX, 0.0, axisZ);
+			boolean lying = onGround && Math.abs(Math.sin(Math.toRadians(angle))) > 0.7;
+			limbs.tick(toModel(effective), toModel(new Vec3(0.0, -1.0, 0.0)), axisModel, spin, spinAccel, lying);
 		}
 	}
 
@@ -412,5 +432,151 @@ public final class RemoteCorpses {
 	private static final class CollisionContextHolder {
 		static final net.minecraft.world.phys.shapes.CollisionContext EMPTY =
 				net.minecraft.world.phys.shapes.CollisionContext.empty();
+	}
+
+	/**
+	 * The corpse's limbs as pendulums on its joints (1.7 ragdoll). Each joint
+	 * angle is a damped spring pulled toward hanging along the effective gravity
+	 * at that joint (gravity, minus the body's acceleration, plus the
+	 * centrifugal pull of a tumble), with a weak return to a relaxed rest pose,
+	 * joint limits, and a floor the limbs cannot pass through once the body lies
+	 * on it. So a body that simply topples keeps its arms nearly where they
+	 * were and flops them once when it lands; a thrown one goes slack in the air
+	 * and spreads out as it spins. No noise, no phases: every motion has a cause.
+	 */
+	static final class LimbPhysics {
+		static final int HEAD_X = 0;
+		static final int R_ARM_X = 1;
+		static final int R_ARM_Z = 2;
+		static final int L_ARM_X = 3;
+		static final int L_ARM_Z = 4;
+		static final int R_LEG_X = 5;
+		static final int R_LEG_Z = 6;
+		static final int L_LEG_X = 7;
+		static final int L_LEG_Z = 8;
+		private static final int N = 9;
+
+		/** Joint limits, radians: x then z per limb (z is outward-positive for the right side). */
+		private static final double[] MIN = {-0.7, -3.0, -0.15, -3.0, -2.6, -1.7, -0.1, -1.7, -1.0};
+		private static final double[] MAX = {0.9, 1.0, 2.6, 1.0, 0.15, 0.6, 1.0, 0.6, 0.1};
+		/** Where a slack body's limbs settle with nothing pulling them. */
+		private static final double[] REST = {0.1, -0.1, 0.12, -0.05, -0.12, 0.0, 0.05, 0.0, -0.05};
+
+		/** Pull toward hanging, per tick squared at one g. */
+		private static final double HANG = 0.10;
+		/** Pull toward rest (muscle tone gone, but joints are not hinges in a vacuum). */
+		private static final double TONE = 0.04;
+		/** Velocity kept per tick. */
+		private static final double DAMPING = 0.26;
+		/** How strongly the body's angular acceleration swings the limbs. */
+		private static final double INERTIA = 0.8;
+		/** Joints from the body's centre, model units along the spine (down positive). */
+		private static final double SHOULDER = -0.4;
+		private static final double HIP = 0.15;
+		/** A floor-limited joint may sink this far into the side the body lies on. */
+		private static final double FLOOR_SLACK = 0.12;
+
+		private final double[] angle = new double[N];
+		private final double[] prev = new double[N];
+		private final double[] vel = new double[N];
+
+		LimbPhysics(int seed) {
+			System.arraycopy(REST, 0, angle, 0, N);
+			// A little asymmetry by body, so two corpses do not lie identically.
+			angle[R_ARM_X] += ((seed * 37) % 7 - 3) * 0.06;
+			angle[L_ARM_X] += ((seed * 53) % 7 - 3) * 0.06;
+			System.arraycopy(angle, 0, prev, 0, N);
+		}
+
+		float[] at(float partialTicks) {
+			float[] out = new float[N];
+			for (int i = 0; i < N; i++) {
+				out[i] = (float) Mth.lerp(partialTicks, prev[i], angle[i]);
+			}
+			return out;
+		}
+
+		double spread() {
+			double sum = 0.0;
+			for (int i = 0; i < N; i++) {
+				sum += Math.abs(angle[i] - REST[i]);
+			}
+			return sum;
+		}
+
+		/**
+		 * @param gravity  effective gravity in the model frame, blocks per tick squared
+		 * @param down     the true down in the model frame, unit (which side is on the floor)
+		 * @param axis     the body's fall axis in the model frame, unit
+		 * @param spin     the body's angular speed about it, radians per tick
+		 * @param spinAccel its angular acceleration, radians per tick squared
+		 * @param lying    the body is flat on the floor
+		 */
+		void tick(Vec3 gravity, Vec3 down, Vec3 axis, double spin, double spinAccel, boolean lying) {
+			System.arraycopy(angle, 0, prev, 0, N);
+			Vec3 armPull = gravity.add(centrifugal(axis, spin, SHOULDER));
+			Vec3 legPull = gravity.add(centrifugal(axis, spin, HIP));
+			if (lying) {
+				// The floor carries whatever pushes into it.
+				Vec3 n = new Vec3(0.0, 0.0, Math.signum(down.z));
+				armPull = armPull.subtract(n.scale(armPull.dot(n)));
+				legPull = legPull.subtract(n.scale(legPull.dot(n)));
+			}
+			swing(R_ARM_X, R_ARM_Z, armPull, axis, spinAccel);
+			swing(L_ARM_X, L_ARM_Z, armPull, axis, spinAccel);
+			swing(R_LEG_X, R_LEG_Z, legPull, axis, spinAccel);
+			swing(L_LEG_X, L_LEG_Z, legPull, axis, spinAccel);
+			// The head hangs the other way up: it sits above its joint, so gravity
+			// toward the back tips the chin up.
+			double headTarget = Mth.clamp(-Math.atan2(armPull.z, Math.max(Math.abs(armPull.y), 1.0e-4)) * 0.6,
+					MIN[HEAD_X], MAX[HEAD_X]);
+			double headWeight = Math.min(4.0, armPull.length() / GRAVITY);
+			step(HEAD_X, headTarget, headWeight, -spinAccel * axis.x * INERTIA * 0.5);
+
+			if (lying) {
+				// Limbs cannot go through the floor on the side the body lies on.
+				boolean onBack = down.z > 0.0;
+				for (int i : new int[] {R_ARM_X, L_ARM_X, R_LEG_X, L_LEG_X}) {
+					if (onBack && angle[i] > FLOOR_SLACK) {
+						angle[i] = FLOOR_SLACK;
+						vel[i] = Math.min(0.0, vel[i]) * -0.2;
+					} else if (!onBack && angle[i] < -FLOOR_SLACK) {
+						angle[i] = -FLOOR_SLACK;
+						vel[i] = Math.max(0.0, vel[i]) * -0.2;
+					}
+				}
+			}
+		}
+
+		/** Centrifugal pull at a joint on the spine, from spinning about the fall axis. */
+		private static Vec3 centrifugal(Vec3 axis, double spin, double along) {
+			Vec3 joint = new Vec3(0.0, along, 0.0);
+			Vec3 perpendicular = joint.subtract(axis.scale(axis.dot(joint)));
+			return perpendicular.scale(spin * spin);
+		}
+
+		private void swing(int xi, int zi, Vec3 pull, Vec3 axis, double spinAccel) {
+			double weight = Math.min(4.0, pull.length() / GRAVITY);
+			// Hang direction as an x swing in the y-z plane, then a z tilt out of it.
+			double hangX = Math.atan2(pull.z, pull.y);
+			double hangZ = Math.atan2(-pull.x, Math.hypot(pull.y, pull.z));
+			// A body that starts or stops turning leaves its limbs turning.
+			step(xi, hangX, weight, -spinAccel * axis.x * INERTIA);
+			step(zi, hangZ, weight, -spinAccel * axis.z * INERTIA);
+		}
+
+		private void step(int i, double target, double weight, double drive) {
+			double toHang = Mth.wrapDegrees(Math.toDegrees(target - angle[i])) * Mth.DEG_TO_RAD;
+			vel[i] += HANG * weight * toHang + TONE * (REST[i] - angle[i]) + drive;
+			vel[i] *= 1.0 - DAMPING;
+			angle[i] += vel[i];
+			if (angle[i] < MIN[i]) {
+				angle[i] = MIN[i];
+				vel[i] = Math.max(0.0, vel[i]) * 0.3;
+			} else if (angle[i] > MAX[i]) {
+				angle[i] = MAX[i];
+				vel[i] = Math.min(0.0, vel[i]) * 0.3;
+			}
+		}
 	}
 }

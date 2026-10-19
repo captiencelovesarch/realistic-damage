@@ -230,6 +230,52 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 				if (lost < 1) {
 					throw new AssertionError("a point-blank killing blast took no limbs on the remote body");
 				}
+
+				// The quietest death there is: no push, no blast. The body should
+				// topple and lie still with its limbs close to where they were, not
+				// thrash (the first ragdoll did, on everything).
+				server.runOnServer(minecraftServer -> {
+					ServerPlayer real = minecraftServer.getPlayerList().getPlayers().stream()
+							.filter(p -> !(p instanceof TestPlayer)).findFirst().orElseThrow();
+					TestPlayer victim = TestPlayer.spawn(real.level(), real.position().add(4.0, 0.0, 0.0), 0.0F, "Quiet");
+					victim.setHealth(1.0F);
+				});
+				context.waitTicks(20);
+				server.runOnServer(minecraftServer -> {
+					for (TestPlayer victim : TestPlayer.all(minecraftServer)) {
+						if (victim.isAlive()) {
+							var level = (net.minecraft.server.level.ServerLevel) victim.level();
+							victim.invulnerableTime = 0;
+							victim.hurtServer(level, level.damageSources().generic(), 50.0F);
+							dev.captience.realisticdamage.systems.DeathHold.request(victim, true);
+						}
+					}
+				});
+				double worstSpread = 0.0;
+				for (int i = 0; i < 24; i++) {
+					context.waitTicks(1);
+					if (i == 6) {
+						context.takeScreenshot("rd_mp_07_quiet_topple");
+					}
+					double spread = context.computeOnClient(client -> {
+						for (Player other : client.level.players()) {
+							RemoteCorpses.Corpse corpse = RemoteCorpses.of(other);
+							if (corpse != null && other.getName().getString().equals("Quiet")) {
+								return corpse.limbSpread();
+							}
+						}
+						return -1.0;
+					});
+					if (spread < 0.0) {
+						throw new AssertionError("no simulated corpse for the quiet death at tick " + i);
+					}
+					worstSpread = Math.max(worstSpread, spread);
+				}
+				context.takeScreenshot("rd_mp_08_quiet_lying");
+				if (worstSpread > 2.5) {
+					throw new AssertionError("a quiet death thrashed: limbs strayed " + worstSpread + " rad from rest");
+				}
+				System.out.println("[rd] quiet death worst limb spread " + worstSpread);
 			}
 		}
 	}

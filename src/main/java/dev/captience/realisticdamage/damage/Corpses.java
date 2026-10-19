@@ -30,6 +30,29 @@ public final class Corpses {
 	/** Fastest launch sent, blocks a tick; a corpse leaving the render distance helps nobody. */
 	private static final double MAX_LAUNCH = 2.0;
 
+	/**
+	 * Bodies whose removal waits for the ragdoll, by identity. Weak-keyed so a
+	 * body removed some other way (unloaded chunk, /kill of the corpse) cannot
+	 * leak. Server thread only.
+	 */
+	private static final java.util.Set<LivingEntity> HELD =
+			java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
+
+	/**
+	 * Whether vanilla's removal of this dead body should wait: it was ragdolled
+	 * and has not been dead for {@code Balance.CORPSE_HOLD_TICKS} yet.
+	 */
+	public static boolean holding(LivingEntity body) {
+		if (!HELD.contains(body)) {
+			return false;
+		}
+		if (!body.isDeadOrDying() || body.deathTime >= dev.captience.realisticdamage.config.Balance.CORPSE_HOLD_TICKS) {
+			HELD.remove(body);
+			return false;
+		}
+		return true;
+	}
+
 	/** From AFTER_DEATH, inside the killing hurt call. */
 	public static void died(LivingEntity body, DamageSource source) {
 		if (!MobAnatomy.participates(body)) {
@@ -63,6 +86,7 @@ public final class Corpses {
 		if (launch.length() > MAX_LAUNCH) {
 			launch = launch.normalize().scale(MAX_LAUNCH);
 		}
+		HELD.add(body);
 		CorpsePayload payload = new CorpsePayload(body.getId(), kind, (float) violence,
 				(float) launch.x, (float) launch.y, (float) launch.z);
 		for (ServerPlayer watcher : PlayerLookup.tracking(body)) {
