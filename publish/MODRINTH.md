@@ -114,7 +114,7 @@ Mark **01** as the featured image.
 
 | Field | Value |
 |---|---|
-| File | `realistic-damage-1.7.0-alpha.13.jar` (the clean build, NOT the one in your own `build/libs`) |
+| File | `publish/realistic-damage-1.7.0-alpha.13.jar`: the clean build, with no TF2 audio. NOT the one in `build/libs`, which has the screams in it. |
 | Version name | `1.7.0 alpha 13` |
 | Version number | `1.7.0-alpha.13` |
 | Release channel | **Alpha** |
