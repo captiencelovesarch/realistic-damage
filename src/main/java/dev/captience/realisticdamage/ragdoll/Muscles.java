@@ -57,6 +57,31 @@ public final class Muscles {
 		return m;
 	}
 
+	/**
+	 * Muscles that hold, firmly and for as long as anything wants them to: a
+	 * body being kept on its feet (the stepper's test body).
+	 */
+	public static Muscles holding(double tone) {
+		Muscles m = new Muscles();
+		m.setAll(tone, 1.0e9, 0.45);
+		return m;
+	}
+
+	/** These muscles, letting go from {@code atSeconds} on over {@code fadeOver} (a time constant). */
+	public Muscles lettingGo(double atSeconds, double fadeOver) {
+		Muscles m = new Muscles();
+		for (int g = 0; g < GROUPS; g++) {
+			m.set(g, start[g], atSeconds, fadeOver);
+		}
+		m.floor = floor;
+		System.arraycopy(limb, 0, m.limb, 0, limb.length);
+		System.arraycopy(limbFloor, 0, m.limbFloor, 0, limbFloor.length);
+		System.arraycopy(looseness, 0, m.looseness, 0, looseness.length);
+		m.stringsCut = stringsCut;
+		m.awake = awake;
+		return m;
+	}
+
 	/** Tone of a part's joint, {@code seconds} after death. */
 	public double tone(int part, double seconds) {
 		int g = group(part);

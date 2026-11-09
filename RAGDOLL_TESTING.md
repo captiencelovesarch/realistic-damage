@@ -1,5 +1,41 @@
 # Ragdolls: your in-game checklist
 
+## Stumbling deaths, IK phase 0: the stepper (alpha.22)
+
+Nothing changes in normal play yet. This phase is the foundation both presets
+stand on: a body held on its feet that **steps to catch itself**. You test it
+with a new command:
+
+`/rdmg ragdoll shove [speed] [away|toward|left|right]`
+
+It places a mannequin 3 blocks in front of you, facing you (or uses the body
+under your crosshair). A second later its ragdoll is held up and shoved that way
+as you see it, at `speed` blocks a second (3 if you leave it out, up to 8). It
+steps until it stands still, holds still for three seconds, then drops like a
+normal body. Walk round to the side to watch it.
+
+- [ ] **The steps look like steps:** legs alternate, each foot lands somewhere
+      and the body goes over it. Not skating, not a cartoon scurry.
+- [ ] **Planted feet stay put** while the other foot is in the air.
+- [ ] **It gets harder the harder you shove:** `shove 1` is a step or two,
+      `shove 3` three or four, `shove 6` four or five, and it stays upright.
+- [ ] **Every direction:** `away` (it backs up), `toward` (it lurches at you),
+      `left` and `right` (it side-steps, the other foot following).
+- [ ] **It squares up:** if it stops with its feet wide apart, it brings one
+      foot back in beside the other.
+- [ ] **A wall:** shove it at a wall. It stops in front of it, not in it.
+- [ ] **Stairs up:** it stops at the bottom step. It doesn't climb (a straight
+      leg can't), and it doesn't kick the riser and bounce off.
+- [ ] **Stairs down / a slab edge:** it drops onto the lower step and stands
+      there. (Known rough edge: it can lurch sideways on the way down.)
+- [ ] **A ledge:** it stops at the edge if it can; if not, it goes over.
+- [ ] **The drop:** after three seconds still, it falls like any other body.
+- [ ] **The head** stays steady while it steps (it doesn't flop about).
+
+Tell me how it **feels**: too floaty, too stiff, steps too quick or too slow,
+too many or too few. Those are all single numbers to change, and phases 1
+(Grounded) and 2 (Arcade) are built on top of whatever you settle here.
+
 ## Phase 5: hit flinches (alpha.21)
 
 New setting **Hit Flinches** (On/Off). A living body that's hit and stays

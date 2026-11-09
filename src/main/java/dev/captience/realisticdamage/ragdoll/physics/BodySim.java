@@ -65,6 +65,24 @@ public final class BodySim {
 	public @org.jspecify.annotations.Nullable Body upright;
 	public final Vector3d uprightAxis = new Vector3d(0.0, -1.0, 0.0);
 	public double uprightStiffness;
+	/**
+	 * The same body's facing (its local -Z) held toward a direction along the
+	 * ground (stumbling deaths): a stepping body that spun with every swing of
+	 * a leg would look like it was wound up. 0 is no hold.
+	 */
+	public final Vector3d facing = new Vector3d();
+	public double facingStiffness;
+
+	/**
+	 * Lift on one body, blocks a second squared upward (stumbling deaths): the
+	 * hand that keeps a stepping body from falling as fast as Minecraft's
+	 * gravity would have it. 0 is none.
+	 */
+	public @org.jspecify.annotations.Nullable Body supported;
+	public double supportAccel;
+
+	/** Points held to spots in the world: planted feet. Solved after the joints, before the world. */
+	public final java.util.List<Pin> pins = new java.util.ArrayList<>(2);
 
 	private final BoxList boxes = new BoxList();
 
@@ -242,6 +260,9 @@ public final class BodySim {
 			b.prevV.set(b.v);
 			b.prevW.set(b.w);
 			b.v.y -= gravity * (1.0 - b.submerged * b.buoyancy) * h;
+			if (b == supported) {
+				b.v.y += supportAccel * h;
+			}
 			double ld = 1.0 - (linearDrag + b.submerged * b.fluidDrag) * h;
 			double ad = 1.0 - (angularDrag + b.submerged * b.fluidDrag) * h;
 			b.v.mul(Math.max(0.0, ld));
@@ -261,6 +282,13 @@ public final class BodySim {
 				limit(j);
 				if (pass == 0) {
 					drive(j, h);
+				}
+			}
+			// Planted feet after the joints, so a leg stood on is where the
+			// body vaults over rather than what it drags along.
+			for (Pin p : pins) {
+				if (p.active) {
+					pin(p, h);
 				}
 			}
 			for (int i = 0; i < pairs.length; i += 2) {
@@ -395,7 +423,11 @@ public final class BodySim {
 	/** Pulls {@link #upright}'s axis toward world up, against the world (which does not turn). */
 	private void holdUpright(double h) {
 		Body b = upright;
-		if (b == null || uprightStiffness <= 0.0) {
+		if (b == null) {
+			return;
+		}
+		holdFacing(b, h);
+		if (uprightStiffness <= 0.0) {
 			return;
 		}
 		Body.rotate(b.q.x, b.q.y, b.q.z, b.q.w, uprightAxis.x, uprightAxis.y, uprightAxis.z, t1);
@@ -412,6 +444,48 @@ public final class BodySim {
 		double w = b.angularInvMass(nx, ny, nz, t3);
 		double lambda = angle / (w + 1.0 / (uprightStiffness * h * h));
 		b.applyAngular(nx * lambda, ny * lambda, nz * lambda, 1.0, t3);
+	}
+
+	/** Turns the held body about world up until its forward (local -Z) lies along {@link #facing}. */
+	private void holdFacing(Body b, double h) {
+		if (facingStiffness <= 0.0) {
+			return;
+		}
+		Body.rotate(b.q.x, b.q.y, b.q.z, b.q.w, 0.0, 0.0, -1.0, t1);
+		double flat = Math.hypot(t1.x, t1.z);
+		double want = Math.hypot(facing.x, facing.z);
+		if (flat < 0.2 || want < 1.0e-6) {
+			return;
+		}
+		// About +Y from forward to the wanted facing: (f x t).y and f . t.
+		double cross = t1.z * facing.x - t1.x * facing.z;
+		double dot = t1.x * facing.x + t1.z * facing.z;
+		double angle = Math.atan2(cross, dot);
+		double w = b.angularInvMass(0.0, 1.0, 0.0, t3);
+		double lambda = angle / (w + 1.0 / (facingStiffness * h * h));
+		b.applyAngular(0.0, lambda, 0.0, 1.0, t3);
+	}
+
+	/** Moves a pinned point back onto its spot, along the ground only when the pin is horizontal. */
+	private void pin(Pin p, double h) {
+		Body b = p.body;
+		b.toWorld(p.local.x, p.local.y, p.local.z, t1);
+		double dx = p.world.x - t1.x;
+		double dy = p.horizontal ? 0.0 : p.world.y - t1.y;
+		double dz = p.world.z - t1.z;
+		double c = Math.sqrt(dx * dx + dy * dy + dz * dz);
+		if (c < 1.0e-9) {
+			return;
+		}
+		double nx = dx / c;
+		double ny = dy / c;
+		double nz = dz / c;
+		double rx = t1.x - b.x.x;
+		double ry = t1.y - b.x.y;
+		double rz = t1.z - b.x.z;
+		double w = b.positionalInvMass(rx, ry, rz, nx, ny, nz, t3);
+		double lambda = c / (w + p.compliance / (h * h));
+		b.applyPositional(nx * lambda, ny * lambda, nz * lambda, rx, ry, rz, 1.0, t3);
 	}
 
 	private void jointDamping(Joint j, double h) {
@@ -448,6 +522,7 @@ public final class BodySim {
 		if (boxes.size == 0) {
 			return;
 		}
+		double sink = b.sink;
 		b.worldExtent(t4);
 		double bminX = b.x.x - t4.x - 0.05;
 		double bminY = b.x.y - t4.y - 0.05;
@@ -463,7 +538,7 @@ public final class BodySim {
 			double minY = d[o + 1];
 			double minZ = d[o + 2];
 			double maxX = d[o + 3];
-			double maxY = d[o + 4];
+			double maxY = d[o + 4] - sink;
 			double maxZ = d[o + 5];
 			if (maxX < bminX || minX > bmaxX || maxY < bminY || minY > bmaxY || maxZ < bminZ || minZ > bmaxZ) {
 				continue;

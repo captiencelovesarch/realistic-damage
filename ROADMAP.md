@@ -438,6 +438,12 @@ up (Knockdown Ragdolls; server rule knockdownFromBlows). Cows, pigs, spiders,
 chickens, creepers, villagers and the rest ragdoll from their own models. And
 a living body that is hit flinches where it was struck (Hit Flinches).
 
+**Stumbling deaths, IK phase 0** (Nov 2026, alpha.22). The stepper: a body held
+on its feet catches itself by stepping where it is falling. It uses the
+capture point, puts its feet down, keeps them planted, and squares up at the
+end. Not used by deaths yet; tested with `/rdmg ragdoll shove`. Grounded and
+Arcade stumbles follow ([IK_PLAN.md](IK_PLAN.md)).
+
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here
   shipped early in 1.6.2 and is ready for mobs to reuse.)

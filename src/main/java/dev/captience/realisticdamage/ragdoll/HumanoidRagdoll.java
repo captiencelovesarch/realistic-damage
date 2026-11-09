@@ -116,7 +116,13 @@ public final class HumanoidRagdoll {
 	private final double[] reflexTone = new double[PARTS];
 	/** What the body still does as it dies (phase 3), or null for none. */
 	private @org.jspecify.annotations.Nullable Behaviour behaviour;
+	/** What keeps it on its feet (stumbling deaths), or null for none. */
+	private @org.jspecify.annotations.Nullable Controller controller;
+	/** This tick's exact tone per part, replacing the muscles' own; NaN for none. Reset every tick. */
+	private final double[] toneOverride = {Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN};
 
+	/** How much wider than normal each joint's limits have been made so far. */
+	private final double[] loosened = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
 	/** The muscles: how each joint holds and lets go (phase 2); see {@link #setMuscles}. */
 	private Muscles muscles = Muscles.standard();
 	/** Which part each joint moves, in {@link #joints} order. */
@@ -352,29 +358,41 @@ public final class HumanoidRagdoll {
 				return;
 			}
 		}
-		if (behaviour != null) {
+		if (behaviour != null || controller != null) {
 			for (int i = 0; i < joints.length; i++) {
 				joints[i].target.set(restTarget[jointPart[i]]);
 			}
 			java.util.Arrays.fill(reflexTone, 0.0);
+			java.util.Arrays.fill(toneOverride, Double.NaN);
 			for (Body b : bodies) {
 				b.friction = 1.0;
+				b.sink = 0.0;
 			}
 			sim.uprightStiffness = 0.0;
-			behaviour.apply(this, world, age, dt);
+			sim.facingStiffness = 0.0;
+			sim.supported = null;
+			sim.supportAccel = 0.0;
+			if (behaviour != null) {
+				behaviour.apply(this, world, age, dt);
+			}
+			if (controller != null) {
+				controller.apply(this, world, age, dt);
+			}
 		}
 		applyTone();
 		for (int i = 0; i < PARTS; i++) {
-			// A limb its reflexes are moving is not to be smothered as it settles.
-			bodies[i].settles = reflexTone[i] < 0.6;
+			// A limb its reflexes are moving is not to be smothered as it settles,
+			// nor is a leg being stood on or stepped with.
+			bodies[i].settles = reflexTone[i] < 0.6 && Double.isNaN(toneOverride[i]);
 		}
 		sim.step(dt, world);
 		carryLost();
 		// At rest when nothing is moving, or when nothing has moved: two
 		// constraints pressing against each other (a limb at its limit on the
 		// floor) can leave a body reporting speed while its pose stays put, and
-		// it would never sleep.
-		boolean still = sim.maxMotion() < STILL_SPEED || poseUnchanged();
+		// it would never sleep. A body still being held on its feet never is.
+		boolean held = controller != null && controller.holding();
+		boolean still = !held && (sim.maxMotion() < STILL_SPEED || poseUnchanged());
 		if (still) {
 			if (++stillTicks >= STILL_TICKS) {
 				asleep = true;
@@ -426,7 +444,9 @@ public final class HumanoidRagdoll {
 	private void applyTone() {
 		for (int i = 0; i < joints.length; i++) {
 			int part = jointPart[i];
-			joints[i].stiffness = Math.max(muscles.tone(part, age), reflexTone[part]) * driveScale[i];
+			double tone = Double.isNaN(toneOverride[part])
+					? Math.max(muscles.tone(part, age), reflexTone[part]) : toneOverride[part];
+			joints[i].stiffness = tone * driveScale[i];
 		}
 	}
 
@@ -437,7 +457,10 @@ public final class HumanoidRagdoll {
 	public void setMuscles(Muscles m) {
 		this.muscles = m;
 		for (int i = 0; i < joints.length; i++) {
-			double f = m.looseness[jointPart[i]];
+			// Relative to what was applied before, so muscles given twice (a
+			// body let go after being held up) do not loosen a limb twice.
+			double f = m.looseness[jointPart[i]] / loosened[jointPart[i]];
+			loosened[jointPart[i]] = m.looseness[jointPart[i]];
 			if (f != 1.0) {
 				Joint j = joints[i];
 				j.swingXMin *= f;
@@ -478,6 +501,60 @@ public final class HumanoidRagdoll {
 	public void holdUpright(double strength) {
 		sim.upright = bodies[TORSO];
 		sim.uprightStiffness = Math.max(0.0, strength) * TOTAL_MASS * 32.0;
+	}
+
+	/**
+	 * This tick: hold the torso's facing (its front) toward a direction along
+	 * the ground, as strongly as {@code strength} times the body's weight.
+	 */
+	public void holdFacing(Vector3d dir, double strength) {
+		sim.upright = bodies[TORSO];
+		sim.facing.set(dir.x, 0.0, dir.z);
+		sim.facingStiffness = Math.max(0.0, strength) * TOTAL_MASS * 32.0;
+	}
+
+	/**
+	 * This tick: carry {@code share} of the body's weight on the torso, as if
+	 * held up under the arms (stumbling deaths). The legs still stand on the
+	 * ground; they just have less to hold up and longer to step in.
+	 */
+	public void support(double share) {
+		sim.supported = bodies[TORSO];
+		sim.supportAccel = Math.max(0.0, share) * sim.gravity * TOTAL_MASS / bodies[TORSO].mass;
+	}
+
+	/** This tick: exactly this tone at the part's joint, in place of its muscles' own (a leg stood on or stepped with). */
+	public void setTone(int part, double tone) {
+		toneOverride[part] = Math.max(0.0, tone);
+	}
+
+	public void setController(@org.jspecify.annotations.Nullable Controller controller) {
+		this.controller = controller;
+	}
+
+	public @org.jspecify.annotations.Nullable Controller controller() {
+		return controller;
+	}
+
+	/** A whole body's mass, kilograms: the same for every body, whatever its size. */
+	public static double totalMass() {
+		return TOTAL_MASS;
+	}
+
+	/** A limb's length from its joint to its far end, blocks. */
+	public double length(int part) {
+		return bodies[part].hy * 2.0;
+	}
+
+	/** Where a part's joint is in the world now (a hip, a shoulder). */
+	public Vector3d joint(int part, Vector3d out) {
+		Body b = bodies[part];
+		return b.q.transform(new Vector3d(centre[part]).negate().mul(unit), out).add(b.x);
+	}
+
+	/** The middle of a limb's far face in its own frame (a foot's sole, the flat of a hand). */
+	public Vector3d tipLocal(int part, Vector3d out) {
+		return out.set(0.0, part == HEAD ? -bodies[part].hy : bodies[part].hy, 0.0);
 	}
 
 	/** Wakes a sleeping body (a twitch). */

@@ -5,11 +5,13 @@ import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.ragdoll.Behaviour;
 import dev.captience.realisticdamage.ragdoll.Muscles;
+import dev.captience.realisticdamage.ragdoll.Stand;
 import dev.captience.realisticdamage.systems.AdrenalineMath;
 import dev.captience.realisticdamage.systems.LimpMath;
 import dev.captience.realisticdamage.damage.DeathKind;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import dev.captience.realisticdamage.net.CorpsePayload;
+import dev.captience.realisticdamage.net.StandTestPayload;
 import dev.captience.realisticdamage.ragdoll.HumanoidRagdoll;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
@@ -141,6 +143,14 @@ final class RagdollCorpse extends SimulatedCorpse {
 		float[] before = deathPose(entity, 1.0F, stride, stride);
 		HumanoidRagdoll ragdoll = new HumanoidRagdoll(parts, feet, yaw, unit, now, present);
 		ragdoll.inheritMotion(parts, before, seen, LIMB_SWING_SHARE, DT);
+		StandTestPayload stand = STAND_TESTS.remove(entity.getId());
+		if (stand != null && !live) {
+			// The stepper's test body: held on its feet and shoved, not dropped.
+			ragdoll.setMuscles(Muscles.holding(2.5));
+			ragdoll.setController(new Stand());
+			ragdoll.push(stand.vx(), 0.0, stand.vz());
+			return new RagdollCorpse(entity, ragdoll, modelScale, level);
+		}
 		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
 		ragdoll.setMuscles(muscles);
 		Behaviour behaviour = Behaviour.choose(behaviourInput(entity, payload, snapshot, muscles));
@@ -153,6 +163,39 @@ final class RagdollCorpse extends SimulatedCorpse {
 					payload.vz() * 20, seen.x, seen.y, seen.z, payload.hitPart(), payload.kick() * 20, yaw, stride);
 		}
 		return new RagdollCorpse(entity, ragdoll, modelScale, level);
+	}
+
+	/** Bodies the next death of which is the stepper's test ({@code /rdmg ragdoll shove}), by entity id. */
+	private static final it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<StandTestPayload> STAND_TESTS =
+			new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>();
+
+	/** The server says this body's coming death is a stand test; its corpse packet follows. */
+	static void standTest(StandTestPayload payload) {
+		if (STAND_TESTS.size() > 32) {
+			STAND_TESTS.clear();
+		}
+		STAND_TESTS.put(payload.entityId(), payload);
+	}
+
+	/** For the client gametest: the stepper of the stand test on this entity's ragdoll, or null. */
+	public static dev.captience.realisticdamage.ragdoll.@Nullable Stepper stepperOf(int entityId) {
+		SimulatedCorpse corpse = RemoteCorpses.simulated(entityId);
+		if (corpse instanceof RagdollCorpse r && r.body.controller() instanceof Stand stand) {
+			return stand.stepper;
+		}
+		return null;
+	}
+
+	/** For the client gametest: the lean of this entity's ragdoll, degrees (0 upright, 90 lying), or -1 for none. */
+	public static double leanOf(int entityId) {
+		SimulatedCorpse corpse = RemoteCorpses.simulated(entityId);
+		return corpse instanceof RagdollCorpse r ? r.body.lean() : -1.0;
+	}
+
+	/** For the client gametest: whether this entity's stand test has let go. */
+	public static boolean letGo(int entityId) {
+		SimulatedCorpse corpse = RemoteCorpses.simulated(entityId);
+		return corpse instanceof RagdollCorpse r && r.body.controller() instanceof Stand stand && !stand.holding();
 	}
 
 	/** A part's pivot and the bounds of its own cubes (not its overlay children). */

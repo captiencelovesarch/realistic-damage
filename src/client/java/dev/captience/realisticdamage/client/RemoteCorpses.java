@@ -338,6 +338,35 @@ public final class RemoteCorpses {
 		return new double[] {deepest, r.gap(), r.angle(), r.asleep() ? 1.0 : 0.0, r.centreOf().y};
 	}
 
+	/** The ragdoll of this entity id, still with its entity or kept after it (an orphan); null for none. */
+	static @Nullable SimulatedCorpse simulated(int entityId) {
+		SimulatedCorpse r = RAGDOLLS.get(entityId);
+		if (r != null) {
+			return r;
+		}
+		for (SimulatedCorpse orphan : ORPHANS.values()) {
+			if (orphan.id == entityId) {
+				return orphan;
+			}
+		}
+		return null;
+	}
+
+	/** For the client gametest: the stand test's stepper on this entity's ragdoll, or null. */
+	public static dev.captience.realisticdamage.ragdoll.@Nullable Stepper standStepper(int entityId) {
+		return RagdollCorpse.stepperOf(entityId);
+	}
+
+	/** For the client gametest: whether this entity's stand test has let go. */
+	public static boolean standLetGo(int entityId) {
+		return RagdollCorpse.letGo(entityId);
+	}
+
+	/** For the client gametest: the lean of this entity's ragdoll, degrees, or -1 for none. */
+	public static double leanOf(int entityId) {
+		return RagdollCorpse.leanOf(entityId);
+	}
+
 	/** For the client gametest: whether this body is simulated by the any-model rig. */
 	public static boolean generic(Entity entity) {
 		return RAGDOLLS.get(entity.getId()) instanceof GenericCorpse;

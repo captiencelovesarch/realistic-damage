@@ -104,6 +104,9 @@ public class RealisticDamageClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.FlinchPayload.TYPE,
 				(payload, context) -> Flinches.hit(payload));
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.StandTestPayload.TYPE,
+				(payload, context) -> RagdollCorpse.standTest(payload));
 
 		// Reachable without Mod Menu, per the "no config-file editing" rule.
 		KeyMapping.Category category = KeyMapping.Category.register(RealisticDamage.id("main"));

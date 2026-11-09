@@ -29,6 +29,11 @@ public final class BoxList {
 		size++;
 	}
 
+	/** Box {@code index}'s bounds into {@code out}: minX, minY, minZ, maxX, maxY, maxZ. */
+	public void get(int index, double[] out) {
+		System.arraycopy(data, index * 6, out, 0, 6);
+	}
+
 	/** How deep a point is inside the deepest box holding it, 0 when it is in none. */
 	public double deepest(double x, double y, double z) {
 		double worst = 0.0;

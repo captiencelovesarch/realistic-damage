@@ -56,6 +56,15 @@ public final class Body {
 	 * (writhing on the ground) must not be smothered by it.
 	 */
 	public boolean settles = true;
+	/**
+	 * How far down through the tops of blocks this body may go this tick,
+	 * blocks: a leg swinging through under the hips (stumbling deaths). A
+	 * straight leg has no knee to lift its foot with, so mid-swing it would
+	 * catch the floor it is stepping over; let it brush a few centimetres into
+	 * the floor instead. Never more: a foot let deep into the ground is thrown
+	 * out again, and the body with it.
+	 */
+	public double sink;
 
 	/** Points on the box that collide with the world, local, packed xyz. */
 	final double[] samples;
