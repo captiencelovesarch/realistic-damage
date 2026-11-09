@@ -1,5 +1,21 @@
 # Ragdolls: your in-game checklist
 
+## Phase 4d: animals and other mobs (alpha.20)
+
+Mobs that aren't humanoids now ragdoll too, built from their own models: cows,
+pigs, sheep, wolves, cats, horses, spiders, chickens, parrots, creepers,
+villagers, illagers, iron golems, striders, and so on. Bosses, slimes, fish,
+squids, ghasts, guardians, bats and phantoms keep vanilla's death.
+
+- [ ] **Animals** keel over onto their side, toward where the blow pushed them.
+- [ ] **Spiders** often end on their backs, legs in the air.
+- [ ] **Two-legged bodies** (villagers, golems) topple over.
+- [ ] **Their bodies stay** like everyone else's (Bodies Stay).
+- [ ] **A mob farm** doesn't stutter: past 16 ragdolls they fall the simple way
+      or vanilla's.
+- [ ] **Odd models** look sane, or at least not broken: a horse, a llama, a
+      fox, a goat, an axolotl, a frog, a camel, a sniffer.
+
 ## Phase 4c: knockdown ragdolls (alpha.19) — your ask
 
 New settings: **Knockdown Ragdolls** (On/Off, client) and the server rule

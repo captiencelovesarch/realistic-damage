@@ -63,9 +63,9 @@ public final class RagdollDebug {
 						.then(literal("status").executes(ctx -> {
 							int asleep = 0;
 							int all = 0;
-							for (RagdollCorpse r : RemoteCorpses.ragdolls()) {
+							for (SimulatedCorpse r : RemoteCorpses.ragdolls()) {
 								all++;
-								if (r.body.asleep()) {
+								if (r.asleep()) {
 									asleep++;
 								}
 							}
@@ -84,14 +84,10 @@ public final class RagdollDebug {
 		Vector3d c = new Vector3d();
 		Vector3d corner = new Vector3d();
 		Vec3[] corners = new Vec3[8];
-		for (RagdollCorpse ragdoll : RemoteCorpses.ragdolls()) {
-			HumanoidRagdoll body = ragdoll.body;
-			boolean asleep = body.asleep();
-			for (int i = 0; i < HumanoidRagdoll.PARTS; i++) {
-				if (!body.present(i)) {
-					continue;
-				}
-				Body b = body.body(i);
+		for (SimulatedCorpse ragdoll : RemoteCorpses.ragdolls()) {
+			boolean asleep = ragdoll.asleep();
+			int index = 0;
+			for (Body b : ragdoll.bodies()) {
 				q.set(b.tickQ).slerp(b.q, partialTicks);
 				c.set(b.tickX).lerp(b.x, partialTicks);
 				for (int k = 0; k < 8; k++) {
@@ -99,16 +95,10 @@ public final class RagdollDebug {
 					q.transform(corner).add(c);
 					corners[k] = new Vec3(corner.x, corner.y, corner.z);
 				}
-				int colour = asleep ? ASLEEP : COLOURS[i];
+				int colour = asleep ? ASLEEP : COLOURS[index++ % COLOURS.length];
 				for (int e = 0; e < EDGES.length; e += 2) {
 					Gizmos.line(corners[EDGES[e]], corners[EDGES[e + 1]], colour, 2.0F).setAlwaysOnTop();
 					lines++;
-				}
-			}
-			for (int i = 0; i < HumanoidRagdoll.PARTS; i++) {
-				if (i != HumanoidRagdoll.TORSO) {
-					Vector3d p = body.pivot(i, partialTicks, new Vector3d());
-					Gizmos.point(new Vec3(p.x, p.y, p.z), 0xFFFF00FF, 6.0F).setAlwaysOnTop();
 				}
 			}
 		}

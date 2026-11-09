@@ -341,7 +341,9 @@ public final class BodySim {
 	}
 
 	private void limit(Joint j) {
+		// Measured from the joint's rest: rest^-1 * relative.
 		j.relative(q1);
+		j.rest.conjugate(q2).mul(q1, q1);
 		Joint.decompose(q1, swing, twist);
 		double sx = clamp(swing.x, j.swingXMin, j.swingXMax);
 		double sz = clamp(swing.z, j.swingZMin, j.swingZMax);
@@ -351,6 +353,7 @@ public final class BodySim {
 		}
 		// The allowed rotation nearest this one, and the turn that gets there.
 		Joint.compose(sx, sz, tw, q2);
+		new Quaterniond(j.rest).mul(q2, q2);
 		correctToward(j, q2, 0.0);
 	}
 

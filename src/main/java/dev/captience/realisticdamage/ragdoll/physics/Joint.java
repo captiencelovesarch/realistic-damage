@@ -32,6 +32,14 @@ public final class Joint {
 	public double twistMin;
 	public double twistMax;
 
+	/**
+	 * The relative rotation the limits are measured from (child relative to
+	 * parent). Identity for a humanoid, whose parts all rest square to the
+	 * torso; a cow's body is modelled upright and turned flat, so its legs and
+	 * head rest at a right angle to it, and that is where their range is centred.
+	 */
+	public final Quaterniond rest = new Quaterniond();
+
 	/** The drive's target, child relative to parent. Identity: the rest pose. */
 	public final Quaterniond target = new Quaterniond();
 	/** The drive's stiffness, torque per radian; 0 is no drive. */

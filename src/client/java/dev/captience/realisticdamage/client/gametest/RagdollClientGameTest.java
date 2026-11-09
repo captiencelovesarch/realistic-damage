@@ -229,6 +229,101 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 			muscles(context, singleplayer, px, py, pz);
 			reflexes(context, singleplayer, px, py, pz);
 			bodiesStay(context, singleplayer, px, py, pz);
+			animals(context, singleplayer, px, py, pz);
+		}
+	}
+
+	/**
+	 * Phase 4: bodies that are not humanoids, from their own models: a cow, a
+	 * pig, a spider, a chicken, a creeper and a villager. Each is ragdolled by
+	 * the any-model rig, lands on the blocks in one piece, and ends over on its
+	 * side (or toppled, on two legs).
+	 */
+	private static void animals(ClientGameTestContext context, TestSingleplayerContext singleplayer,
+			double px, double py, double pz) {
+		double bx = Math.floor(px) + 0.5;
+		double by = Math.floor(py);
+		double bz = Math.floor(pz) + 22.0;
+		List<EntityType<? extends LivingEntity>> types = List.of(EntityTypes.COW, EntityTypes.PIG, EntityTypes.SPIDER,
+				EntityTypes.CHICKEN, EntityTypes.CREEPER, EntityTypes.VILLAGER);
+		List<Integer> ids = new ArrayList<>();
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			for (int i = 0; i < types.size(); i++) {
+				LivingEntity body = types.get(i).create(level, EntitySpawnReason.COMMAND);
+				body.snapTo(bx - 7.5 + i * 3.0, by, bz, 90.0F, 0.0F);
+				body.setYHeadRot(90.0F);
+				body.yBodyRot = 90.0F;
+				if (body instanceof Mob mob) {
+					mob.setNoAi(true);
+					mob.setPersistenceRequired();
+				}
+				level.addFreshEntity(body);
+				RDAttachments.get(body).reset();
+				RDAttachments.pushSnapshot(body);
+				MobAnatomy.track(body);
+				ids.add(body.getId());
+			}
+		});
+		context.runOnClient(client -> {
+			client.player.setPos(bx, py + 2.0, bz - 9.0);
+			client.player.setYRot(0.0F);
+			client.player.setXRot(15.0F);
+		});
+		context.waitTicks(30);
+		context.takeScreenshot("rd_ragdoll_40_animals_standing");
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			for (int id : ids) {
+				LivingEntity body = (LivingEntity) level.getEntity(id);
+				Corpses.script(body, new Corpses.Script(DeathKind.BLOW, BodyPart.TORSO, new Vec3(0.0, 0.0, 1.0), 0.15, 0.3));
+				body.invulnerableTime = 0;
+				body.kill(level);
+			}
+		});
+		context.waitTicks(2);
+		List<String> failures = new ArrayList<>();
+		for (int i = 0; i < ids.size(); i++) {
+			int id = ids.get(i);
+			boolean generic = context.computeOnClient(client -> {
+				Entity e = client.level.getEntity(id);
+				return e != null && RemoteCorpses.generic(e);
+			});
+			if (!generic) {
+				failures.add(types.get(i).toShortString() + " was not ragdolled by the any-model rig");
+			}
+		}
+		context.waitTicks(8);
+		context.takeScreenshot("rd_ragdoll_41_animals_falling");
+		context.waitTicks(50);
+		context.takeScreenshot("rd_ragdoll_42_animals_down");
+		StringBuilder report = new StringBuilder();
+		for (int i = 0; i < ids.size(); i++) {
+			int id = ids.get(i);
+			String name = types.get(i).toShortString();
+			double[] check = context.computeOnClient(client -> {
+				Entity e = client.level.getEntity(id);
+				return e == null ? null : RemoteCorpses.ragdollCheck(e);
+			});
+			if (check == null) {
+				failures.add(name + ": no ragdoll by the time it should have landed");
+				continue;
+			}
+			report.append(String.format(java.util.Locale.ROOT, "[rd] animal %s: inside %.3f, joint gap %.3f, lean %.1f, at rest %s%n",
+					name, check[0], check[1], check[2], check[3] > 0.5));
+			if (check[0] > 0.08) {
+				failures.add(name + " ended " + check[0] + " inside a block");
+			}
+			if (check[1] > 0.06) {
+				failures.add(name + " came apart at a joint by " + check[1]);
+			}
+			if (check[2] < 45.0) {
+				failures.add(name + " is still standing (lean " + check[2] + ")");
+			}
+		}
+		System.out.print(report);
+		if (!failures.isEmpty()) {
+			throw new AssertionError(String.join("; ", failures));
 		}
 	}
 

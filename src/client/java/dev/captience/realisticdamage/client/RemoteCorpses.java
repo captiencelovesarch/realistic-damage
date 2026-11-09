@@ -64,7 +64,7 @@ public final class RemoteCorpses {
 	private static final Int2ObjectOpenHashMap<Corpse> CORPSES = new Int2ObjectOpenHashMap<>();
 
 	/** Ragdolls (active ragdolls phase 0) by entity id; see {@link RagdollCorpse}. */
-	private static final Int2ObjectOpenHashMap<RagdollCorpse> RAGDOLLS = new Int2ObjectOpenHashMap<>();
+	private static final Int2ObjectOpenHashMap<SimulatedCorpse> RAGDOLLS = new Int2ObjectOpenHashMap<>();
 
 	/** Farther than this from the camera, blocks, a body falls the simple way: nobody can tell. */
 	private static final double RAGDOLL_RANGE = 64.0;
@@ -105,6 +105,12 @@ public final class RemoteCorpses {
 				RAGDOLLS.put(body.getId(), ragdoll);
 				return;
 			}
+			// Not a humanoid: a cow, a spider, a chicken, built from its own model (phase 4).
+			GenericCorpse generic = own ? null : GenericCorpse.create(body, payload, level);
+			if (generic != null) {
+				RAGDOLLS.put(body.getId(), generic);
+				return;
+			}
 		}
 		if (own) {
 			return;
@@ -142,7 +148,7 @@ public final class RemoteCorpses {
 		int stay = Math.max(0, ClientEffectsConfig.get().bodiesStay) * 20;
 		var rit = RAGDOLLS.int2ObjectEntrySet().fastIterator();
 		while (rit.hasNext()) {
-			RagdollCorpse ragdoll = rit.next().getValue();
+			SimulatedCorpse ragdoll = rit.next().getValue();
 			Entity entity = level.getEntity(ragdoll.id);
 			boolean still = entity instanceof LivingEntity body && entity == ragdoll.entity.get() && !body.isRemoved()
 					&& body.isDeadOrDying();
@@ -173,7 +179,7 @@ public final class RemoteCorpses {
 		}
 		var oit = ORPHANS.int2ObjectEntrySet().fastIterator();
 		while (oit.hasNext()) {
-			RagdollCorpse ragdoll = oit.next().getValue();
+			SimulatedCorpse ragdoll = oit.next().getValue();
 			if (ragdoll.expired() || ragdoll.age >= stay + SINK_TICKS) {
 				oit.remove();
 				continue;
@@ -184,8 +190,8 @@ public final class RemoteCorpses {
 
 	/** Your own ragdoll while you are dead, or null. */
 	static @Nullable RagdollCorpse ownRagdoll(LivingEntity player) {
-		RagdollCorpse r = RAGDOLLS.isEmpty() ? null : RAGDOLLS.get(player.getId());
-		return r != null && r.entity.get() == player ? r : null;
+		SimulatedCorpse r = RAGDOLLS.isEmpty() ? null : RAGDOLLS.get(player.getId());
+		return r instanceof RagdollCorpse ragdoll && r.entity.get() == player ? ragdoll : null;
 	}
 
 	@SuppressWarnings({"unchecked", "rawtypes"})
@@ -196,7 +202,7 @@ public final class RemoteCorpses {
 	}
 
 	/** Bodies whose entity is gone, kept by this client (phase 4), oldest first. */
-	private static final it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap<RagdollCorpse> ORPHANS =
+	private static final it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap<SimulatedCorpse> ORPHANS =
 			new it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap<>();
 	private static int nextOrphan;
 	private static @Nullable ClientLevel lastLevel;
@@ -220,12 +226,12 @@ public final class RemoteCorpses {
 		}
 		int stay = Math.max(0, ClientEffectsConfig.get().bodiesStay) * 20;
 		Vec3 camera = Minecraft.getInstance().gameRenderer.mainCamera().position();
-		for (RagdollCorpse ragdoll : ORPHANS.values()) {
+		for (SimulatedCorpse ragdoll : ORPHANS.values()) {
 			LivingEntityRenderState state = ragdoll.lastState;
 			if (state == null) {
 				continue;
 			}
-			RagdollCorpse.Frame frame = ragdoll.frame(partialTicks);
+			Frame frame = ragdoll.frame(partialTicks);
 			double sinking = Mth.clamp((ragdoll.age + partialTicks - stay) / SINK_TICKS, 0.0, 1.0);
 			state.x = frame.root().x;
 			state.y = frame.root().y - SINK_DEPTH * sinking * sinking;
@@ -267,7 +273,7 @@ public final class RemoteCorpses {
 	 * twice over (the body is not there, and it is not going).
 	 */
 	public static boolean keeping(Entity entity) {
-		RagdollCorpse r = RAGDOLLS.isEmpty() ? null : RAGDOLLS.get(entity.getId());
+		SimulatedCorpse r = RAGDOLLS.isEmpty() ? null : RAGDOLLS.get(entity.getId());
 		return r != null && r.entity.get() == entity && ClientEffectsConfig.get().bodiesStay * 20 > r.age;
 	}
 
@@ -295,7 +301,7 @@ public final class RemoteCorpses {
 			return live.ragdoll;
 		}
 		if (!RAGDOLLS.isEmpty()) {
-			RagdollCorpse ragdoll = RAGDOLLS.get(entity.getId());
+			SimulatedCorpse ragdoll = RAGDOLLS.get(entity.getId());
 			if (ragdoll != null && ragdoll.entity.get() == entity) {
 				return ragdoll;
 			}
@@ -309,7 +315,7 @@ public final class RemoteCorpses {
 	 * rest, torso centre y}; null when this body is not a ragdoll.
 	 */
 	public static double @Nullable [] ragdollCheck(Entity entity) {
-		RagdollCorpse r = RAGDOLLS.get(entity.getId());
+		SimulatedCorpse r = RAGDOLLS.get(entity.getId());
 		ClientLevel level = Minecraft.getInstance().level;
 		if (r == null || level == null) {
 			return null;
@@ -318,11 +324,7 @@ public final class RemoteCorpses {
 		dev.captience.realisticdamage.ragdoll.physics.BoxList boxes = new dev.captience.realisticdamage.ragdoll.physics.BoxList();
 		McPhysicsWorld world = new McPhysicsWorld(level);
 		org.joml.Vector3d p = new org.joml.Vector3d();
-		for (int i = 0; i < dev.captience.realisticdamage.ragdoll.HumanoidRagdoll.PARTS; i++) {
-			if (!r.body.present(i)) {
-				continue;
-			}
-			var b = r.body.body(i);
+		for (var b : r.bodies()) {
 			for (int k = 0; k < 8; k++) {
 				p.set((k & 1) == 0 ? -b.hx : b.hx, (k & 2) == 0 ? -b.hy : b.hy, (k & 4) == 0 ? -b.hz : b.hz);
 				b.q.transform(p).add(b.x);
@@ -331,26 +333,29 @@ public final class RemoteCorpses {
 				deepest = Math.max(deepest, boxes.deepest(p.x, p.y, p.z));
 			}
 		}
-		return new double[] {deepest, r.body.worstSeparation(), r.body.lean(), r.body.asleep() ? 1.0 : 0.0,
-				r.body.centre().y};
+		return new double[] {deepest, r.gap(), r.angle(), r.asleep() ? 1.0 : 0.0, r.centreOf().y};
+	}
+
+	/** For the client gametest: whether this body is simulated by the any-model rig. */
+	public static boolean generic(Entity entity) {
+		return RAGDOLLS.get(entity.getId()) instanceof GenericCorpse;
 	}
 
 	/** For the client gametest: the reactions a ragdoll died with, or null. */
 	public static java.util.@Nullable Set<dev.captience.realisticdamage.ragdoll.Behaviour.Reaction> ragdollReactions(
 			Entity entity) {
-		RagdollCorpse r = RAGDOLLS.get(entity.getId());
-		return r == null || r.body.behaviour() == null ? null : r.body.behaviour().reactions();
+		return RAGDOLLS.get(entity.getId()) instanceof RagdollCorpse r && r.body.behaviour() != null
+				? r.body.behaviour().reactions() : null;
 	}
 
 	/** For the client gametest: the muscles a ragdoll died with, or null. */
 	public static dev.captience.realisticdamage.ragdoll.@Nullable Muscles ragdollMuscles(Entity entity) {
-		RagdollCorpse r = RAGDOLLS.get(entity.getId());
-		return r == null ? null : r.body.muscles();
+		return RAGDOLLS.get(entity.getId()) instanceof RagdollCorpse r ? r.body.muscles() : null;
 	}
 
 	/** Every ragdoll, kept ones too, for the debug view. */
-	static Iterable<RagdollCorpse> ragdolls() {
-		java.util.List<RagdollCorpse> all = new java.util.ArrayList<>(RAGDOLLS.values());
+	static Iterable<SimulatedCorpse> ragdolls() {
+		java.util.List<SimulatedCorpse> all = new java.util.ArrayList<>(RAGDOLLS.values());
 		all.addAll(ORPHANS.values());
 		for (RagdollCorpse r : LiveRagdolls.ragdolls()) {
 			all.add(r);
@@ -375,6 +380,11 @@ public final class RemoteCorpses {
 
 	/** One frame of a simulated body, for the renderer: the root's turn and the parts' pose. */
 	public interface Frame {
+		/** Where the model's root is put in the world (a ragdoll's frame sets the render state there). */
+		default Vec3 root() {
+			return Vec3.ZERO;
+		}
+
 		/** From the end of {@code setupRotations}. */
 		void applyRotation(PoseStack poseStack);
 
@@ -413,7 +423,7 @@ public final class RemoteCorpses {
 			((CorpseHolder) state).realisticdamage$setCorpse(frame);
 			return;
 		}
-		if (!(state instanceof HumanoidRenderState) || (CORPSES.isEmpty() && RAGDOLLS.isEmpty())) {
+		if (CORPSES.isEmpty() && RAGDOLLS.isEmpty()) {
 			((CorpseHolder) state).realisticdamage$setCorpse(null);
 			return;
 		}
@@ -421,22 +431,24 @@ public final class RemoteCorpses {
 		// asleep) must not add its own turn: the player renderer applies those
 		// after the base rotations this hangs off, on top of the corpse's.
 		boolean simulated = RAGDOLLS.containsKey(entity.getId()) || CORPSES.containsKey(entity.getId());
-		if (simulated && state instanceof HumanoidRenderState humanoid) {
-			humanoid.swimAmount = 0.0F;
-			humanoid.isFallFlying = false;
-			humanoid.isVisuallySwimming = false;
-			humanoid.isCrouching = false;
+		if (simulated) {
 			state.isAutoSpinAttack = false;
 			state.isUpsideDown = false;
 			state.pose = net.minecraft.world.entity.Pose.STANDING;
+			if (state instanceof HumanoidRenderState humanoid) {
+				humanoid.swimAmount = 0.0F;
+				humanoid.isFallFlying = false;
+				humanoid.isVisuallySwimming = false;
+				humanoid.isCrouching = false;
+			}
 		}
-		RagdollCorpse ragdoll = RAGDOLLS.get(entity.getId());
+		SimulatedCorpse ragdoll = RAGDOLLS.get(entity.getId());
 		if (ragdoll != null && ragdoll.entity.get() != entity) {
 			// A respawn reused the id: this is someone alive.
 			ragdoll = null;
 		}
 		if (ragdoll != null) {
-			RagdollCorpse.Frame frame = ragdoll.frame(partialTicks);
+			Frame frame = ragdoll.frame(partialTicks);
 			state.x = frame.root().x;
 			state.y = frame.root().y;
 			state.z = frame.root().z;
@@ -457,7 +469,7 @@ public final class RemoteCorpses {
 			ragdoll.lastState = state;
 			return;
 		}
-		Corpse corpse = CORPSES.get(entity.getId());
+		Corpse corpse = state instanceof HumanoidRenderState ? CORPSES.get(entity.getId()) : null;
 		if (corpse == null) {
 			((CorpseHolder) state).realisticdamage$setCorpse(null);
 			return;

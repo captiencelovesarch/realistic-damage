@@ -12,6 +12,10 @@ Status (Nov 9 2026):
 - **Phase 4c (knockdown ragdolls) built** (alpha.19): `damage/Knockdowns`
   (server: non-lethal blasts, big hitters, huge blows) and
   `client/LiveRagdolls` (thrown, then down, then the get-up blend).
+- **Phase 4d (other mobs) built** (alpha.20): `ragdoll/GenericRagdoll`
+  (any model's top-level parts jointed to the biggest, limits from each
+  part's rest angle, a keel computed from the body's own shape) and
+  `client/GenericCorpse`; `SimulatedCorpse` is the base both kinds share.
 - Phases 3 and 4 follow. Phase 4 now also covers knockdown ragdolls (being
   thrown without dying).
 

@@ -39,7 +39,7 @@ import org.jspecify.annotations.Nullable;
  * <p>Deterministic (no RNG): everything follows the launch, the model and the
  * blocks, so every client watching sees the same fall in its broad strokes.
  */
-final class RagdollCorpse implements RemoteCorpses.View {
+final class RagdollCorpse extends SimulatedCorpse {
 	/** Seconds per tick. */
 	private static final double DT = 0.05;
 	/** A body pushed slower than this, blocks a second, gets a nudge to go over the way it faced. */
@@ -67,23 +67,11 @@ final class RagdollCorpse implements RemoteCorpses.View {
 			HumanoidRagdoll.LEFT_LEG, HumanoidRagdoll.RIGHT_LEG,
 	};
 
-	final int id;
 	final HumanoidRagdoll body;
-	/** The entity this body was, to notice it gone or replaced (a respawn reuses the id). */
-	final java.lang.ref.WeakReference<LivingEntity> entity;
-	/**
-	 * How it was last drawn (phase 4: bodies that stay). Minecraft makes a
-	 * fresh state every frame, so holding the last one is safe; once the
-	 * entity is gone, this is what the body keeps looking like.
-	 */
-	net.minecraft.client.renderer.entity.state.@Nullable LivingEntityRenderState lastState;
-	/** Ticks since the entity went away, or -1 while it is still there. */
-	int orphanAge = -1;
 	/** The renderer's model scale (vanilla's {@code scale(state, poseStack)}). */
 	private final float modelScale;
 	private final McPhysicsWorld world;
 	private final ClientLevel level;
-	int age;
 	/** The torso's fall speed last tick, blocks a second, and ticks since the last thud. */
 	private double lastFall;
 	private int sinceThud = 100;
@@ -91,8 +79,7 @@ final class RagdollCorpse implements RemoteCorpses.View {
 	private static final double THUD_SPEED = 3.5;
 
 	private RagdollCorpse(LivingEntity entity, HumanoidRagdoll body, float modelScale, ClientLevel level) {
-		this.id = entity.getId();
-		this.entity = new java.lang.ref.WeakReference<>(entity);
+		super(entity);
 		this.body = body;
 		this.modelScale = modelScale;
 		this.world = new McPhysicsWorld(level);
@@ -190,6 +177,11 @@ final class RagdollCorpse implements RemoteCorpses.View {
 			System.arraycopy(new float[] {-1, -1, -1, 1, 1, 1}, 0, b, 0, 6);
 		}
 		return new HumanoidRagdoll.Part(pose.x(), pose.y(), pose.z(), b[0], b[1], b[2], b[3], b[4], b[5]);
+	}
+
+	/** For {@link GenericCorpse}: the same reading of a renderer's own scale. */
+	static float modelScaleOf(LivingEntityRenderer<?, ?, ?> renderer) {
+		return modelScale(renderer);
 	}
 
 	/** The renderer's own scale, read off what its {@code scale} call does to an empty stack. */
@@ -346,6 +338,7 @@ final class RagdollCorpse implements RemoteCorpses.View {
 	}
 
 	/** Once per client tick. */
+	@Override
 	void tick(double timeScale) {
 		age++;
 		if (orphanAge >= 0) {
@@ -379,6 +372,7 @@ final class RagdollCorpse implements RemoteCorpses.View {
 
 	private static final boolean TRACE = System.getenv("RD_RAGDOLL_TRACE") != null;
 
+	@Override
 	boolean expired() {
 		return body.broken();
 	}
@@ -407,8 +401,35 @@ final class RagdollCorpse implements RemoteCorpses.View {
 		return body.spread();
 	}
 
+	@Override
 	boolean red() {
 		return age < RED_TICKS;
+	}
+
+	@Override
+	Iterable<dev.captience.realisticdamage.ragdoll.physics.Body> bodies() {
+		java.util.List<dev.captience.realisticdamage.ragdoll.physics.Body> all = new java.util.ArrayList<>();
+		for (int i = 0; i < HumanoidRagdoll.PARTS; i++) {
+			if (body.present(i)) {
+				all.add(body.body(i));
+			}
+		}
+		return all;
+	}
+
+	@Override
+	boolean asleep() {
+		return body.asleep();
+	}
+
+	@Override
+	double gap() {
+		return body.worstSeparation();
+	}
+
+	@Override
+	Vector3d centreOf() {
+		return body.centre();
 	}
 
 	// --- Drawing ---------------------------------------------------------------------
@@ -417,6 +438,7 @@ final class RagdollCorpse implements RemoteCorpses.View {
 	 * This frame of the body: the torso as the model's root, every other part
 	 * relative to it, in the model's own terms (pixels and ZYX angles).
 	 */
+	@Override
 	Frame frame(float partialTicks) {
 		Quaterniond torsoQ = body.orientation(HumanoidRagdoll.TORSO, partialTicks, new Quaterniond());
 		Vector3d torsoPivot = body.pivot(HumanoidRagdoll.TORSO, partialTicks, new Vector3d());
