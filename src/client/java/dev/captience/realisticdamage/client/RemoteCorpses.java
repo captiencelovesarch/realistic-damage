@@ -63,16 +63,36 @@ public final class RemoteCorpses {
 
 	private static final Int2ObjectOpenHashMap<Corpse> CORPSES = new Int2ObjectOpenHashMap<>();
 
+	/** Ragdolls (active ragdolls phase 0) by entity id; see {@link RagdollCorpse}. */
+	private static final Int2ObjectOpenHashMap<RagdollCorpse> RAGDOLLS = new Int2ObjectOpenHashMap<>();
+
+	/** Farther than this from the camera, blocks, a body falls the simple way: nobody can tell. */
+	private static final double RAGDOLL_RANGE = 64.0;
+
+	/** The ragdoll clock, for slow-motion tuning ({@code /rdragdoll slowmo}); 1 is real time. */
+	static double timeScale = 1.0;
+
 	/** The packet: start simulating that body, if this client can see it and it is a shape we know. */
 	public static void start(CorpsePayload payload) {
 		Minecraft client = Minecraft.getInstance();
 		ClientLevel level = client.level;
-		if (level == null || !ClientEffectsConfig.get().deathCamera) {
+		ClientEffectsConfig config = ClientEffectsConfig.get();
+		if (level == null || config.ragdolls == ClientEffectsConfig.RagdollMode.OFF) {
 			return;
 		}
 		Entity entity = level.getEntity(payload.entityId());
 		if (!(entity instanceof LivingEntity body) || body == client.player) {
 			return;
+		}
+		CORPSES.remove(body.getId());
+		RAGDOLLS.remove(body.getId());
+		if (config.ragdolls == ClientEffectsConfig.RagdollMode.FULL && RAGDOLLS.size() < config.ragdollLimit
+				&& client.gameRenderer.mainCamera().position().distanceTo(body.position()) < RAGDOLL_RANGE) {
+			RagdollCorpse ragdoll = RagdollCorpse.create(body, payload, level);
+			if (ragdoll != null) {
+				RAGDOLLS.put(body.getId(), ragdoll);
+				return;
+			}
 		}
 		CORPSES.put(body.getId(), new Corpse(body, payload));
 	}
@@ -82,6 +102,7 @@ public final class RemoteCorpses {
 		ClientLevel level = Minecraft.getInstance().level;
 		if (level == null) {
 			CORPSES.clear();
+			RAGDOLLS.clear();
 			return;
 		}
 		var it = CORPSES.int2ObjectEntrySet().fastIterator();
@@ -95,20 +116,110 @@ public final class RemoteCorpses {
 			}
 			corpse.tick(level);
 		}
+		var rit = RAGDOLLS.int2ObjectEntrySet().fastIterator();
+		while (rit.hasNext()) {
+			RagdollCorpse ragdoll = rit.next().getValue();
+			Entity entity = level.getEntity(ragdoll.id);
+			if (!(entity instanceof LivingEntity body) || body.isRemoved() || !body.isDeadOrDying()
+					|| ragdoll.expired()) {
+				rit.remove();
+				continue;
+			}
+			ragdoll.tick(timeScale);
+		}
 	}
 
 	public static void clear() {
 		CORPSES.clear();
+		RAGDOLLS.clear();
 	}
 
-	/** How many bodies are being simulated; for the gametest. */
+	/** How many bodies are being simulated, either way; for the gametest. */
 	public static int count() {
-		return CORPSES.size();
+		return CORPSES.size() + RAGDOLLS.size();
+	}
+
+	/** How many of them are full ragdolls; for the gametest. */
+	public static int ragdollCount() {
+		return RAGDOLLS.size();
 	}
 
 	/** The simulated body for this entity, or null. */
-	public static @Nullable Corpse of(Entity entity) {
+	public static @Nullable View of(Entity entity) {
+		if (!RAGDOLLS.isEmpty()) {
+			RagdollCorpse ragdoll = RAGDOLLS.get(entity.getId());
+			if (ragdoll != null) {
+				return ragdoll;
+			}
+		}
 		return CORPSES.isEmpty() ? null : CORPSES.get(entity.getId());
+	}
+
+	/**
+	 * For the client gametest: how a ragdoll is lying, as
+	 * {deepest point inside a block, worst joint gap, lean in degrees, 1 if at
+	 * rest, torso centre y}; null when this body is not a ragdoll.
+	 */
+	public static double @Nullable [] ragdollCheck(Entity entity) {
+		RagdollCorpse r = RAGDOLLS.get(entity.getId());
+		ClientLevel level = Minecraft.getInstance().level;
+		if (r == null || level == null) {
+			return null;
+		}
+		double deepest = 0.0;
+		dev.captience.realisticdamage.ragdoll.physics.BoxList boxes = new dev.captience.realisticdamage.ragdoll.physics.BoxList();
+		McPhysicsWorld world = new McPhysicsWorld(level);
+		org.joml.Vector3d p = new org.joml.Vector3d();
+		for (int i = 0; i < dev.captience.realisticdamage.ragdoll.HumanoidRagdoll.PARTS; i++) {
+			if (!r.body.present(i)) {
+				continue;
+			}
+			var b = r.body.body(i);
+			for (int k = 0; k < 8; k++) {
+				p.set((k & 1) == 0 ? -b.hx : b.hx, (k & 2) == 0 ? -b.hy : b.hy, (k & 4) == 0 ? -b.hz : b.hz);
+				b.q.transform(p).add(b.x);
+				boxes.clear();
+				world.collect(p.x - 0.01, p.y - 0.01, p.z - 0.01, p.x + 0.01, p.y + 0.01, p.z + 0.01, boxes);
+				deepest = Math.max(deepest, boxes.deepest(p.x, p.y, p.z));
+			}
+		}
+		return new double[] {deepest, r.body.worstSeparation(), r.body.lean(), r.body.asleep() ? 1.0 : 0.0,
+				r.body.centre().y};
+	}
+
+	/** For the client gametest: the muscles a ragdoll died with, or null. */
+	public static dev.captience.realisticdamage.ragdoll.@Nullable Muscles ragdollMuscles(Entity entity) {
+		RagdollCorpse r = RAGDOLLS.get(entity.getId());
+		return r == null ? null : r.body.muscles();
+	}
+
+	/** Every ragdoll, for the debug view. */
+	static Iterable<RagdollCorpse> ragdolls() {
+		return RAGDOLLS.values();
+	}
+
+	/** What callers outside the simulation may ask a body: where it is and where its wounds are. */
+	public interface View {
+		/** Where a point on the standing body (as the server has it) is on this one. */
+		Vec3 place(LivingEntity body, Vec3 upright);
+
+		/** Its centre. */
+		Vec3 position();
+
+		/** Degrees from upright; 90 is lying. */
+		double angle();
+
+		/** How far the limbs are from rest, radians summed. */
+		double limbSpread();
+	}
+
+	/** One frame of a simulated body, for the renderer: the root's turn and the parts' pose. */
+	public interface Frame {
+		/** From the end of {@code setupRotations}. */
+		void applyRotation(PoseStack poseStack);
+
+		/** After a model has been posed for this state, the last word on its parts. */
+		void pose(net.minecraft.client.model.Model<?> model);
 	}
 
 	/**
@@ -116,8 +227,43 @@ public final class RemoteCorpses {
 	 * simulation has it and swaps vanilla's roll for the simulation's.
 	 */
 	public static void extract(LivingEntity entity, LivingEntityRenderState state, float partialTicks) {
-		Corpse corpse = of(entity);
-		if (corpse == null || !(state instanceof HumanoidRenderState)) {
+		if (!(state instanceof HumanoidRenderState) || (CORPSES.isEmpty() && RAGDOLLS.isEmpty())) {
+			((CorpseHolder) state).realisticdamage$setCorpse(null);
+			return;
+		}
+		// Whatever the body was doing when it died (swimming, gliding, crouching,
+		// asleep) must not add its own turn: the player renderer applies those
+		// after the base rotations this hangs off, on top of the corpse's.
+		boolean simulated = RAGDOLLS.containsKey(entity.getId()) || CORPSES.containsKey(entity.getId());
+		if (simulated && state instanceof HumanoidRenderState humanoid) {
+			humanoid.swimAmount = 0.0F;
+			humanoid.isFallFlying = false;
+			humanoid.isVisuallySwimming = false;
+			humanoid.isCrouching = false;
+			state.isAutoSpinAttack = false;
+			state.isUpsideDown = false;
+			state.pose = net.minecraft.world.entity.Pose.STANDING;
+		}
+		RagdollCorpse ragdoll = RAGDOLLS.get(entity.getId());
+		if (ragdoll != null) {
+			RagdollCorpse.Frame frame = ragdoll.frame(partialTicks);
+			state.x = frame.root().x;
+			state.y = frame.root().y;
+			state.z = frame.root().z;
+			// Facing 180 makes vanilla's yaw turn the identity; the frame's own turn
+			// is the whole orientation.
+			state.bodyRot = 180.0F;
+			state.yRot = 0.0F;
+			state.xRot = 0.0F;
+			state.walkAnimationSpeed = 0.0F;
+			state.deathTime = 0.0F;
+			state.hasRedOverlay = ragdoll.red();
+			state.nameTag = null;
+			((CorpseHolder) state).realisticdamage$setCorpse(frame);
+			return;
+		}
+		Corpse corpse = CORPSES.get(entity.getId());
+		if (corpse == null) {
 			((CorpseHolder) state).realisticdamage$setCorpse(null);
 			return;
 		}
@@ -141,53 +287,80 @@ public final class RemoteCorpses {
 
 	/** From the end of {@code setupRotations}: the body's orientation about its own centre. */
 	public static boolean applyRotation(LivingEntityRenderState state, PoseStack poseStack) {
-		Pose pose = ((CorpseHolder) state).realisticdamage$corpse();
-		if (pose == null) {
+		Frame frame = ((CorpseHolder) state).realisticdamage$corpse();
+		if (frame == null) {
 			return false;
 		}
-		poseStack.translate(0.0F, pose.pivot(), 0.0F);
-		poseStack.mulPose(pose.rotation());
-		poseStack.translate(0.0F, -pose.pivot(), 0.0F);
+		frame.applyRotation(poseStack);
 		return true;
 	}
 
 	/**
-	 * What one frame of a corpse needs: its orientation about its centre, and
-	 * its limb angles (see {@link LimbPhysics} for the order).
+	 * What one frame of a simple corpse needs: its orientation about its centre,
+	 * and its limb angles (see {@link LimbPhysics} for the order).
 	 */
-	public record Pose(Quaternionf rotation, float pivot, float[] limbs) {}
+	public record Pose(Quaternionf rotation, float pivot, float[] limbs) implements Frame {
+		@Override
+		public void applyRotation(PoseStack poseStack) {
+			poseStack.translate(0.0F, pivot, 0.0F);
+			poseStack.mulPose(rotation);
+			poseStack.translate(0.0F, -pivot, 0.0F);
+		}
+
+		/**
+		 * The limbs of a body with nobody in it, as {@link LimbPhysics} left them.
+		 * Set outright rather than added to: whatever vanilla had them doing (a
+		 * swing, holding a bow) stopped when the player did.
+		 */
+		@Override
+		public void pose(net.minecraft.client.model.Model<?> any) {
+			if (!(any instanceof net.minecraft.client.model.HumanoidModel<?> model)) {
+				return;
+			}
+			float[] l = limbs;
+			model.head.xRot = l[LimbPhysics.HEAD_X];
+			model.head.yRot = 0.0F;
+			model.head.zRot = 0.0F;
+			model.rightArm.xRot = l[LimbPhysics.R_ARM_X];
+			model.rightArm.yRot = 0.0F;
+			model.rightArm.zRot = l[LimbPhysics.R_ARM_Z];
+			model.leftArm.xRot = l[LimbPhysics.L_ARM_X];
+			model.leftArm.yRot = 0.0F;
+			model.leftArm.zRot = l[LimbPhysics.L_ARM_Z];
+			model.rightLeg.xRot = l[LimbPhysics.R_LEG_X];
+			model.rightLeg.yRot = 0.0F;
+			model.rightLeg.zRot = l[LimbPhysics.R_LEG_Z];
+			model.leftLeg.xRot = l[LimbPhysics.L_LEG_X];
+			model.leftLeg.yRot = 0.0F;
+			model.leftLeg.zRot = l[LimbPhysics.L_LEG_Z];
+		}
+	}
+
+	/** From the end of HumanoidModel setupAnim. */
+	public static void limp(LivingEntityRenderState state, net.minecraft.client.model.HumanoidModel<?> model) {
+		Frame frame = ((CorpseHolder) state).realisticdamage$corpse();
+		if (frame != null) {
+			frame.pose(model);
+		}
+	}
 
 	/**
-	 * The limbs of a body with nobody in it (from the end of HumanoidModel
-	 * setupAnim), as {@link LimbPhysics} left them. Set outright rather than
-	 * added to: whatever vanilla had them doing (a swing, holding a bow)
-	 * stopped when the player did.
+	 * After any model was posed for a render state, wherever that happened: at
+	 * the deferred draw, and in the renderer before its layers. A subclass's
+	 * {@code setupAnim} (a zombie's raised arms) runs after HumanoidModel's tail,
+	 * so this is the only place the corpse's pose reliably has the last word.
 	 */
-	public static void limp(LivingEntityRenderState state, net.minecraft.client.model.HumanoidModel<?> model) {
-		Pose pose = ((CorpseHolder) state).realisticdamage$corpse();
-		if (pose == null) {
-			return;
+	public static void pose(net.minecraft.client.model.Model<?> model, @Nullable Object state) {
+		if (state instanceof CorpseHolder holder) {
+			Frame frame = holder.realisticdamage$corpse();
+			if (frame != null) {
+				frame.pose(model);
+			}
 		}
-		float[] l = pose.limbs();
-		model.head.xRot = l[LimbPhysics.HEAD_X];
-		model.head.yRot = 0.0F;
-		model.head.zRot = 0.0F;
-		model.rightArm.xRot = l[LimbPhysics.R_ARM_X];
-		model.rightArm.yRot = 0.0F;
-		model.rightArm.zRot = l[LimbPhysics.R_ARM_Z];
-		model.leftArm.xRot = l[LimbPhysics.L_ARM_X];
-		model.leftArm.yRot = 0.0F;
-		model.leftArm.zRot = l[LimbPhysics.L_ARM_Z];
-		model.rightLeg.xRot = l[LimbPhysics.R_LEG_X];
-		model.rightLeg.yRot = 0.0F;
-		model.rightLeg.zRot = l[LimbPhysics.R_LEG_Z];
-		model.leftLeg.xRot = l[LimbPhysics.L_LEG_X];
-		model.leftLeg.yRot = 0.0F;
-		model.leftLeg.zRot = l[LimbPhysics.L_LEG_Z];
 	}
 
 	/** One body. */
-	public static final class Corpse {
+	public static final class Corpse implements View {
 		final int id;
 		final float bodyYaw;
 		/** Half the standing height, unscaled model units (blocks at scale 1). */

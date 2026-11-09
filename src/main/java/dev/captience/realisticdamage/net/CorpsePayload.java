@@ -22,9 +22,20 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  * @param kind     what killed it
  * @param violence 0..1, see {@code DeathMath}
  * @param vx       launch velocity, blocks a tick
+ * @param hitPart  the region the killing blow landed on ({@code BodyPart} ordinal), or -1 when
+ *                 nothing struck it (a bleed-out, a drowning); since active ragdolls, so the
+ *                 body can take the blow where it landed
+ * @param hx       the direction the blow travelled, unit length (zero when there was none)
+ * @param kick     how hard it struck that region, blocks a tick of velocity given to it alone
  */
-public record CorpsePayload(int entityId, DeathKind kind, float violence, float vx, float vy, float vz)
+public record CorpsePayload(int entityId, DeathKind kind, float violence, float vx, float vy, float vz,
+		int hitPart, float hx, float hy, float hz, float kick)
 		implements CustomPacketPayload {
+	/** A death with no blow to speak of. */
+	public CorpsePayload(int entityId, DeathKind kind, float violence, float vx, float vy, float vz) {
+		this(entityId, kind, violence, vx, vy, vz, -1, 0.0F, 0.0F, 0.0F, 0.0F);
+	}
+
 	public static final CustomPacketPayload.Type<CorpsePayload> TYPE =
 			new CustomPacketPayload.Type<>(RealisticDamage.id("corpse"));
 
@@ -35,6 +46,11 @@ public record CorpsePayload(int entityId, DeathKind kind, float violence, float 
 			ByteBufCodecs.FLOAT, CorpsePayload::vx,
 			ByteBufCodecs.FLOAT, CorpsePayload::vy,
 			ByteBufCodecs.FLOAT, CorpsePayload::vz,
+			ByteBufCodecs.VAR_INT.map(i -> i - 1, i -> i + 1), CorpsePayload::hitPart,
+			ByteBufCodecs.FLOAT, CorpsePayload::hx,
+			ByteBufCodecs.FLOAT, CorpsePayload::hy,
+			ByteBufCodecs.FLOAT, CorpsePayload::hz,
+			ByteBufCodecs.FLOAT, CorpsePayload::kick,
 			CorpsePayload::new);
 
 	@Override

@@ -391,6 +391,11 @@ public final class RealisticDamageData {
 		deathViolenceTick = tick;
 	}
 
+	/** The stashed violence if it was scored this same tick, else -1; leaves it stashed. */
+	public double peekDeathViolence(int tick) {
+		return tick == deathViolenceTick ? deathViolence : -1.0;
+	}
+
 	/** The stashed violence if it was scored this same tick, else 0. Clears either way. */
 	public double consumeDeathViolence(int tick) {
 		double value = tick == deathViolenceTick ? deathViolence : 0.0;

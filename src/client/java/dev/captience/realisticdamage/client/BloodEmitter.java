@@ -244,7 +244,7 @@ public final class BloodEmitter {
 			return;
 		}
 		Vec3 at = BodyHitResolver.regionCenter(player, part);
-		RemoteCorpses.Corpse corpse = RemoteCorpses.of(player);
+		RemoteCorpses.View corpse = RemoteCorpses.of(player);
 		if (corpse != null) {
 			at = corpse.place(player, at);
 		}

@@ -1,0 +1,382 @@
+package dev.captience.realisticdamage.client.gametest;
+
+import dev.captience.realisticdamage.RDAttachments;
+import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.body.RealisticDamageData;
+import dev.captience.realisticdamage.client.ClientEffectsConfig;
+import dev.captience.realisticdamage.client.RemoteCorpses;
+import dev.captience.realisticdamage.damage.Corpses;
+import dev.captience.realisticdamage.damage.DeathKind;
+import dev.captience.realisticdamage.systems.MobAnatomy;
+import java.util.ArrayList;
+import java.util.List;
+import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
+import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
+
+/**
+ * Active ragdolls, phase 0, in a real client: five bodies die in a little
+ * scene built for it — off the top of a staircase, at the edge of a ledge, in
+ * the open to a blast, a skeleton shot in the head, and a one-legged mannequin
+ * — and each must end up lying on the blocks rather than in them, in one
+ * piece. The screenshots (with the physics boxes drawn on some) are for a
+ * person to judge how it looks; the assertions only say it is not broken.
+ */
+public class RagdollClientGameTest implements FabricClientGameTest {
+	private record Victim(String name, double x, double y, double z, float yaw, Corpses.Script script) {}
+
+	@Override
+	public void runTest(ClientGameTestContext context) {
+		context.runOnClient(client -> {
+			ClientEffectsConfig.load();
+			ClientEffectsConfig.get().ragdolls = ClientEffectsConfig.RagdollMode.FULL;
+		});
+		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
+			context.waitTicks(20);
+			singleplayer.getServer().runOnServer(server -> {
+				var source = server.createCommandSourceStack();
+				server.getCommands().performPrefixedCommand(source, "time set noon");
+				server.getCommands().performPrefixedCommand(source, "gamerule doMobSpawning false");
+			});
+
+			// The scene, in front of the player (who looks along +Z).
+			List<Victim> victims = new ArrayList<>();
+			singleplayer.getServer().runOnServer(server -> {
+				ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+				ServerLevel level = player.level();
+				BlockPos o = player.blockPosition();
+				// A staircase going down toward +X: columns 3, 2, 1 high.
+				for (int k = 0; k < 3; k++) {
+					for (int y = 0; y < 3 - k; y++) {
+						for (int z = 6; z <= 8; z++) {
+							level.setBlockAndUpdate(o.offset(-6 + k, y, z), Blocks.STONE.defaultBlockState());
+						}
+					}
+				}
+				// A ledge two blocks high, its edge at x = +4.
+				for (int x = 2; x <= 3; x++) {
+					for (int y = 0; y < 2; y++) {
+						for (int z = 6; z <= 8; z++) {
+							level.setBlockAndUpdate(o.offset(x, y, z), Blocks.STONE_BRICKS.defaultBlockState());
+						}
+					}
+				}
+			});
+			context.waitTicks(10);
+
+			double px = context.computeOnClient(client -> client.player.getX());
+			double py = context.computeOnClient(client -> client.player.getY());
+			double pz = context.computeOnClient(client -> client.player.getZ());
+			double bx = Math.floor(px);
+			double by = Math.floor(py);
+			double bz = Math.floor(pz);
+			// Facing +X is yaw -90.
+			victims.add(new Victim("stairs", bx - 5.5, by + 3.0, bz + 7.5, -90.0F,
+					new Corpses.Script(DeathKind.BLOW, BodyPart.TORSO, new Vec3(1.0, 0.0, 0.0), 0.25, 0.5)));
+			victims.add(new Victim("ledge", bx + 3.6, by + 2.0, bz + 7.5, -90.0F,
+					new Corpses.Script(DeathKind.FADE, null, new Vec3(1.0, 0.0, 0.0), 0.0, 0.2)));
+			victims.add(new Victim("blast", bx + 0.5, by, bz + 11.5, 0.0F,
+					new Corpses.Script(DeathKind.EXPLOSION, BodyPart.LEFT_LEG, new Vec3(0.4, 0.0, -1.0), 0.4, 0.8)));
+			victims.add(new Victim("headshot", bx - 1.5, by, bz + 5.5, 180.0F,
+					new Corpses.Script(DeathKind.PROJECTILE, BodyPart.HEAD, new Vec3(0.0, 0.0, 1.0), 0.35, 0.6)));
+			victims.add(new Victim("one_leg", bx + 0.7, by, bz + 4.5, 160.0F,
+					new Corpses.Script(DeathKind.BLOW, BodyPart.RIGHT_ARM, new Vec3(0.3, 0.0, 1.0), 0.2, 0.4)));
+
+			List<Integer> ids = new ArrayList<>();
+			singleplayer.getServer().runOnServer(server -> {
+				ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+				ServerLevel level = player.level();
+				for (Victim v : victims) {
+					EntityType<? extends LivingEntity> type = switch (v.name()) {
+						case "headshot" -> EntityTypes.SKELETON;
+						case "one_leg" -> EntityTypes.MANNEQUIN;
+						default -> EntityTypes.ZOMBIE;
+					};
+					LivingEntity body = type.create(level, EntitySpawnReason.COMMAND);
+					if (body == null) {
+						throw new AssertionError("could not create " + type);
+					}
+					body.snapTo(v.x(), v.y(), v.z(), v.yaw(), 0.0F);
+					body.setYHeadRot(v.yaw());
+					body.yBodyRot = v.yaw();
+					if (body instanceof Mob mob) {
+						mob.setNoAi(true);
+						mob.setPersistenceRequired();
+					}
+					level.addFreshEntity(body);
+					RealisticDamageData data = RDAttachments.get(body);
+					data.reset();
+					if (v.name().equals("one_leg")) {
+						data.part(BodyPart.LEFT_LEG).setDestroyed(true);
+					}
+					RDAttachments.pushSnapshot(body);
+					MobAnatomy.track(body);
+					ids.add(body.getId());
+				}
+			});
+			// Camera: back and up, looking at the scene.
+			context.runOnClient(client -> {
+				client.player.setPos(px, py, pz - 3.0);
+				client.player.setYRot(0.0F);
+				client.player.setXRot(22.0F);
+			});
+			context.waitTicks(30);
+			context.takeScreenshot("rd_ragdoll_00_standing");
+
+			singleplayer.getServer().runOnServer(server -> {
+				ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+				for (int i = 0; i < victims.size(); i++) {
+					Entity e = level.getEntity(ids.get(i));
+					if (!(e instanceof LivingEntity body)) {
+						throw new AssertionError("victim " + victims.get(i).name() + " is gone before its death");
+					}
+					Corpses.script(body, victims.get(i).script());
+					body.invulnerableTime = 0;
+					body.kill(level);
+				}
+			});
+			context.waitTicks(2);
+			int ragdolls = context.computeOnClient(client -> RemoteCorpses.ragdollCount());
+			if (ragdolls != victims.size()) {
+				throw new AssertionError("expected " + victims.size() + " ragdolls, got " + ragdolls
+						+ " (and " + context.computeOnClient(client -> RemoteCorpses.count()) + " bodies in all)");
+			}
+			context.waitTicks(4);
+			context.takeScreenshot("rd_ragdoll_01_falling");
+			long linesBefore = context.computeOnClient(client -> dev.captience.realisticdamage.client.RagdollDebug.lines());
+			context.runOnClient(client -> setDebug(true));
+			context.waitTicks(4);
+			context.takeScreenshot("rd_ragdoll_02_falling_boxes");
+			if (context.computeOnClient(client -> dev.captience.realisticdamage.client.RagdollDebug.lines()) <= linesBefore) {
+				throw new AssertionError("/rdragdoll debug drew no boxes");
+			}
+			context.runOnClient(client -> setDebug(false));
+			context.waitTicks(50);
+			context.takeScreenshot("rd_ragdoll_03_landed");
+			context.runOnClient(client -> setDebug(true));
+			context.waitTicks(1);
+			context.takeScreenshot("rd_ragdoll_04_landed_boxes");
+			context.runOnClient(client -> setDebug(false));
+
+			StringBuilder report = new StringBuilder();
+			List<String> failures = new ArrayList<>();
+			for (int i = 0; i < victims.size(); i++) {
+				Victim v = victims.get(i);
+				int id = ids.get(i);
+				double[] check = context.computeOnClient(client -> {
+					Entity e = client.level.getEntity(id);
+					return e == null ? null : RemoteCorpses.ragdollCheck(e);
+				});
+				if (check == null) {
+					failures.add(v.name() + ": no ragdoll by the time it should have landed");
+					continue;
+				}
+				report.append(String.format(java.util.Locale.ROOT,
+						"[rd] ragdoll %s: inside %.3f, joint gap %.3f, lean %.1f, at rest %s, torso y %.2f (died at %.2f)%n",
+						v.name(), check[0], check[1], check[2], check[3] > 0.5, check[4], v.y()));
+				if (check[0] > 0.06) {
+					failures.add(v.name() + " ended " + check[0] + " inside a block");
+				}
+				if (check[1] > 0.05) {
+					failures.add(v.name() + " came apart at a joint by " + check[1]);
+				}
+				if (check[2] < 35.0) {
+					failures.add(v.name() + " is still standing (lean " + check[2] + ")");
+				}
+			}
+			System.out.print(report);
+			double stairsY = victims.getFirst().y();
+			double stairsTorso = context.computeOnClient(client -> {
+				Entity e = client.level.getEntity(ids.getFirst());
+				double[] c = e == null ? null : RemoteCorpses.ragdollCheck(e);
+				return c == null ? Double.NaN : c[4];
+			});
+			if (!(stairsTorso < stairsY + 0.4)) {
+				failures.add("the body pushed off the top step did not go down it (torso y " + stairsTorso
+						+ ", top step " + stairsY + ")");
+			}
+			if (!failures.isEmpty()) {
+				throw new AssertionError(String.join("; ", failures));
+			}
+
+			// Closer looks for the person judging it.
+			context.runOnClient(client -> {
+				client.player.setPos(px - 3.5, py + 1.0, pz + 2.5);
+				client.player.setYRot(-20.0F);
+				client.player.setXRot(30.0F);
+			});
+			context.waitTicks(5);
+			context.takeScreenshot("rd_ragdoll_05_stairs_close");
+			context.runOnClient(client -> {
+				client.player.setPos(px + 2.5, py + 1.0, pz + 3.0);
+				client.player.setYRot(25.0F);
+				client.player.setXRot(30.0F);
+			});
+			context.waitTicks(5);
+			context.takeScreenshot("rd_ragdoll_06_ledge_close");
+
+			muscles(context, singleplayer, px, py, pz);
+		}
+	}
+
+	/**
+	 * Phase 2: four zombies in a row, facing the camera, each dying a way its
+	 * muscles should show: shot in the head (strings cut, drops and folds at
+	 * once), bled out (sinks, legs first), frozen (goes over straight), and
+	 * struck with a broken arm (that arm swings free).
+	 */
+	private static void muscles(ClientGameTestContext context, TestSingleplayerContext singleplayer,
+			double px, double py, double pz) {
+		double bx = Math.floor(px) + 12.0;
+		double by = Math.floor(py);
+		double bz = Math.floor(pz) + 6.0;
+		List<Victim> row = List.of(
+				new Victim("headshot", bx - 3.5, by, bz + 0.5, 180.0F,
+						new Corpses.Script(DeathKind.PROJECTILE, BodyPart.HEAD, new Vec3(0.0, 0.0, 1.0), 0.35, 0.5)),
+				new Victim("bleed_out", bx - 1.0, by, bz + 0.5, 180.0F,
+						new Corpses.Script(DeathKind.FADE, null, new Vec3(0.0, 0.0, 1.0), 0.0, 0.2)),
+				new Victim("frozen", bx + 1.5, by, bz + 0.5, 180.0F,
+						new Corpses.Script(DeathKind.FREEZE, null, new Vec3(0.0, 0.0, -1.0), 0.0, 0.3)),
+				new Victim("broken_arm", bx + 4.0, by, bz + 0.5, 180.0F,
+						new Corpses.Script(DeathKind.BLOW, BodyPart.TORSO, new Vec3(0.0, 0.0, 1.0), 0.25, 0.3)));
+		List<Integer> ids = new ArrayList<>();
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			for (Victim v : row) {
+				LivingEntity body = EntityTypes.ZOMBIE.create(level, EntitySpawnReason.COMMAND);
+				body.snapTo(v.x(), v.y(), v.z(), v.yaw(), 0.0F);
+				body.setYHeadRot(v.yaw());
+				body.yBodyRot = v.yaw();
+				((Mob) body).setNoAi(true);
+				((Mob) body).setPersistenceRequired();
+				// Out of the sun, or every one of them burns in the pictures.
+				body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD,
+						new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.LEATHER_HELMET));
+				level.addFreshEntity(body);
+				RealisticDamageData data = RDAttachments.get(body);
+				data.reset();
+				if (v.name().equals("broken_arm")) {
+					data.part(BodyPart.LEFT_ARM).setBroken(true);
+				}
+				RDAttachments.pushSnapshot(body);
+				MobAnatomy.track(body);
+				ids.add(body.getId());
+			}
+		});
+		context.runOnClient(client -> {
+			client.player.setPos(bx + 0.25, py + 0.5, bz - 6.0);
+			client.player.setYRot(0.0F);
+			client.player.setXRot(12.0F);
+		});
+		context.waitTicks(30);
+		context.takeScreenshot("rd_ragdoll_10_muscles_standing");
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			for (int i = 0; i < row.size(); i++) {
+				LivingEntity body = (LivingEntity) level.getEntity(ids.get(i));
+				Corpses.script(body, row.get(i).script());
+				body.invulnerableTime = 0;
+				body.kill(level);
+			}
+		});
+		context.waitTicks(2);
+		// The right muscles reached this client.
+		List<String> failures = new ArrayList<>();
+		for (int i = 0; i < row.size(); i++) {
+			String name = row.get(i).name();
+			int id = ids.get(i);
+			String muscles = context.computeOnClient(client -> {
+				Entity e = client.level.getEntity(id);
+				var m = e == null ? null : RemoteCorpses.ragdollMuscles(e);
+				return m == null ? "none" : m.stringsCut + "," + m.limb[3] + "," + m.floor;
+			});
+			String[] f = muscles.split(",");
+			if (f.length < 3) {
+				failures.add(name + " is not a ragdoll");
+				continue;
+			}
+			boolean cut = Boolean.parseBoolean(f[0]);
+			double leftArm = Double.parseDouble(f[1]);
+			double floor = Double.parseDouble(f[2]);
+			switch (name) {
+				case "headshot" -> {
+					if (!cut) {
+						failures.add("a headshot did not cut the strings");
+					}
+				}
+				case "bleed_out" -> {
+					if (cut) {
+						failures.add("a conscious bleed-out dropped like a headshot");
+					}
+				}
+				case "frozen" -> {
+					if (floor < 1.0) {
+						failures.add("a frozen body is not stiff");
+					}
+				}
+				case "broken_arm" -> {
+					if (leftArm != 0.0) {
+						failures.add("the broken arm kept its muscle (" + leftArm + ")");
+					}
+				}
+				default -> {}
+			}
+		}
+		context.waitTicks(4);
+		context.takeScreenshot("rd_ragdoll_11_muscles_falling");
+		context.waitTicks(6);
+		context.takeScreenshot("rd_ragdoll_12_muscles_falling_late");
+		context.waitTicks(50);
+		context.takeScreenshot("rd_ragdoll_13_muscles_landed");
+		StringBuilder report = new StringBuilder();
+		for (int i = 0; i < row.size(); i++) {
+			Victim v = row.get(i);
+			int id = ids.get(i);
+			double[] check = context.computeOnClient(client -> {
+				Entity e = client.level.getEntity(id);
+				return e == null ? null : RemoteCorpses.ragdollCheck(e);
+			});
+			if (check == null) {
+				failures.add(v.name() + ": no ragdoll by the time it should have landed");
+				continue;
+			}
+			report.append(String.format(java.util.Locale.ROOT,
+					"[rd] muscles %s: inside %.3f, joint gap %.3f, lean %.1f, at rest %s%n",
+					v.name(), check[0], check[1], check[2], check[3] > 0.5));
+			if (check[0] > 0.06) {
+				failures.add(v.name() + " ended " + check[0] + " inside a block");
+			}
+			if (check[1] > 0.05) {
+				failures.add(v.name() + " came apart at a joint by " + check[1]);
+			}
+			if (check[2] < 35.0) {
+				failures.add(v.name() + " is still standing (lean " + check[2] + ")");
+			}
+		}
+		System.out.print(report);
+		if (!failures.isEmpty()) {
+			throw new AssertionError(String.join("; ", failures));
+		}
+	}
+
+	private static void setDebug(boolean on) {
+		try {
+			var f = Class.forName("dev.captience.realisticdamage.client.RagdollDebug").getDeclaredField("enabled");
+			f.setAccessible(true);
+			f.setBoolean(null, on);
+		} catch (ReflectiveOperationException e) {
+			throw new AssertionError(e);
+		}
+	}
+}

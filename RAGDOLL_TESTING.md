@@ -1,0 +1,105 @@
+# Ragdolls: your in-game checklist
+
+## Phase 2: muscles (alpha.15)
+
+Jar: `realistic-damage-1.7.0-alpha.15.jar`, in both Prism instances (alpha.14
+is in `mods/replaced-jars/`).
+
+A dying body now holds the pose it died in for a moment, then lets go. How
+hard it holds and in what order comes from the body itself: its
+consciousness, its injuries, its adrenaline, and how it died.
+
+- [ ] **Headshot** (`/rdmg ragdoll projectile head 1`, or a real bow
+      headshot). It drops where it stands, folding at the hips. There's no
+      stiff topple.
+- [ ] **Sword to the chest** (`/rdmg ragdoll blow torso`). It goes over in one
+      piece for a moment, then folds as it falls.
+- [ ] **Bleed-out or poison** (`/rdmg ragdoll fade`). It holds a beat, then the
+      legs give first and it sinks forward. The head is the last thing to
+      drop.
+- [ ] **Frozen** (`/rdmg ragdoll freeze`). It tips over stiff as a board.
+- [ ] **Drowned** (`/rdmg ragdoll drowning`). It's soft from the start and
+      drifts.
+- [ ] **Broken arm.** Break a zombie's arm in a fight (or a friend's with
+      `/rdmg break <them> left_arm`), then kill it. That arm swings loose
+      while the other is held.
+- [ ] **Knocked out first.** Kill someone already unconscious: they drop like
+      a headshot.
+- [ ] **Hips.** No body folds into an upside-down V on its head and feet. Legs
+      with no knees now stop folding at about 80 degrees, like real straight
+      legs.
+- [ ] **Bodies settle** within a few seconds and lie still: no slow creeping,
+      no gap at a shoulder or hip.
+
+## Phase 0: the physics body (alpha.14, passed)
+
+Passed Nov 9 2026 ("the ragdolls are AWESOME"). Phase 1 (elbows, knees,
+waist) was dropped by choice: six boxes is the Minecraft look. The phase 0
+notes below are kept for reference.
+
+### What changed
+
+- Other bodies (players, zombies, skeletons, piglins, illagers, mannequins…)
+  are now six real physics parts: head, torso, two arms, two legs. They land
+  on their side, slide down stairs, hang off ledges, and hit walls with their
+  limbs.
+- The blow lands where it hit: a headshot snaps the head, a sword pushes the
+  shoulder it hit, a blast throws the nearest limb hardest so the body tumbles.
+- Lost limbs take no part in the fall.
+- Bodies float in water and sink slowly in lava.
+- New setting, **Settings → Bodies**: Ragdoll / Simple (the old plank) /
+  Vanilla. **Ragdolls at Once** (default 16): any more than that, or any farther
+  than 64 blocks, fall the Simple way.
+- **Your own death is unchanged.** You see your body ragdoll in phase 4. For
+  now you see other people's and mobs' bodies.
+
+### Tools (need cheats on)
+
+- `/rdmg ragdoll <kind> [part] [kick]` kills whatever you're looking at, or
+  places a mannequin 3 blocks ahead and kills it a second later.
+  - kinds: `blow`, `projectile`, `fall`, `explosion`, `crush`, `fire`, `lava`,
+    `drowning`, `freeze`, `shock`, `void`, `fade`
+  - parts: `head`, `torso`, `left_arm`, `right_arm`, `left_leg`, `right_leg`
+  - kick: 0 to 2 (default 0.3). Try `/rdmg ragdoll blow head 1.5`.
+- `/rdragdoll debug` draws the physics boxes over each body (grey = at rest).
+- `/rdragdoll slowmo 0.2` is 5x slow motion; `/rdragdoll slowmo` goes back to
+  real time.
+- `/rdragdoll status` says how many ragdolls there are.
+
+### The scenes
+
+Tick each one and note anything odd. "Looks bad" is useful; "the arm went
+through the floor on stairs" is gold.
+
+- [ ] **1. Sword kill on flat ground** (a zombie or a mannequin). It crumples
+      or goes over, with no stiff 90-degree tip.
+- [ ] **2. Killed on stairs.** It slides or tumbles down them and doesn't sink
+      into them.
+- [ ] **3. Killed at a ledge.** It goes over the edge, or hangs off it.
+- [ ] **4. Creeper point-blank, or `/rdmg ragdoll explosion left_leg 0.5`.**
+      It's thrown and tumbles, the limbs move from the physics, and it lands in
+      a heap.
+- [ ] **5. Bleed-out, or `/rdmg ragdoll fade`.** It sags over, softer than a
+      blow.
+- [ ] **6. Bow headshot, or `/rdmg ragdoll projectile head 1`.** The head snaps
+      back and the body drops.
+- [ ] **7. A 30-block fall.** It slams and the limbs bounce.
+- [ ] **8. Burning or lava.** It sinks in lava and floats in water. (Phase 3
+      adds writhing.)
+- [ ] **9. One leg gone.** Use a zombie that lost a leg in a fight, or a friend
+      after `/rdmg destroy <them> left_leg`. It falls without the leg and the
+      stump stays put.
+- [ ] **10. Two of you watching one death.** Both of you see a believable fall.
+      It doesn't have to be identical.
+- [ ] **11. A mob farm or a big fight.** No stutter when lots of things die.
+      Past 16 bodies they fall the Simple way.
+- [ ] **12. With shaders (Complementary) and EntityCulling.** Bodies don't
+      vanish mid-air.
+
+### Known limits of phase 0 (on purpose)
+
+- No elbows, knees or waist: limbs are straight sticks, by choice.
+- No reactions yet (phase 3). Muscles came in phase 2.
+- Bodies disappear 5 seconds after death, the same as alpha.13. Phase 4 makes
+  them stay.
+- Corpses don't bump into each other or other entities, only blocks.

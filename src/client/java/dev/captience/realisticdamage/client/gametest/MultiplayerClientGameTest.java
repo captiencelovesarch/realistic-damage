@@ -201,7 +201,7 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 				context.waitTicks(30);
 				String landing = context.computeOnClient(client -> {
 					for (Player other : client.level.players()) {
-						RemoteCorpses.Corpse corpse = RemoteCorpses.of(other);
+						RemoteCorpses.View corpse = RemoteCorpses.of(other);
 						if (corpse == null) {
 							continue;
 						}
@@ -251,15 +251,22 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 						}
 					}
 				});
-				double worstSpread = 0.0;
-				for (int i = 0; i < 24; i++) {
+				// Thrashing is limbs that keep going. A full-violence death drops
+				// where it stands (active ragdolls, phase 2: no muscle left, so it
+				// folds and lands in a heap), so how far the limbs are from a
+				// standing pose says nothing; what must hold is that once it is down
+				// it is still, and not wrung out to its joint limits.
+				double first = Double.NaN;
+				double low = Double.POSITIVE_INFINITY;
+				double high = Double.NEGATIVE_INFINITY;
+				for (int i = 0; i < 50; i++) {
 					context.waitTicks(1);
 					if (i == 6) {
 						context.takeScreenshot("rd_mp_07_quiet_topple");
 					}
 					double spread = context.computeOnClient(client -> {
 						for (Player other : client.level.players()) {
-							RemoteCorpses.Corpse corpse = RemoteCorpses.of(other);
+							RemoteCorpses.View corpse = RemoteCorpses.of(other);
 							if (corpse != null && other.getName().getString().equals("Quiet")) {
 								return corpse.limbSpread();
 							}
@@ -269,13 +276,22 @@ public class MultiplayerClientGameTest implements FabricClientGameTest {
 					if (spread < 0.0) {
 						throw new AssertionError("no simulated corpse for the quiet death at tick " + i);
 					}
-					worstSpread = Math.max(worstSpread, spread);
+					if (i == 0) {
+						first = spread;
+					}
+					if (i >= 40) {
+						low = Math.min(low, spread);
+						high = Math.max(high, spread);
+					}
 				}
 				context.takeScreenshot("rd_mp_08_quiet_lying");
-				if (worstSpread > 2.5) {
-					throw new AssertionError("a quiet death thrashed: limbs strayed " + worstSpread + " rad from rest");
+				System.out.println("[rd] quiet death spread at death " + first + ", settled " + low + ".." + high);
+				if (high - low > 0.25) {
+					throw new AssertionError("a quiet death was still thrashing two seconds on: spread " + low + ".." + high);
 				}
-				System.out.println("[rd] quiet death worst limb spread " + worstSpread);
+				if (high > 4.5) {
+					throw new AssertionError("a quiet death ended wrung out: limbs " + high + " rad from rest");
+				}
 			}
 		}
 	}

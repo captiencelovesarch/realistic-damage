@@ -117,6 +117,20 @@ public class AccessibilityScreen extends OptionsSubScreen {
 				CycleButton.onOffBuilder(config.deathCamera)
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.death_camera"),
 								(button, value) -> config.deathCamera = value),
+				CycleButton.<ClientEffectsConfig.RagdollMode>builder(
+								mode -> Component.translatable("realisticdamage.config.ragdolls."
+										+ mode.name().toLowerCase(java.util.Locale.ROOT)),
+								config.ragdolls)
+						.withValues(java.util.List.of(ClientEffectsConfig.RagdollMode.values()))
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.ragdolls"),
+								(button, value) -> config.ragdolls = value));
+		this.list.addSmall(
+				CycleButton.<Integer>builder(
+								limit -> Component.literal(Integer.toString(limit)),
+								config.ragdollLimit)
+						.withValues(java.util.List.of(4, 8, 16, 32))
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.ragdoll_limit"),
+								(button, value) -> config.ragdollLimit = value),
 				null);
 
 		// The four things that happen to you rather than to a limb (1.7). Their

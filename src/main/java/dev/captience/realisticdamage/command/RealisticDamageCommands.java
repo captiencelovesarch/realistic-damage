@@ -52,6 +52,7 @@ public final class RealisticDamageCommands {
 	private RealisticDamageCommands() {}
 
 	public static void init() {
+		RagdollTestCommand.init();
 		CommandRegistrationCallback.EVENT.register((dispatcher, buildContext, selection) -> {
 			dispatcher.register(tree("realisticdamage"));
 			dispatcher.register(tree("rdmg"));
@@ -140,7 +141,8 @@ public final class RealisticDamageCommands {
 				.then(configTree())
 				.then(literal("burn")
 						.then(argument("player", EntityArgument.player())
-								.executes(RealisticDamageCommands::burn)));
+								.executes(RealisticDamageCommands::burn)))
+				.then(RagdollTestCommand.tree());
 
 	}
 

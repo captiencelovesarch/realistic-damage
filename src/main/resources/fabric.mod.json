@@ -24,6 +24,7 @@
 		"fabric-client-gametest": [
 			"dev.captience.realisticdamage.client.gametest.BodyHudClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.MultiplayerClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.RagdollClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.BloodClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.DeathClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.DeathCameraClientGameTest",

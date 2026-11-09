@@ -36,6 +36,20 @@ public abstract class LivingEntityRendererMixin {
 		dev.captience.realisticdamage.client.RemoteCorpses.extract(entity, state, partialTicks);
 	}
 
+	@org.spongepowered.asm.mixin.Shadow
+	protected net.minecraft.client.model.EntityModel<?> model;
+
+	/** The model posed for the layers (held items, the head slot): the corpse's pose must be there too. */
+	@Inject(method = "submit",
+			at = @At(value = "INVOKE",
+					target = "Lnet/minecraft/client/model/EntityModel;setupAnim(Ljava/lang/Object;)V",
+					shift = At.Shift.AFTER))
+	private void realisticdamage$poseForLayers(LivingEntityRenderState state, PoseStack poseStack,
+			net.minecraft.client.renderer.SubmitNodeCollector collector,
+			net.minecraft.client.renderer.state.level.CameraRenderState camera, CallbackInfo ci) {
+		dev.captience.realisticdamage.client.RemoteCorpses.pose(this.model, state);
+	}
+
 	@Inject(method = "setupRotations", at = @At("TAIL"))
 	private void realisticdamage$layOut(LivingEntityRenderState state, PoseStack poseStack, float bodyRot, float scale, CallbackInfo ci) {
 		if (dev.captience.realisticdamage.client.RemoteCorpses.applyRotation(state, poseStack)) {

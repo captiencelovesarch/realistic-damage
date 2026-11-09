@@ -1311,4 +1311,16 @@ public final class Balance {
 	 * removal (and its poof) may run. Vanilla's is 20: the body vanished mid-air.
 	 */
 	public static final int CORPSE_HOLD_TICKS = 100;
+	/**
+	 * The killing blow's kick on the one region it landed on (active ragdolls),
+	 * blocks a tick at violence 0 and 1: a sword knocks the struck shoulder back,
+	 * an arrow snaps the head, a blast throws the nearest limb hardest so the
+	 * body tumbles about it. On top of the whole body's launch.
+	 */
+	public static final double CORPSE_KICK_BLOW_MIN = 0.10;
+	public static final double CORPSE_KICK_BLOW_MAX = 0.30;
+	public static final double CORPSE_KICK_SHOT_MIN = 0.15;
+	public static final double CORPSE_KICK_SHOT_MAX = 0.35;
+	public static final double CORPSE_KICK_BLAST_MIN = 0.20;
+	public static final double CORPSE_KICK_BLAST_MAX = 0.50;
 }

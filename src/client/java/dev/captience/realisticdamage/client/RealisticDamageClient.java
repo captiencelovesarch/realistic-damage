@@ -14,6 +14,7 @@ import org.lwjgl.glfw.GLFW;
 public class RealisticDamageClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
+		RagdollDebug.init();
 		ClientEffectsConfig.load();
 		BodyInspector.init();
 		InjuryMessageFilter.register();

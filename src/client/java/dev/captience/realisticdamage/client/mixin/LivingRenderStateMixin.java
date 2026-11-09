@@ -14,15 +14,15 @@ import org.spongepowered.asm.mixin.Unique;
 @Mixin(LivingEntityRenderState.class)
 public abstract class LivingRenderStateMixin implements LimbStateHolder, BloodStainHolder, dev.captience.realisticdamage.client.CorpseHolder {
 	@Unique
-	private dev.captience.realisticdamage.client.RemoteCorpses.@org.jspecify.annotations.Nullable Pose realisticdamage$corpse;
+	private dev.captience.realisticdamage.client.RemoteCorpses.@org.jspecify.annotations.Nullable Frame realisticdamage$corpse;
 
 	@Override
-	public dev.captience.realisticdamage.client.RemoteCorpses.@org.jspecify.annotations.Nullable Pose realisticdamage$corpse() {
+	public dev.captience.realisticdamage.client.RemoteCorpses.@org.jspecify.annotations.Nullable Frame realisticdamage$corpse() {
 		return this.realisticdamage$corpse;
 	}
 
 	@Override
-	public void realisticdamage$setCorpse(dev.captience.realisticdamage.client.RemoteCorpses.@org.jspecify.annotations.Nullable Pose pose) {
+	public void realisticdamage$setCorpse(dev.captience.realisticdamage.client.RemoteCorpses.@org.jspecify.annotations.Nullable Frame pose) {
 		this.realisticdamage$corpse = pose;
 	}
 

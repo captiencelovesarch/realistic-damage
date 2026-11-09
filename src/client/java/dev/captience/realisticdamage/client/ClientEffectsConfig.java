@@ -213,6 +213,25 @@ public final class ClientEffectsConfig {
 	public boolean deathCamera = true;
 
 	/**
+	 * How other people's bodies fall (active ragdolls): {@code FULL} is the
+	 * physics body (six jointed parts that land, slide and drape the way the
+	 * world lets them), {@code SIMPLE} the 1.7 plank with swinging limbs, which
+	 * also stands in for full bodies past {@link #ragdollLimit} or far away, and
+	 * {@code OFF} vanilla's tip onto the side. Absent from an older file, Gson
+	 * leaves the initialiser.
+	 */
+	public RagdollMode ragdolls = RagdollMode.FULL;
+
+	/** At most this many full bodies at once; the rest fall the simple way. */
+	public int ragdollLimit = 16;
+
+	public enum RagdollMode {
+		OFF,
+		SIMPLE,
+		FULL
+	}
+
+	/**
 	 * The blast taking your hearing (1.7): the world cut to a dull thud under a
 	 * ring for seconds after a nearby explosion, plus the dust and the shake.
 	 * Boxed and migrated: seeded from Muffling, the closest existing statement

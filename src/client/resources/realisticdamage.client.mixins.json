@@ -3,6 +3,8 @@
 	"package": "dev.captience.realisticdamage.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"EntityRendererCullMixin",
+		"DebugRendererMixin",
 		"AvatarRendererMixin",
 		"ChannelAccessor",
 		"ClientInputMixin",
@@ -17,6 +19,7 @@
 		"IllagerModelMixin",
 		"IllagerRendererMixin",
 		"HumanoidModelMixin",
+		"LivingEntityRendererAccess",
 		"LivingEntityRendererMixin",
 		"LivingRenderStateMixin",
 		"LocalPlayerInputMixin",

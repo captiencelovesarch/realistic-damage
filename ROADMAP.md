@@ -397,6 +397,30 @@ blood is drawn onto the model's own surface with an equal-depth pass, so no
 mob needed hand-built shells. Not yet: stumps, severed limbs and limps for the
 non-humanoid models.
 
+**Active ragdolls, phase 0** (Nov 9 2026, alpha.14; plan in `RAGDOLL_PLAN.md`,
+playtest list in `RAGDOLL_TESTING.md`). Other people's and mobs' bodies are six
+real physics parts instead of a plank: a small pure-Java XPBD solver (unit-tested
+against a fake world) joins head, torso, arms and legs at the model's own pivots
+with human ranges of motion, collides them with block shapes, floats them in
+water and sinks them in lava. The killing blow now lands on the region it hit
+(the corpse packet carries the part, direction and kick). Setting: Bodies =
+Ragdoll / Simple / Vanilla, at most 16 ragdolls at once. Tools: `/rdmg ragdoll`,
+`/rdragdoll debug|slowmo|status`. Phases 1-5 (elbows and knees, muscles,
+reactions, your own death, knockouts) follow the playtest.
+
+**Active ragdolls, phase 2: muscles** (Nov 9 2026, alpha.15). Phase 0 passed
+the playtest ("AWESOME"); phase 1 (elbows and knees) was dropped by choice,
+because six boxes is the Minecraft look. Every joint now holds the pose the body
+died in, and lets go in an order the body decides: a headshot, a crushed skull,
+a full-violence death or an already unconscious body drops where it stands; a
+bleed-out holds a beat, the legs give first and the head is last; a struck body
+goes over in one piece and folds as it falls; a frozen one tips stiff; a drowned
+one drifts. Broken and limp limbs swing free, concussion weakens the neck and
+adrenaline holds on longer. Straight legs now stop folding at about 80 degrees
+(no more upside-down V), and bodies settle their joints as they come to rest.
+Phase 4 gained knockdown ragdolls: a blast or heavy hit that doesn't kill
+throws you, and you get back up.
+
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here
   shipped early in 1.6.2 and is ready for mobs to reuse.)

@@ -4,7 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 /** The simulated corpse's pose on a living render state; see {@link RemoteCorpses}. */
 public interface CorpseHolder {
-	RemoteCorpses.@Nullable Pose realisticdamage$corpse();
+	RemoteCorpses.@Nullable Frame realisticdamage$corpse();
 
-	void realisticdamage$setCorpse(RemoteCorpses.@Nullable Pose pose);
+	void realisticdamage$setCorpse(RemoteCorpses.@Nullable Frame pose);
 }
