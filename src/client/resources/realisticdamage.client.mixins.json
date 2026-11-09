@@ -3,6 +3,8 @@
 	"package": "dev.captience.realisticdamage.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"LevelExtractorMixin",
+		"LivingEntityPoofMixin",
 		"EntityRendererCullMixin",
 		"DebugRendererMixin",
 		"AvatarRendererMixin",

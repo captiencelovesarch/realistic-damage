@@ -116,22 +116,129 @@ public final class RemoteCorpses {
 			}
 			corpse.tick(level);
 		}
+		if (level != lastLevel) {
+			// A new world or dimension: nothing lying in the old one is here.
+			RAGDOLLS.clear();
+			ORPHANS.clear();
+			lastLevel = level;
+		}
+		int stay = Math.max(0, ClientEffectsConfig.get().bodiesStay) * 20;
 		var rit = RAGDOLLS.int2ObjectEntrySet().fastIterator();
 		while (rit.hasNext()) {
 			RagdollCorpse ragdoll = rit.next().getValue();
 			Entity entity = level.getEntity(ragdoll.id);
-			if (!(entity instanceof LivingEntity body) || body.isRemoved() || !body.isDeadOrDying()
-					|| ragdoll.expired()) {
+			boolean still = entity instanceof LivingEntity body && entity == ragdoll.entity.get() && !body.isRemoved()
+					&& body.isDeadOrDying();
+			if (ragdoll.expired()) {
 				rit.remove();
+				continue;
+			}
+			if (!still) {
+				rit.remove();
+				// The server is done with it (or a respawn took its id). Kept here,
+				// lying where it fell, if this client wants bodies to stay.
+				if (ragdoll.lastState != null && ragdoll.age < stay) {
+					ragdoll.orphanAge = 0;
+					ORPHANS.put(nextOrphan++, ragdoll);
+					while (ORPHANS.size() > MAX_ORPHANS) {
+						ORPHANS.removeFirst();
+					}
+				}
+				continue;
+			}
+			ragdoll.tick(timeScale);
+		}
+		var oit = ORPHANS.int2ObjectEntrySet().fastIterator();
+		while (oit.hasNext()) {
+			RagdollCorpse ragdoll = oit.next().getValue();
+			if (ragdoll.expired() || ragdoll.age >= stay + SINK_TICKS) {
+				oit.remove();
 				continue;
 			}
 			ragdoll.tick(timeScale);
 		}
 	}
 
+	/** Bodies whose entity is gone, kept by this client (phase 4), oldest first. */
+	private static final it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap<RagdollCorpse> ORPHANS =
+			new it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap<>();
+	private static int nextOrphan;
+	private static @Nullable ClientLevel lastLevel;
+	/** Kept bodies at most; past this the oldest goes first. */
+	private static final int MAX_ORPHANS = 64;
+	/** How long a kept body takes to sink into the ground at the end, ticks. */
+	private static final int SINK_TICKS = 40;
+	/** How far it sinks, blocks: out of sight under the surface. */
+	private static final double SINK_DEPTH = 0.7;
+	private static long orphanDraws;
+
+	/**
+	 * After the frame's entities are gathered: the kept bodies, drawn as they
+	 * last looked and posed where their ragdoll lies, sinking at the end.
+	 */
+	public static void extractOrphans(java.util.List<net.minecraft.client.renderer.entity.state.EntityRenderState> out,
+			float partialTicks) {
+		ClientLevel level = Minecraft.getInstance().level;
+		if (ORPHANS.isEmpty() || level == null) {
+			return;
+		}
+		int stay = Math.max(0, ClientEffectsConfig.get().bodiesStay) * 20;
+		Vec3 camera = Minecraft.getInstance().gameRenderer.mainCamera().position();
+		for (RagdollCorpse ragdoll : ORPHANS.values()) {
+			LivingEntityRenderState state = ragdoll.lastState;
+			if (state == null) {
+				continue;
+			}
+			RagdollCorpse.Frame frame = ragdoll.frame(partialTicks);
+			double sinking = Mth.clamp((ragdoll.age + partialTicks - stay) / SINK_TICKS, 0.0, 1.0);
+			state.x = frame.root().x;
+			state.y = frame.root().y - SINK_DEPTH * sinking * sinking;
+			state.z = frame.root().z;
+			state.bodyRot = 180.0F;
+			state.yRot = 0.0F;
+			state.xRot = 0.0F;
+			state.deathTime = 0.0F;
+			state.hasRedOverlay = false;
+			state.nameTag = null;
+			state.scoreText = null;
+			state.leashStates = null;
+			state.displayFireAnimation = false;
+			state.shadowRadius = 0.0F;
+			state.shadowPieces.clear();
+			state.distanceToCameraSq = camera.distanceToSqr(state.x, state.y, state.z);
+			net.minecraft.core.BlockPos at = net.minecraft.core.BlockPos.containing(frame.root());
+			state.lightCoords = net.minecraft.util.LightCoordsUtil.pack(
+					level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, at),
+					level.getBrightness(net.minecraft.world.level.LightLayer.SKY, at));
+			((CorpseHolder) state).realisticdamage$setCorpse(frame);
+			out.add(state);
+			orphanDraws++;
+		}
+	}
+
+	/** For the client gametest: kept bodies, and how often one has been drawn. */
+	public static int orphanCount() {
+		return ORPHANS.size();
+	}
+
+	public static long orphanDraws() {
+		return orphanDraws;
+	}
+
+	/**
+	 * Whether this entity's body is a ragdoll this client will keep after the
+	 * server removes it: then vanilla's poof of smoke where it died is wrong
+	 * twice over (the body is not there, and it is not going).
+	 */
+	public static boolean keeping(Entity entity) {
+		RagdollCorpse r = RAGDOLLS.isEmpty() ? null : RAGDOLLS.get(entity.getId());
+		return r != null && r.entity.get() == entity && ClientEffectsConfig.get().bodiesStay * 20 > r.age;
+	}
+
 	public static void clear() {
 		CORPSES.clear();
 		RAGDOLLS.clear();
+		ORPHANS.clear();
 	}
 
 	/** How many bodies are being simulated, either way; for the gametest. */
@@ -148,7 +255,7 @@ public final class RemoteCorpses {
 	public static @Nullable View of(Entity entity) {
 		if (!RAGDOLLS.isEmpty()) {
 			RagdollCorpse ragdoll = RAGDOLLS.get(entity.getId());
-			if (ragdoll != null) {
+			if (ragdoll != null && ragdoll.entity.get() == entity) {
 				return ragdoll;
 			}
 		}
@@ -200,9 +307,11 @@ public final class RemoteCorpses {
 		return r == null ? null : r.body.muscles();
 	}
 
-	/** Every ragdoll, for the debug view. */
+	/** Every ragdoll, kept ones too, for the debug view. */
 	static Iterable<RagdollCorpse> ragdolls() {
-		return RAGDOLLS.values();
+		java.util.List<RagdollCorpse> all = new java.util.ArrayList<>(RAGDOLLS.values());
+		all.addAll(ORPHANS.values());
+		return all;
 	}
 
 	/** What callers outside the simulation may ask a body: where it is and where its wounds are. */
@@ -252,6 +361,10 @@ public final class RemoteCorpses {
 			state.pose = net.minecraft.world.entity.Pose.STANDING;
 		}
 		RagdollCorpse ragdoll = RAGDOLLS.get(entity.getId());
+		if (ragdoll != null && ragdoll.entity.get() != entity) {
+			// A respawn reused the id: this is someone alive.
+			ragdoll = null;
+		}
 		if (ragdoll != null) {
 			RagdollCorpse.Frame frame = ragdoll.frame(partialTicks);
 			state.x = frame.root().x;
@@ -266,7 +379,12 @@ public final class RemoteCorpses {
 			state.deathTime = 0.0F;
 			state.hasRedOverlay = ragdoll.red();
 			state.nameTag = null;
+			// Vanilla's shadow is worked out at the entity's own spot, which a
+			// thrown body has left; a body on the ground does not need the blob.
+			state.shadowRadius = 0.0F;
+			state.shadowPieces.clear();
 			((CorpseHolder) state).realisticdamage$setCorpse(frame);
+			ragdoll.lastState = state;
 			return;
 		}
 		Corpse corpse = CORPSES.get(entity.getId());

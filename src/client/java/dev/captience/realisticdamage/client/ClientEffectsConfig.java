@@ -225,6 +225,14 @@ public final class ClientEffectsConfig {
 	/** At most this many full bodies at once; the rest fall the simple way. */
 	public int ragdollLimit = 16;
 
+	/**
+	 * How long a ragdoll stays after death, seconds (active ragdolls phase 4).
+	 * The server removes a body after five; past that this client keeps it,
+	 * still lying where it fell, then lets it sink into the ground. 5 is
+	 * vanilla's timing.
+	 */
+	public int bodiesStay = 30;
+
 	public enum RagdollMode {
 		OFF,
 		SIMPLE,

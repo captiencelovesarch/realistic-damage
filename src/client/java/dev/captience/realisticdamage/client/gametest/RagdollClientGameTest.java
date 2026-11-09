@@ -228,6 +228,74 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 
 			muscles(context, singleplayer, px, py, pz);
 			reflexes(context, singleplayer, px, py, pz);
+			bodiesStay(context, singleplayer, px, py, pz);
+		}
+	}
+
+	/**
+	 * Phase 4: the server removes a dead body after five seconds; this client
+	 * keeps it, lying where it fell and drawn as it looked, for as long as
+	 * Bodies Stay says, then lets it sink away.
+	 */
+	private static void bodiesStay(ClientGameTestContext context, TestSingleplayerContext singleplayer,
+			double px, double py, double pz) {
+		context.runOnClient(client -> ClientEffectsConfig.get().bodiesStay = 30);
+		double bx = Math.floor(px) + 0.5;
+		double by = Math.floor(py);
+		double bz = Math.floor(pz) - 8.5;
+		int[] id = new int[1];
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			LivingEntity body = EntityTypes.ZOMBIE.create(level, EntitySpawnReason.COMMAND);
+			body.snapTo(bx, by, bz, 0.0F, 0.0F);
+			((Mob) body).setNoAi(true);
+			body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD,
+					new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_HELMET));
+			level.addFreshEntity(body);
+			RDAttachments.get(body).reset();
+			RDAttachments.pushSnapshot(body);
+			MobAnatomy.track(body);
+			id[0] = body.getId();
+		});
+		context.runOnClient(client -> {
+			client.player.setPos(bx, py + 1.0, bz + 4.0);
+			client.player.setYRot(180.0F);
+			client.player.setXRot(35.0F);
+		});
+		context.waitTicks(20);
+		int orphansBefore = context.computeOnClient(client -> RemoteCorpses.orphanCount());
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			LivingEntity body = (LivingEntity) level.getEntity(id[0]);
+			Corpses.script(body, new Corpses.Script(DeathKind.BLOW, BodyPart.TORSO, new Vec3(1.0, 0.0, 0.0), 0.2, 0.4));
+			body.invulnerableTime = 0;
+			body.kill(level);
+		});
+		context.waitTicks(125);
+		boolean entityGone = context.computeOnClient(client -> client.level.getEntity(id[0]) == null);
+		if (!entityGone) {
+			throw new AssertionError("the server never removed the dead zombie; the test proves nothing");
+		}
+		int orphans = context.computeOnClient(client -> RemoteCorpses.orphanCount());
+		long draws = context.computeOnClient(client -> RemoteCorpses.orphanDraws());
+		context.waitTicks(5);
+		long drawsLater = context.computeOnClient(client -> RemoteCorpses.orphanDraws());
+		context.takeScreenshot("rd_ragdoll_30_kept_body");
+		System.out.println("[rd] kept bodies " + orphansBefore + " -> " + orphans + ", draws " + draws + " -> " + drawsLater);
+		if (orphans <= orphansBefore) {
+			throw new AssertionError("the body went with the entity: kept bodies " + orphansBefore + " -> " + orphans);
+		}
+		if (drawsLater <= draws) {
+			throw new AssertionError("a kept body is not being drawn");
+		}
+		// A shorter stay: the kept bodies sink and are gone.
+		context.runOnClient(client -> ClientEffectsConfig.get().bodiesStay = 5);
+		context.waitTicks(45);
+		context.takeScreenshot("rd_ragdoll_31_bodies_sunk");
+		int after = context.computeOnClient(client -> RemoteCorpses.orphanCount());
+		context.runOnClient(client -> ClientEffectsConfig.get().bodiesStay = 30);
+		if (after != 0) {
+			throw new AssertionError(after + " kept bodies outlived a five-second stay");
 		}
 	}
 

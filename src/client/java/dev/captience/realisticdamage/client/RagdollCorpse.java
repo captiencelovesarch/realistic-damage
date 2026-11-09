@@ -57,8 +57,6 @@ final class RagdollCorpse implements RemoteCorpses.View {
 	private static final double MAX_INHERITED_SPEED = 9.0;
 	/** How much of the walk cycle's limb swing a body keeps; vanilla's legs swing far too fast. */
 	private static final double LIMB_SWING_SHARE = 0.35;
-	/** How long a body is simulated at most, ticks; after that it is left where it is. */
-	private static final int MAX_AGE = 1200;
 	/** How long a body keeps vanilla's red death tint, ticks. */
 	private static final int RED_TICKS = 8;
 
@@ -71,13 +69,24 @@ final class RagdollCorpse implements RemoteCorpses.View {
 
 	final int id;
 	final HumanoidRagdoll body;
+	/** The entity this body was, to notice it gone or replaced (a respawn reuses the id). */
+	final java.lang.ref.WeakReference<LivingEntity> entity;
+	/**
+	 * How it was last drawn (phase 4: bodies that stay). Minecraft makes a
+	 * fresh state every frame, so holding the last one is safe; once the
+	 * entity is gone, this is what the body keeps looking like.
+	 */
+	net.minecraft.client.renderer.entity.state.@Nullable LivingEntityRenderState lastState;
+	/** Ticks since the entity went away, or -1 while it is still there. */
+	int orphanAge = -1;
 	/** The renderer's model scale (vanilla's {@code scale(state, poseStack)}). */
 	private final float modelScale;
 	private final McPhysicsWorld world;
 	int age;
 
-	private RagdollCorpse(int id, HumanoidRagdoll body, float modelScale, ClientLevel level) {
-		this.id = id;
+	private RagdollCorpse(LivingEntity entity, HumanoidRagdoll body, float modelScale, ClientLevel level) {
+		this.id = entity.getId();
+		this.entity = new java.lang.ref.WeakReference<>(entity);
 		this.body = body;
 		this.modelScale = modelScale;
 		this.world = new McPhysicsWorld(level);
@@ -140,7 +149,7 @@ final class RagdollCorpse implements RemoteCorpses.View {
 					entity.getName().getString(), payload.kind(), payload.violence(), payload.vx() * 20, payload.vy() * 20,
 					payload.vz() * 20, seen.x, seen.y, seen.z, payload.hitPart(), payload.kick() * 20, yaw, stride);
 		}
-		return new RagdollCorpse(entity.getId(), ragdoll, modelScale, level);
+		return new RagdollCorpse(entity, ragdoll, modelScale, level);
 	}
 
 	/** A part's pivot and the bounds of its own cubes (not its overlay children). */
@@ -298,7 +307,10 @@ final class RagdollCorpse implements RemoteCorpses.View {
 	/** Once per client tick. */
 	void tick(double timeScale) {
 		age++;
-		if (age <= MAX_AGE && !body.broken()) {
+		if (orphanAge >= 0) {
+			orphanAge++;
+		}
+		if (!body.broken()) {
 			body.tick(world, DT * timeScale);
 		}
 		if (TRACE && (age <= 40 || age % 5 == 0) && age <= 80) {
@@ -312,7 +324,7 @@ final class RagdollCorpse implements RemoteCorpses.View {
 	private static final boolean TRACE = System.getenv("RD_RAGDOLL_TRACE") != null;
 
 	boolean expired() {
-		return age > MAX_AGE || body.broken();
+		return body.broken();
 	}
 
 	// --- RemoteCorpses.View ---------------------------------------------------------

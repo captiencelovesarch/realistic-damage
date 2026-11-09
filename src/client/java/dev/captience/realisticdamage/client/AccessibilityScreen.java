@@ -131,7 +131,12 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						.withValues(java.util.List.of(4, 8, 16, 32))
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.ragdoll_limit"),
 								(button, value) -> config.ragdollLimit = value),
-				null);
+				CycleButton.<Integer>builder(
+								seconds -> Component.translatable("realisticdamage.config.bodies_stay.seconds", seconds),
+								config.bodiesStay)
+						.withValues(java.util.List.of(5, 30, 120, 300))
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.bodies_stay"),
+								(button, value) -> config.bodiesStay = value));
 
 		// The four things that happen to you rather than to a limb (1.7). Their
 		// own section: none of them is a vision effect, a sound or an aim effect
