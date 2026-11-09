@@ -15,8 +15,10 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  *
  * @param entityId the body
  * @param vx       the shove, blocks a second, world
+ * @param onFeet   how long it has on its feet, weakening, seconds; 0 for a
+ *                 body that does not weaken and is let go once it stands still
  */
-public record StandTestPayload(int entityId, float vx, float vz) implements CustomPacketPayload {
+public record StandTestPayload(int entityId, float vx, float vz, float onFeet) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<StandTestPayload> TYPE =
 			new CustomPacketPayload.Type<>(RealisticDamage.id("stand_test"));
 
@@ -24,6 +26,7 @@ public record StandTestPayload(int entityId, float vx, float vz) implements Cust
 			ByteBufCodecs.VAR_INT, StandTestPayload::entityId,
 			ByteBufCodecs.FLOAT, StandTestPayload::vx,
 			ByteBufCodecs.FLOAT, StandTestPayload::vz,
+			ByteBufCodecs.FLOAT, StandTestPayload::onFeet,
 			StandTestPayload::new);
 
 	@Override

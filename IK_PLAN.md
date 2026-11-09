@@ -1,8 +1,10 @@
 # Stumbling deaths (IK): plan
 
 Status:
-- **Phase 0 built** (alpha.22): the stepper, tested with
-  `/rdmg ragdoll shove`. Awaiting your playtest
+- **Phase 0 built** (alpha.22), **loosened after your first playtest**
+  (alpha.23: "incredibly stiff", and the body held upright in a pit): the
+  test body now weakens, stumbles and goes over by itself, and is let go the
+  moment it has nothing to stand on. Awaiting your second look
   ([RAGDOLL_TESTING.md](RAGDOLL_TESTING.md), top section).
 - Phases 1 to 4 not started.
 
@@ -137,7 +139,7 @@ The arrow example, both ways:
 | Headshot, crush, overkill | Drops, with a 0.15 s hang first (the film beat) | Drops on the spot |
 | Path | Planned: back along the shot, drifting or spinning | Wherever momentum goes |
 | Ledges | Teeters at the edge, then goes over | Steps off it (a misstep) |
-| Block edges, stairs | Steps up and down cleanly | Can trip on an edge it didn't lift for; steps down stairs or tumbles |
+| Block edges, stairs | Steps up and down cleanly (open: phase 0 could only make edges falls, see "What the first playtest taught") | Can trip on an edge it didn't lift for; steps down stairs or tumbles |
 | The end | A finisher, picked from the situation (below) | Whatever physics does |
 | Head | Looks toward the shot for a beat | Held by the neck's strength, drooping; looks at the ground as it falls |
 
@@ -219,9 +221,11 @@ top), a commit, and alpha.N installed in both Prism instances.
 ### Phase 0: the stepper (what both presets stand on)
 
 - Balance, Reach and Stepper, and the foot lock.
-- A test body that only stands, with the hold at full strength. You shove it
-  with `/rdmg ragdoll shove [speed] [away|toward|left|right]`, and it steps to catch itself. Once it
-  has stood still for three seconds it drops.
+- A test body that only stands. You shove it with
+  `/rdmg ragdoll shove [speed] [away|toward|left|right] [seconds]`, and it
+  steps to catch itself while it weakens: `seconds` is how long it has on its
+  feet at most (1.6 if left out). `0` is the old test body, at full strength
+  until it stands still.
 - **The gate (you judge it):**
   - the feet don't slide;
   - the steps land on the ground;
@@ -255,8 +259,7 @@ top), a commit, and alpha.N installed in both Prism instances.
 - **Stairs and steps:**
   - Ground more than 0.2 above the standing foot is a wall to a stumble: it
     stops short of a riser.
-  - Stepping down, the foot it stands on slides off the edge and the body
-    drops onto the lower step.
+  - Stepping down is a fall (alpha.23): see below.
 - **Small sways are not steps.** A slow body allows its capture point 7 cm
   outside its feet before stepping.
 - **Measured** in a fake world, 1 to 6 blocks a second, four directions:
@@ -266,6 +269,45 @@ top), a commit, and alpha.N installed in both Prism instances.
   - it always ends standing.
 
   In the real client: 6 steps at 3 blocks a second, 6 mm slide.
+
+**What the first playtest taught (alpha.23):**
+- **A full-strength hold reads as a statue.** You called it "incredibly
+  stiff", and a body shoved into a pit stayed upright with a leg stuck out
+  sideways. The hold was doing the work the legs should do.
+- **Balance goes first, strength after.** The torso's upright hold is now a
+  channel of its own (`Stepper.balance`). It starts at 35% and is all but
+  gone 40% of the way through the time on its feet; the legs' strength fades
+  after that. With little balance the body has to step to stay up, each step
+  catches less, and it goes over by itself, the way it was shoved. That one
+  number decides between "catches itself" and "stumbles and falls".
+- **Time on its feet scales the stumble.** 0.8 s: one to three steps, down
+  in about 0.6 s. 1.6 s (the default): one to three steps, over in 0.4 to
+  1.05 s. 3 s: a 2 blocks/s shove backs up seven steps over 2.25 s.
+- **Lost footing ends it at once.** The stepper lets go when:
+  - it leans past 55° (over);
+  - its hips are low (down);
+  - it is in the air;
+  - a step's landing spot is a hole, or more than 0.2 below the foot it
+    stands on (a pit, a ledge, stairs or a slab down): let go within a
+    quarter of a second, and the ragdoll falls in;
+  - it has stopped moving while leaning more than 35° (lying against stairs
+    or a wall).
+
+  So block edges are trips and falls for now, in both presets. Arcade's
+  "steps up and down cleanly" needs knees, or a hop: decide in phase 2.
+- **A body let go keeps the pose it was caught in.** Its joints rest in the
+  pose it was released in, so one that fell forward propped itself on its
+  hands and toes like a table for three seconds. Once let go, the rest pose
+  now eases back to the one it died in (0.8 s).
+- **Measured**, weakening over 1.6 s, 1 to 6 blocks a second:
+  - shoved back or forward it always goes over the way it was shoved, 0.9 to
+    3.2 blocks from where it stood;
+  - soft sideways shoves (1 to 3) are still caught, and it crumples where it
+    stands at 1.6 s;
+  - worst planted-foot slide 1 cm; worst sink into the floor 3.3 cm.
+
+  In the real client: 3 steps at 3 blocks a second, over after 0.45 s, down
+  1.6 blocks along the shove.
 
 ### Phase 1: Grounded
 

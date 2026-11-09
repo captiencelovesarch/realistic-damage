@@ -13,11 +13,12 @@ import net.minecraft.world.phys.AABB;
 
 /**
  * Stumbling deaths, IK phase 0, in a real client: {@code /rdmg ragdoll shove}
- * places a mannequin, holds its ragdoll on its feet and shoves it away from
- * the player. It has to catch itself in a few steps without its planted feet
- * sliding, stand, and drop once it has stood still for three seconds. The
- * screenshots, taken from the side every few ticks through the steps, are for
- * a person to judge the look.
+ * places a mannequin, puts its ragdoll on its feet and shoves it away from
+ * the player. It has to stumble after its balance, its planted feet not
+ * sliding, and go over by itself the way it was shoved, well away from where
+ * it stood, before its time on its feet is up. The screenshots, taken from
+ * the side every other tick through the stumble, are for a person to judge
+ * the look.
  */
 public class StandClientGameTest implements FabricClientGameTest {
 	@Override
@@ -61,57 +62,68 @@ public class StandClientGameTest implements FabricClientGameTest {
 			});
 			// Watch from the side: off to -X, level with the body, looking +X.
 			context.runOnClient(client -> {
-				client.player.setPos(px - 2.6, py, pz + 3.4);
+				client.player.setPos(px - 3.4, py, pz + 4.2);
 				client.player.setYRot(-90.0F);
 				client.player.setXRot(8.0F);
 			});
 			context.waitTicks(16);
 			context.takeScreenshot("rd_stand_00_before");
-			// The death, then the steps: a frame every two ticks.
-			int shotTick = 0;
 			for (int i = 0; i < 40 && context.computeOnClient(client -> RemoteCorpses.standStepper(id)) == null; i++) {
 				context.waitTick();
 			}
 			if (context.computeOnClient(client -> RemoteCorpses.standStepper(id)) == null) {
 				throw new AssertionError("the shoved mannequin never became a standing ragdoll");
 			}
-			for (int frame = 0; frame < 10; frame++) {
-				context.takeScreenshot(String.format("rd_stand_%02d_step", frame + 1));
-				context.waitTick();
-				shotTick++;
+			org.joml.Vector3d from = context.computeOnClient(client -> RemoteCorpses.torsoOf(id));
+			// The stumble: a frame every other tick for a second and a quarter.
+			int lostAt = -1;
+			for (int frame = 0; frame < 13; frame++) {
+				context.takeScreenshot(String.format("rd_stand_%02d_stumble", frame + 1));
+				for (int i = 0; i < 2; i++) {
+					context.waitTick();
+					if (lostAt < 0 && context.computeOnClient(client -> RemoteCorpses.standLetGo(id))) {
+						lostAt = frame * 2 + i + 1;
+					}
+				}
 			}
-			context.waitTicks(30);
+			// On its feet for 1.6 seconds at the very most; shoved like this it is over well before.
+			for (int i = 26; i < 60 && lostAt < 0; i++) {
+				context.waitTick();
+				if (context.computeOnClient(client -> RemoteCorpses.standLetGo(id))) {
+					lostAt = i + 1;
+				}
+			}
 			Stepper stepper = context.computeOnClient(client -> RemoteCorpses.standStepper(id));
 			int steps = stepper.steps();
 			double drift = stepper.worstDrift();
-			double lean = context.computeOnClient(client -> RemoteCorpses.leanOf(id));
-			boolean standing = stepper.standing();
+			String why = stepper.lost();
 			System.out.printf(java.util.Locale.ROOT,
-					"RD stand test: %d steps, worst planted-foot slide %.3f, lean %.1f, standing %s%n",
-					steps, drift, lean, standing);
-			context.takeScreenshot("rd_stand_11_caught");
+					"RD stand test: %d steps, worst planted-foot slide %.3f, off its feet after %d ticks (%s)%n",
+					steps, drift, lostAt, why);
+			if (lostAt < 0) {
+				throw new AssertionError("held on its feet and never let go");
+			}
 			if (steps < 1) {
 				throw new AssertionError("shoved at 3 blocks a second and took no step");
 			}
 			if (drift > 0.02) {
 				throw new AssertionError("a planted foot slid " + drift + " blocks");
 			}
-			if (lean > 15.0) {
-				throw new AssertionError("not back on its feet: lean " + lean);
-			}
-			// Let go after three seconds standing still, then down.
-			for (int i = 0; i < 160 && !context.computeOnClient(client -> RemoteCorpses.standLetGo(id)); i++) {
-				context.waitTick();
-			}
-			if (!context.computeOnClient(client -> RemoteCorpses.standLetGo(id))) {
-				throw new AssertionError("held on its feet and never let go");
+			if (lostAt > 30) {
+				throw new AssertionError("shoved at 3 blocks a second and still on its feet after " + lostAt + " ticks");
 			}
 			context.waitTicks(40);
 			double down = context.computeOnClient(client -> RemoteCorpses.leanOf(id));
-			System.out.printf(java.util.Locale.ROOT, "RD stand test: let go, lean %.1f%n", down);
-			context.takeScreenshot("rd_stand_12_dropped");
+			org.joml.Vector3d to = context.computeOnClient(client -> RemoteCorpses.torsoOf(id));
+			double went = to.z - from.z;
+			System.out.printf(java.util.Locale.ROOT, "RD stand test: down, lean %.1f, %.2f blocks along the shove%n",
+					down, went);
+			context.takeScreenshot("rd_stand_14_down");
 			if (down < 60.0) {
-				throw new AssertionError("let go and still up: lean " + down);
+				throw new AssertionError("off its feet and still up: lean " + down);
+			}
+			if (went < 0.8) {
+				throw new AssertionError("it was to stumble away with the shove, and went " + went + " blocks");
 			}
 		} finally {
 			context.runOnClient(client -> ClientEffectsConfig.load());

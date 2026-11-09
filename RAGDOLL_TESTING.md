@@ -1,6 +1,47 @@
 # Ragdolls: your in-game checklist
 
+## The stepper, loosened (alpha.23)
+
+After your screenshot ("incredibly stiff", upright in a pit with a leg stuck
+out). The test body no longer stands like a statue: it **weakens while it
+stumbles**, takes a few steps, and goes over by itself. Still not in normal
+play; same command, one new argument:
+
+`/rdmg ragdoll shove [speed] [away|toward|left|right] [seconds]`
+
+`seconds` is how long it has on its feet at the very most (1.6 if you leave
+it out, up to 8). `0` is the old alpha.22 body: full strength until it stands
+still, then it drops.
+
+- [ ] **It stumbles, then falls:** `shove 3 away`. It backs up two or three
+      steps, arms out, leaning further each step, and goes over on its back
+      in under a second.
+- [ ] **It falls the way it was shoved:** `away` on its back, `toward` on its
+      face, both well away from where it stood.
+- [ ] **Loose, not stiff:** arms swing out, the head lags, the torso leans.
+      Nothing looks held on a pole.
+- [ ] **The pit from your screenshot:** `shove 5 away` with a 1x1 hole behind
+      it. It drops in (or sprawls across it) as a limp body. Never upright,
+      never with a leg held out.
+- [ ] **A ledge and stairs down:** it goes off the edge and falls, limp.
+- [ ] **Stairs up and a wall:** it falls against them and slumps. It doesn't
+      stay propped, leaning, for long.
+- [ ] **Once it's down it lies flat:** not propped on its hands and toes, no
+      arched back.
+- [ ] **Longer and shorter:** `shove 2 away 3` (a long stagger, about seven
+      steps), `shove 3 away 0.8` (a step and down). Which length feels like
+      "shot by an arrow"? That number becomes Grounded's default.
+- [ ] **A soft shove:** `shove 1 left`. It catches itself, sways, and
+      crumples at 1.6 s. (Known: which way it crumples is arbitrary.)
+- [ ] **No shove:** `shove 0`. It stands, sags, and falls on its face at 1.6 s.
+
+Tell me what still looks **stiff or fake**, and where: legs, torso, arms,
+head, or the fall itself. And which `seconds` felt right.
+
 ## Stumbling deaths, IK phase 0: the stepper (alpha.22)
+
+(Superseded by the section above: the full-strength body it describes is now
+`seconds` = `0`.)
 
 Nothing changes in normal play yet. This phase is the foundation both presets
 stand on: a body held on its feet that **steps to catch itself**. You test it

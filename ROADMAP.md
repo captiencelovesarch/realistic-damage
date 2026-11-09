@@ -444,6 +444,13 @@ capture point, puts its feet down, keeps them planted, and squares up at the
 end. Not used by deaths yet; tested with `/rdmg ragdoll shove`. Grounded and
 Arcade stumbles follow ([IK_PLAN.md](IK_PLAN.md)).
 
+**Stepper, loosened** (Nov 9 2026, alpha.23; after the first playtest: "it
+seems incredibly stiff"). The test body weakens while it stumbles: its
+balance goes first, so it takes a few steps and goes over by itself, the way
+it was shoved. It is let go at once when a step finds a hole or an edge, or
+when it ends up lying against something. `/rdmg ragdoll shove` takes a third
+argument, the seconds it has on its feet.
+
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here
   shipped early in 1.6.2 and is ready for mobs to reuse.)

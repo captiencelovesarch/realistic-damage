@@ -147,7 +147,7 @@ final class RagdollCorpse extends SimulatedCorpse {
 		if (stand != null && !live) {
 			// The stepper's test body: held on its feet and shoved, not dropped.
 			ragdoll.setMuscles(Muscles.holding(2.5));
-			ragdoll.setController(new Stand());
+			ragdoll.setController(new Stand(stand.onFeet()));
 			ragdoll.push(stand.vx(), 0.0, stand.vz());
 			return new RagdollCorpse(entity, ragdoll, modelScale, level);
 		}
@@ -190,6 +190,12 @@ final class RagdollCorpse extends SimulatedCorpse {
 	public static double leanOf(int entityId) {
 		SimulatedCorpse corpse = RemoteCorpses.simulated(entityId);
 		return corpse instanceof RagdollCorpse r ? r.body.lean() : -1.0;
+	}
+
+	/** For the client gametest: where the torso of this entity's ragdoll is, world, or null for none. */
+	public static org.joml.@Nullable Vector3d torsoOf(int entityId) {
+		SimulatedCorpse corpse = RemoteCorpses.simulated(entityId);
+		return corpse instanceof RagdollCorpse r ? new org.joml.Vector3d(r.body.body(HumanoidRagdoll.TORSO).x) : null;
 	}
 
 	/** For the client gametest: whether this entity's stand test has let go. */

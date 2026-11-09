@@ -82,6 +82,20 @@ public final class Muscles {
 		return m;
 	}
 
+	/**
+	 * These muscles giving way from {@code atSeconds} on, from the ground up: the
+	 * legs go at once, the arms a moment after, the head last. A body let go of
+	 * this way sinks and folds; one whose muscles all go together goes over like
+	 * a plank.
+	 */
+	public Muscles crumpling(double atSeconds) {
+		Muscles m = lettingGo(atSeconds, 0.3);
+		m.set(LEGS, Math.min(start[LEGS], 2.0), atSeconds, 0.2);
+		m.set(ARMS, Math.min(start[ARMS], 0.7), atSeconds + 0.2, 0.5);
+		m.set(NECK, Math.min(start[NECK], 1.2), atSeconds + 0.4, 0.6);
+		return m;
+	}
+
 	/** Tone of a part's joint, {@code seconds} after death. */
 	public double tone(int part, double seconds) {
 		int g = group(part);

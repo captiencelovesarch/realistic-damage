@@ -36,11 +36,12 @@ import net.minecraft.world.phys.Vec3;
  * death, struck on that part from where you stand. For tuning ragdolls without
  * dying for every look at one.
  *
- * <p>{@code /rdmg ragdoll shove [speed] [away|toward|left|right]}: the same
- * body becomes the stepper's test (stumbling deaths, IK phase 0): held on its
- * feet, shoved at that many blocks a second (3 if not given) that way as you
- * see it, stepping to catch itself, and dropped once it has stood still for
- * three seconds.
+ * <p>{@code /rdmg ragdoll shove [speed] [away|toward|left|right] [seconds]}:
+ * the same body becomes the stepper's test (stumbling deaths, IK phase 0):
+ * on its feet, shoved at that many blocks a second (3 if not given) that way
+ * as you see it, and stumbling after its balance for that many seconds at
+ * most (1.6 if not given) before it goes down. With 0 seconds it does not
+ * weaken: it catches itself and is dropped once it has stood still.
  *
  * <p>A mannequin that has only just been placed is killed a second later:
  * the death has to reach clients that already know the body is there.
@@ -49,11 +50,13 @@ public final class RagdollTestCommand {
 	private RagdollTestCommand() {}
 
 	private static final double REACH = 24.0;
+	/** How long the stepper's test body has on its feet when the command does not say. */
+	private static final float ON_FEET = (float) dev.captience.realisticdamage.ragdoll.Stand.ON_FEET;
 	/** Ticks between placing a mannequin and killing it. */
 	private static final int PLACE_DELAY = 20;
 
 	private record Pending(ServerLevel level, LivingEntity body, Corpses.Script script, int dueTick,
-			@org.jspecify.annotations.Nullable Vec3 shove) {}
+			@org.jspecify.annotations.Nullable Vec3 shove, float onFeet) {}
 
 	private static final List<Pending> PENDING = new ArrayList<>();
 
@@ -69,7 +72,7 @@ public final class RagdollTestCommand {
 				}
 				if (p.body().isAlive()) {
 					if (p.shove() != null) {
-						announceStand(p.body(), p.shove());
+						announceStand(p.body(), p.shove(), p.onFeet());
 					}
 					kill(p.level(), p.body(), p.script());
 				}
@@ -81,14 +84,18 @@ public final class RagdollTestCommand {
 	static LiteralArgumentBuilder<CommandSourceStack> tree() {
 		return literal("ragdoll")
 				.then(literal("shove")
-						.executes(ctx -> shove(ctx, 3.0F, "away"))
+						.executes(ctx -> shove(ctx, 3.0F, "away", ON_FEET))
 						.then(argument("speed", FloatArgumentType.floatArg(0.0F, 8.0F))
-								.executes(ctx -> shove(ctx, FloatArgumentType.getFloat(ctx, "speed"), "away"))
+								.executes(ctx -> shove(ctx, FloatArgumentType.getFloat(ctx, "speed"), "away", ON_FEET))
 								.then(argument("direction", StringArgumentType.word())
 										.suggests((ctx, b) -> SharedSuggestionProvider.suggest(
 												List.of("away", "toward", "left", "right"), b))
 										.executes(ctx -> shove(ctx, FloatArgumentType.getFloat(ctx, "speed"),
-												StringArgumentType.getString(ctx, "direction"))))))
+												StringArgumentType.getString(ctx, "direction"), ON_FEET))
+										.then(argument("seconds", FloatArgumentType.floatArg(0.0F, 8.0F))
+												.executes(ctx -> shove(ctx, FloatArgumentType.getFloat(ctx, "speed"),
+														StringArgumentType.getString(ctx, "direction"),
+														FloatArgumentType.getFloat(ctx, "seconds")))))))
 				.then(argument("kind", StringArgumentType.word())
 						.suggests((ctx, b) -> SharedSuggestionProvider.suggest(
 								Arrays.stream(DeathKind.values()).map(k -> k.name().toLowerCase(Locale.ROOT)), b))
@@ -141,7 +148,7 @@ public final class RagdollTestCommand {
 			ctx.getSource().sendFailure(Component.literal("Could not place a mannequin"));
 			return 0;
 		}
-		PENDING.add(new Pending(level, mannequin, script, level.getServer().getTickCount() + PLACE_DELAY, null));
+		PENDING.add(new Pending(level, mannequin, script, level.getServer().getTickCount() + PLACE_DELAY, null, 0.0F));
 		ctx.getSource().sendSuccess(() -> Component.literal("Placed a mannequin; it dies in a second ("
 				+ kind.name().toLowerCase(Locale.ROOT) + ")"), false);
 		return 1;
@@ -165,7 +172,7 @@ public final class RagdollTestCommand {
 		return mannequin;
 	}
 
-	private static int shove(CommandContext<CommandSourceStack> ctx, float speed, String direction)
+	private static int shove(CommandContext<CommandSourceStack> ctx, float speed, String direction, float onFeet)
 			throws CommandSyntaxException {
 		ServerPlayer player = ctx.getSource().getPlayerOrException();
 		ServerLevel level = player.level();
@@ -192,10 +199,10 @@ public final class RagdollTestCommand {
 				new AABB(eye, end).inflate(1.0), e -> e instanceof LivingEntity l && l.isAlive() && e != player,
 				REACH * REACH);
 		if (hit != null && hit.getEntity() instanceof LivingEntity target) {
-			announceStand(target, shove);
+			announceStand(target, shove, onFeet);
 			kill(level, target, script);
 			ctx.getSource().sendSuccess(() -> Component.literal("Shoved " + target.getName().getString()
-					+ String.format(Locale.ROOT, " at %.1f blocks a second", speed)), false);
+					+ String.format(Locale.ROOT, " at %.1f blocks a second, ", speed) + onFeet(onFeet)), false);
 			return 1;
 		}
 		Mannequin mannequin = place(player, level);
@@ -203,15 +210,23 @@ public final class RagdollTestCommand {
 			ctx.getSource().sendFailure(Component.literal("Could not place a mannequin"));
 			return 0;
 		}
-		PENDING.add(new Pending(level, mannequin, script, level.getServer().getTickCount() + PLACE_DELAY, shove));
+		PENDING.add(new Pending(level, mannequin, script, level.getServer().getTickCount() + PLACE_DELAY, shove,
+				onFeet));
 		ctx.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-				"Placed a mannequin; in a second it is shoved %s at %.1f blocks a second", direction, speed)), false);
+				"Placed a mannequin; in a second it is shoved %s at %.1f blocks a second, ", direction, speed)
+				+ onFeet(onFeet)), false);
 		return 1;
 	}
 
+	private static String onFeet(float seconds) {
+		return seconds <= 0.0F ? "at full strength until it stands still"
+				: String.format(Locale.ROOT, "%.1f seconds on its feet at most", seconds);
+	}
+
 	/** Tells everyone watching that this body's death is the stepper's test, before the death itself. */
-	private static void announceStand(LivingEntity body, Vec3 shove) {
-		var payload = new dev.captience.realisticdamage.net.StandTestPayload(body.getId(), (float) shove.x, (float) shove.z);
+	private static void announceStand(LivingEntity body, Vec3 shove, float onFeet) {
+		var payload = new dev.captience.realisticdamage.net.StandTestPayload(body.getId(), (float) shove.x,
+				(float) shove.z, onFeet);
 		for (ServerPlayer watcher : net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(body)) {
 			if (net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(watcher,
 					dev.captience.realisticdamage.net.StandTestPayload.TYPE)) {

@@ -362,6 +362,11 @@ public final class RemoteCorpses {
 		return RagdollCorpse.letGo(entityId);
 	}
 
+	/** For the client gametest: where the torso of this entity's ragdoll is, world, or null for none. */
+	public static org.joml.@Nullable Vector3d torsoOf(int entityId) {
+		return RagdollCorpse.torsoOf(entityId);
+	}
+
 	/** For the client gametest: the lean of this entity's ragdoll, degrees, or -1 for none. */
 	public static double leanOf(int entityId) {
 		return RagdollCorpse.leanOf(entityId);
