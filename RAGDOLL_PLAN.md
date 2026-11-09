@@ -5,8 +5,10 @@ Status (Nov 9 2026):
   ragdolls are AWESOME".
 - **Phase 1 dropped** by the user: the six-box body *is* the Minecraft look.
 - **Phase 2 (muscles) built** (alpha.15). The user: "works swell".
-- **Phase 3 (reflexes) built** (alpha.16, overnight Nov 9-10), awaiting the
-  user's playtest.
+- **Phase 3 (reflexes) built** (alpha.16, overnight Nov 9-10).
+- **Phase 4a (bodies that stay) and 4b (your own death) built** (alpha.17 and
+  18). 4b is a new Death View setting (Ragdoll / Classic) so the classic
+  camera and its tests stay intact.
 - Phases 3 and 4 follow. Phase 4 now also covers knockdown ragdolls (being
   thrown without dying).
 

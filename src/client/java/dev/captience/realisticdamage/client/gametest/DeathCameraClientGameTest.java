@@ -30,6 +30,9 @@ public class DeathCameraClientGameTest implements FabricClientGameTest {
 		context.runOnClient(client -> {
 			ClientEffectsConfig.load();
 			ClientEffectsConfig.get().deathCamera = true;
+			// The classic death camera: this test measures its springs (active
+			// ragdolls phase 4 added the ragdoll view; RagdollClientGameTest has it).
+			ClientEffectsConfig.get().ownRagdoll = false;
 			// Realistic, because its blackout is the one that goes fully black,
 			// and a full-violence blow makes it a cut: the held blackout is only
 			// tested if there is a blackout to hold.

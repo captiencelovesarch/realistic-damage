@@ -1,5 +1,26 @@
 # Ragdolls: your in-game checklist
 
+## Phase 4a and 4b: bodies that stay, and your own death (alpha.17 and 18)
+
+New settings: **Bodies Stay** (5 s / 30 s / 2 min / 5 min, default 30 s) and
+**Death View** (Ragdoll / Classic, default Ragdoll).
+
+- [ ] **Bodies stay.** Kill something, then wait. The body keeps lying where it
+      fell after the 5 seconds the server keeps it, then sinks into the ground
+      at the end. There's no puff of smoke where it died.
+- [ ] **Your own body stays.** Die, respawn, walk back: your body is still
+      lying where it fell (for the Bodies Stay time).
+- [ ] **Your own death, first person.** The camera is in your ragdoll's eyes and
+      turns with its head, smoothed so it isn't nauseating. Thrown off a
+      roof, you see the tumble and end up looking at the sky or the dirt.
+      **Death Intensity** lowers how much of the head's turn the view follows.
+- [ ] **Your own death, F5.** Third person looks at your ragdoll, not at the
+      spot you died.
+- [ ] **Death View = Classic** gives back the old death camera exactly.
+- [ ] **VR:** nothing changes (no view turns in VR); the classic VR death
+      camera still runs.
+- [ ] **Thud.** A body that lands hard makes a sound and kicks up floor dust.
+
 ## Phase 3: reflexes (alpha.16)
 
 A dying body still reacts while there's a mind left in it. A headshot, or

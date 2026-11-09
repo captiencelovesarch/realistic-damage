@@ -233,6 +233,14 @@ public final class ClientEffectsConfig {
 	 */
 	public int bodiesStay = 30;
 
+	/**
+	 * Death View (active ragdolls phase 4): true rides the camera on your own
+	 * ragdoll's head (see {@link RagdollView}); false is the classic death
+	 * camera, a view that collapses, rolls and thuds on its own springs. Never
+	 * the ragdoll in VR.
+	 */
+	public boolean ownRagdoll = true;
+
 	public enum RagdollMode {
 		OFF,
 		SIMPLE,

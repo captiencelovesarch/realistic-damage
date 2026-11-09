@@ -81,18 +81,27 @@ public final class RemoteCorpses {
 			return;
 		}
 		Entity entity = level.getEntity(payload.entityId());
-		if (!(entity instanceof LivingEntity body) || body == client.player) {
+		if (!(entity instanceof LivingEntity body)) {
+			return;
+		}
+		boolean own = body == client.player;
+		if (own && !(config.ownRagdoll && config.ragdolls == ClientEffectsConfig.RagdollMode.FULL
+				&& DeathCamera.enabled() && !dev.captience.realisticdamage.client.compat.Vr.active())) {
+			// Your own death: the classic death camera, or vanilla.
 			return;
 		}
 		CORPSES.remove(body.getId());
 		RAGDOLLS.remove(body.getId());
-		if (config.ragdolls == ClientEffectsConfig.RagdollMode.FULL && RAGDOLLS.size() < config.ragdollLimit
-				&& client.gameRenderer.mainCamera().position().distanceTo(body.position()) < RAGDOLL_RANGE) {
+		if (config.ragdolls == ClientEffectsConfig.RagdollMode.FULL && (own || RAGDOLLS.size() < config.ragdollLimit
+				&& client.gameRenderer.mainCamera().position().distanceTo(body.position()) < RAGDOLL_RANGE)) {
 			RagdollCorpse ragdoll = RagdollCorpse.create(body, payload, level);
 			if (ragdoll != null) {
 				RAGDOLLS.put(body.getId(), ragdoll);
 				return;
 			}
+		}
+		if (own) {
+			return;
 		}
 		CORPSES.put(body.getId(), new Corpse(body, payload));
 	}
@@ -147,6 +156,12 @@ public final class RemoteCorpses {
 				continue;
 			}
 			ragdoll.tick(timeScale);
+			if (entity == Minecraft.getInstance().player) {
+				// Your own body is not drawn in first person, so nothing would
+				// remember how it looked for the body you leave behind: ask for a
+				// render state now and then (the extraction keeps it, see extract).
+				captureOwn((LivingEntity) entity);
+			}
 		}
 		var oit = ORPHANS.int2ObjectEntrySet().fastIterator();
 		while (oit.hasNext()) {
@@ -157,6 +172,19 @@ public final class RemoteCorpses {
 			}
 			ragdoll.tick(timeScale);
 		}
+	}
+
+	/** Your own ragdoll while you are dead, or null. */
+	static @Nullable RagdollCorpse ownRagdoll(LivingEntity player) {
+		RagdollCorpse r = RAGDOLLS.isEmpty() ? null : RAGDOLLS.get(player.getId());
+		return r != null && r.entity.get() == player ? r : null;
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static void captureOwn(LivingEntity player) {
+		var renderer = (net.minecraft.client.renderer.entity.EntityRenderer) Minecraft.getInstance()
+				.getEntityRenderDispatcher().getRenderer(player);
+		renderer.createRenderState(player, 1.0F);
 	}
 
 	/** Bodies whose entity is gone, kept by this client (phase 4), oldest first. */

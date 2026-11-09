@@ -263,7 +263,10 @@ public final class DeathCamera {
 		}
 
 		double horizontal = velocity.horizontalDistance();
-		boolean moving = (!onGround && !player.isInLiquid()) || horizontal > STILL_SPEED;
+		boolean moving = (!onGround && !player.isInLiquid()) || horizontal > STILL_SPEED
+				// Riding the ragdoll: the blackout waits for it, not for the
+				// unseen vanilla body underneath.
+				|| (RagdollView.active() && RagdollView.moving());
 		stillTicks = ticks >= SETTLE_EARLIEST && !moving ? stillTicks + 1 : 0;
 		// Still, and down: a faint is still folding long after its body stopped
 		// sliding, and the blackout must not close on a view that is still falling.
@@ -417,6 +420,7 @@ public final class DeathCamera {
 		if (deltaTicks <= 0.0 || !active()) {
 			return;
 		}
+		RagdollView.frame(deltaTicks);
 		float partial = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
 		double t = ticks + partial;
 		double s = DeathMotion.settle(DeathMotion.collapse(profile, t - collapseDelay()));
@@ -469,7 +473,7 @@ public final class DeathCamera {
 	 * steps into a smooth drop.
 	 */
 	public static float eyeHeight(Entity entity, float standing) {
-		if (entity != Minecraft.getInstance().player || !active()) {
+		if (entity != Minecraft.getInstance().player || !active() || RagdollView.active()) {
 			return standing;
 		}
 		// One tick ahead so the camera's own lag does not stretch the fall.
@@ -484,6 +488,19 @@ public final class DeathCamera {
 	 */
 	public static void apply(PoseStack poseStack) {
 		if (!active()) {
+			return;
+		}
+		if (RagdollView.orbiting()) {
+			// Third person looking at your ragdoll: the body is the show, not the
+			// view's own springs.
+			return;
+		}
+		if (RagdollView.active()) {
+			// The ragdoll's head turns the camera (RagdollView); only its roll
+			// about the line of sight goes on here.
+			lastRoll = RagdollView.roll();
+			lastPitch = 0.0;
+			poseStack.mulPose(Axis.ZP.rotationDegrees((float) RagdollView.roll()));
 			return;
 		}
 		float partial = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
@@ -579,6 +596,7 @@ public final class DeathCamera {
 	}
 
 	public static void reset() {
+		RagdollView.reset();
 		tracking = false;
 		kind = DeathKind.BLOW;
 		profile = DeathMotion.profile(DeathKind.BLOW, 0.0);

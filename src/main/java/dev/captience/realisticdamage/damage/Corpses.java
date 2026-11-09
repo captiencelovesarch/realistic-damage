@@ -173,6 +173,12 @@ public final class Corpses {
 				ServerPlayNetworking.send(watcher, payload);
 			}
 		}
+		// And the one who died, for their own ragdoll (phase 4); their client
+		// decides whether to use it.
+		if (body instanceof ServerPlayer self && self.connection != null
+				&& ServerPlayNetworking.canSend(self, CorpsePayload.TYPE)) {
+			ServerPlayNetworking.send(self, payload);
+		}
 	}
 
 	private static Vec3 direction(Vec3 v) {

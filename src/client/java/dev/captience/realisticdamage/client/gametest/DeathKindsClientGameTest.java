@@ -36,6 +36,9 @@ public class DeathKindsClientGameTest implements FabricClientGameTest {
 		context.runOnClient(client -> {
 			ClientEffectsConfig.load();
 			ClientEffectsConfig.get().deathCamera = true;
+			// The classic death camera: this test measures its springs (active
+			// ragdolls phase 4 added the ragdoll view; RagdollClientGameTest has it).
+			ClientEffectsConfig.get().ownRagdoll = false;
 			ClientEffectsConfig.get().realisticDeath = true;
 		});
 		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {

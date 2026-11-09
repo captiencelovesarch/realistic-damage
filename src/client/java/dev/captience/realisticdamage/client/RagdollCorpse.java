@@ -82,7 +82,13 @@ final class RagdollCorpse implements RemoteCorpses.View {
 	/** The renderer's model scale (vanilla's {@code scale(state, poseStack)}). */
 	private final float modelScale;
 	private final McPhysicsWorld world;
+	private final ClientLevel level;
 	int age;
+	/** The torso's fall speed last tick, blocks a second, and ticks since the last thud. */
+	private double lastFall;
+	private int sinceThud = 100;
+	/** A torso stopping from at least this fast, blocks a second, lands with a sound. */
+	private static final double THUD_SPEED = 3.5;
 
 	private RagdollCorpse(LivingEntity entity, HumanoidRagdoll body, float modelScale, ClientLevel level) {
 		this.id = entity.getId();
@@ -90,6 +96,7 @@ final class RagdollCorpse implements RemoteCorpses.View {
 		this.body = body;
 		this.modelScale = modelScale;
 		this.world = new McPhysicsWorld(level);
+		this.level = level;
 	}
 
 	/** A ragdoll for this body, or null when its model is not a humanoid one. */
@@ -313,6 +320,21 @@ final class RagdollCorpse implements RemoteCorpses.View {
 		if (!body.broken()) {
 			body.tick(world, DT * timeScale);
 		}
+		// The thud: the torso stopping hard against something. Sound and floor
+		// dust, as the old plank had (RemoteCorpses.thud).
+		double fall = -body.body(HumanoidRagdoll.TORSO).v.y;
+		sinceThud++;
+		if (lastFall > THUD_SPEED && fall < lastFall * 0.35 && sinceThud > 6) {
+			Vector3d c = body.centre();
+			var hit = level.clip(new net.minecraft.world.level.ClipContext(new Vec3(c.x, c.y, c.z),
+					new Vec3(c.x, c.y - 0.8, c.z), net.minecraft.world.level.ClipContext.Block.COLLIDER,
+					net.minecraft.world.level.ClipContext.Fluid.NONE, net.minecraft.world.phys.shapes.CollisionContext.empty()));
+			if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+				RemoteCorpses.thud(level, hit, lastFall / 20.0);
+				sinceThud = 0;
+			}
+		}
+		lastFall = fall;
 		if (TRACE && (age <= 40 || age % 5 == 0) && age <= 80) {
 			System.out.printf(java.util.Locale.ROOT,
 					"[rd] ragdoll %d t%02d lean %.1f spread %.2f gap %.3f motion %.2f y %.2f asleep %s%n",
