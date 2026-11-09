@@ -46,6 +46,17 @@ public final class Body {
 	final double iiy;
 	final double iiz;
 
+	/**
+	 * Friction against the world, as a share of the sim's own: a staggering
+	 * body's feet shuffle instead of sticking (phase 3).
+	 */
+	public double friction = 1.0;
+	/**
+	 * Whether rolling resistance applies: a limb a reflex is moving on purpose
+	 * (writhing on the ground) must not be smothered by it.
+	 */
+	public boolean settles = true;
+
 	/** Points on the box that collide with the world, local, packed xyz. */
 	final double[] samples;
 

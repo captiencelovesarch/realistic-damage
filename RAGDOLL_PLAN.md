@@ -4,7 +4,9 @@ Status (Nov 9 2026):
 - **Phase 0 done** (alpha.14). Passed the gate: the user's verdict was "the
   ragdolls are AWESOME".
 - **Phase 1 dropped** by the user: the six-box body *is* the Minecraft look.
-- **Phase 2 (muscles) built** (alpha.15), awaiting the user's playtest.
+- **Phase 2 (muscles) built** (alpha.15). The user: "works swell".
+- **Phase 3 (reflexes) built** (alpha.16, overnight Nov 9-10), awaiting the
+  user's playtest.
 - Phases 3 and 4 follow. Phase 4 now also covers knockdown ragdolls (being
   thrown without dying).
 

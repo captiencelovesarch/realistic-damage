@@ -47,6 +47,8 @@ public final class Muscles {
 	 * needs no shove to go over, only a direction.
 	 */
 	public boolean stringsCut;
+	/** How much of a mind was left at death, 0..1: what reflexes (phase 3) have to work with. */
+	public double awake = 1.0;
 
 	/** Phase 0's single curve: firm at death, gone in half a second. The default for a body nobody described. */
 	public static Muscles standard() {
@@ -118,6 +120,7 @@ public final class Muscles {
 		boolean headHit = in.hitPart() == HumanoidRagdoll.HEAD
 				&& (in.kind() == DeathKind.BLOW || in.kind() == DeathKind.PROJECTILE || in.kind() == DeathKind.CRUSH);
 		m.stringsCut = awake <= 0.0 || headHit || in.kind() == DeathKind.CRUSH || v >= 0.95;
+		m.awake = m.stringsCut ? 0.0 : awake;
 
 		switch (in.kind()) {
 			case FREEZE -> {

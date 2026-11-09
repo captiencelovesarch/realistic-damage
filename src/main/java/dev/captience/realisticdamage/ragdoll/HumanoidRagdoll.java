@@ -57,8 +57,11 @@ public final class HumanoidRagdoll {
 	private static final double[][] LIMITS = {
 			/* head      */ {-1.0, 0.85, -0.6, 0.6, -1.3, 1.3},
 			/* torso     */ null,
-			/* right arm */ {-3.0, 0.9, -0.25, 2.9, -1.3, 1.3},
-			/* left arm  */ {-3.0, 0.9, -2.9, 0.25, -1.3, 1.3},
+			// Across the body (adduction) to about 50 degrees: a hand can reach the
+			// other side of the chest. The torso, not the limit, stops the arm
+			// going through it.
+			/* right arm */ {-3.0, 0.9, -0.9, 2.9, -1.3, 1.3},
+			/* left arm  */ {-3.0, 0.9, -2.9, 0.9, -1.3, 1.3},
 			// Hip flexion with a straight leg stops at about 80 degrees: the
 			// hamstrings, not the hip. A Minecraft leg has no knee, so it is always
 			// straight, and a body allowed the bent-knee 115 folds into an
@@ -104,6 +107,15 @@ public final class HumanoidRagdoll {
 	private final Quaterniond[] startQ = new Quaterniond[PARTS];
 	/** Each joint's child length, blocks, and the drive's scale: weight times length. */
 	private final double[] driveScale;
+
+	/** Each part's pivot in the model, pixels (the torso's frame at rest). */
+	private final Vector3d[] pivotPx = new Vector3d[PARTS];
+	/** The pose each joint's muscles hold when nothing else asks them to: the pose at death. */
+	private final Quaterniond[] restTarget = new Quaterniond[PARTS];
+	/** This tick's reflex tone per part (phase 3), on top of the muscles' own; reset every tick. */
+	private final double[] reflexTone = new double[PARTS];
+	/** What the body still does as it dies (phase 3), or null for none. */
+	private @org.jspecify.annotations.Nullable Behaviour behaviour;
 
 	/** The muscles: how each joint holds and lets go (phase 2); see {@link #setMuscles}. */
 	private Muscles muscles = Muscles.standard();
@@ -157,6 +169,7 @@ public final class HumanoidRagdoll {
 			double hz = Math.max(0.5, (p.maxZ() - p.minZ()) * 0.5) * unit;
 			bodies[i] = new Body(hx, hy, hz, TOTAL_MASS * MASS_SHARE[i]);
 			centre[i] = new Vector3d((p.minX() + p.maxX()) * 0.5, (p.minY() + p.maxY()) * 0.5, (p.minZ() + p.maxZ()) * 0.5);
+			pivotPx[i] = new Vector3d(p.pivotX(), p.pivotY(), p.pivotZ());
 			Quaterniond rot = partRotation(rotations, i);
 			Quaterniond q = new Quaterniond(qm).mul(rot);
 			// The cube's centre, in the model frame: pivot + R * centre.
@@ -191,6 +204,7 @@ public final class HumanoidRagdoll {
 			j.damping = 2.5;
 			// The muscles hold what the body was doing when it died.
 			j.relative(j.target);
+			restTarget[i] = new Quaterniond(j.target);
 			partList.add(i);
 			driveScale[list.size()] = bodies[i].mass * 32.0 * bodies[i].hy * 2.0;
 			list.add(j);
@@ -329,14 +343,31 @@ public final class HumanoidRagdoll {
 				b.tickQ.set(b.q);
 			}
 			carryLost();
-			if (((int) Math.round(age / dt)) % WAKE_CHECK_TICKS == 0 && sim.worldDigest(world) != sleepDigest) {
+			if (behaviour != null && behaviour.wantsWake(this, age)) {
+				wake();
+			} else if (((int) Math.round(age / dt)) % WAKE_CHECK_TICKS == 0 && sim.worldDigest(world) != sleepDigest) {
 				asleep = false;
 				stillTicks = 0;
 			} else {
 				return;
 			}
 		}
+		if (behaviour != null) {
+			for (int i = 0; i < joints.length; i++) {
+				joints[i].target.set(restTarget[jointPart[i]]);
+			}
+			java.util.Arrays.fill(reflexTone, 0.0);
+			for (Body b : bodies) {
+				b.friction = 1.0;
+			}
+			sim.uprightStiffness = 0.0;
+			behaviour.apply(this, world, age, dt);
+		}
 		applyTone();
+		for (int i = 0; i < PARTS; i++) {
+			// A limb its reflexes are moving is not to be smothered as it settles.
+			bodies[i].settles = reflexTone[i] < 0.6;
+		}
 		sim.step(dt, world);
 		carryLost();
 		// At rest when nothing is moving, or when nothing has moved: two
@@ -394,7 +425,8 @@ public final class HumanoidRagdoll {
 
 	private void applyTone() {
 		for (int i = 0; i < joints.length; i++) {
-			joints[i].stiffness = muscles.tone(jointPart[i], age) * driveScale[i];
+			int part = jointPart[i];
+			joints[i].stiffness = Math.max(muscles.tone(part, age), reflexTone[part]) * driveScale[i];
 		}
 	}
 
@@ -428,8 +460,123 @@ public final class HumanoidRagdoll {
 		return jointPart[i];
 	}
 
+	// --- For behaviours (phase 3) ----------------------------------------------
+
+	public void setBehaviour(@org.jspecify.annotations.Nullable Behaviour behaviour) {
+		this.behaviour = behaviour;
+	}
+
+	public @org.jspecify.annotations.Nullable Behaviour behaviour() {
+		return behaviour;
+	}
+
+	/**
+	 * This tick: hold the torso upright, as strongly as {@code strength} times
+	 * the whole body's weight leaning on it (a stagger; a body without knees
+	 * cannot catch its own balance).
+	 */
+	public void holdUpright(double strength) {
+		sim.upright = bodies[TORSO];
+		sim.uprightStiffness = Math.max(0.0, strength) * TOTAL_MASS * 32.0;
+	}
+
+	/** Wakes a sleeping body (a twitch). */
+	public void wake() {
+		asleep = false;
+		stillTicks = 0;
+		anchorAge = -1;
+	}
+
+	/** The joint that moves this part, or null when the part is the torso or gone. */
+	public @org.jspecify.annotations.Nullable Joint jointOf(int part) {
+		for (int i = 0; i < joints.length; i++) {
+			if (jointPart[i] == part) {
+				return joints[i];
+			}
+		}
+		return null;
+	}
+
+	/** This tick: the part's muscles pull at least this hard (multiples of its gravity torque). */
+	public void reflex(int part, double tone) {
+		reflexTone[part] = Math.max(reflexTone[part], tone);
+	}
+
+	/** This tick: the joint's target, child relative to torso. */
+	public void target(int part, Quaterniond rel) {
+		Joint j = jointOf(part);
+		if (j != null) {
+			j.target.set(rel);
+		}
+	}
+
+	/** This tick: the target as a swing (about the limb's x and z) and a twist. */
+	public void target(int part, double swingX, double swingZ, double twistAngle) {
+		Joint j = jointOf(part);
+		if (j != null) {
+			Joint.compose(swingX, swingZ, twistAngle, j.target);
+		}
+	}
+
+	/** The pose the part's muscles hold when nothing else asks: the pose at death. */
+	public Quaterniond restTarget(int part) {
+		return restTarget[part];
+	}
+
+	/**
+	 * This tick: the limb points from its pivot toward a point given in the
+	 * torso's own frame, in model pixels (y down the body, -z the front).
+	 */
+	public void aimAtModel(int part, double x, double y, double z) {
+		Vector3d d = new Vector3d(x, y, z).sub(pivotPx[part]);
+		aimLocal(part, d);
+	}
+
+	/** This tick: the limb points along a world direction. */
+	public void aimWorld(int part, Vector3d dirWorld) {
+		Vector3d d = bodies[TORSO].q.conjugate(new Quaterniond()).transform(new Vector3d(dirWorld));
+		aimLocal(part, d);
+	}
+
+	private void aimLocal(int part, Vector3d d) {
+		Joint j = jointOf(part);
+		if (j == null || d.lengthSquared() < 1.0e-12) {
+			return;
+		}
+		d.normalize();
+		// The shortest turn that takes the limb's own axis (+Y) to d.
+		j.target.rotationTo(0.0, 1.0, 0.0, d.x, d.y, d.z);
+	}
+
+	/** The far end of a limb (a hand, a foot, the top of the head), world. */
+	public Vector3d tip(int part) {
+		Body b = bodies[part];
+		double end = part == HEAD ? -b.hy : b.hy;
+		return b.q.transform(new Vector3d(0.0, end, 0.0)).add(b.x);
+	}
+
+	/** The torso's "up" (from the hips to the neck), world, unit. */
+	public Vector3d up() {
+		return bodies[TORSO].q.transform(new Vector3d(0.0, -1.0, 0.0));
+	}
+
+	/** The way the body faces, world, unit. */
+	public Vector3d facing() {
+		return bodies[TORSO].q.transform(new Vector3d(0.0, 0.0, -1.0));
+	}
+
+	/** Whether the part is still on the body and its muscles can move it at all. */
+	public boolean usable(int part) {
+		return present[part] && muscles.limb[part] > 0.0;
+	}
+
 	public boolean asleep() {
 		return asleep;
+	}
+
+	/** The seconds since death. */
+	public double seconds() {
+		return age;
 	}
 
 	public boolean broken() {

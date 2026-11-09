@@ -57,6 +57,15 @@ public final class BodySim {
 	/** Upper bound on any body's speed, blocks a second; a corpse leaving the world helps nobody. */
 	public double maxSpeed = 60.0;
 
+	/**
+	 * A body held upright for a moment (a stagger, phase 3): its local
+	 * {@link #uprightAxis} is pulled toward world up with this stiffness,
+	 * torque per radian. 0 is no hold.
+	 */
+	public @org.jspecify.annotations.Nullable Body upright;
+	public final Vector3d uprightAxis = new Vector3d(0.0, -1.0, 0.0);
+	public double uprightStiffness;
+
 	private final BoxList boxes = new BoxList();
 
 	private static final int MAX_CONTACTS = 1024;
@@ -257,6 +266,9 @@ public final class BodySim {
 			for (int i = 0; i < pairs.length; i += 2) {
 				selfCollide(bodies[pairs[i]], bodies[pairs[i + 1]]);
 			}
+			if (pass == 0) {
+				holdUpright(h);
+			}
 			for (int i = 0; i < bodies.length; i++) {
 				worldCollide(i);
 			}
@@ -284,7 +296,7 @@ public final class BodySim {
 			}
 			lastBody = bi;
 			Body b = bodies[bi];
-			if (b.v.length() < restSpeed && b.w.length() * 0.25 < restSpeed) {
+			if (b.settles && b.v.length() < restSpeed && b.w.length() * 0.25 < restSpeed) {
 				double keep = Math.max(0.0, 1.0 - restDamping * h);
 				b.v.mul(keep);
 				b.w.mul(keep);
@@ -375,6 +387,28 @@ public final class BodySim {
 		double lambda = theta / (wa + wb + alphaTilde);
 		b.applyAngular(nx * lambda, ny * lambda, nz * lambda, 1.0, t3);
 		a.applyAngular(nx * lambda, ny * lambda, nz * lambda, -1.0, t3);
+	}
+
+	/** Pulls {@link #upright}'s axis toward world up, against the world (which does not turn). */
+	private void holdUpright(double h) {
+		Body b = upright;
+		if (b == null || uprightStiffness <= 0.0) {
+			return;
+		}
+		Body.rotate(b.q.x, b.q.y, b.q.z, b.q.w, uprightAxis.x, uprightAxis.y, uprightAxis.z, t1);
+		// The turn taking the axis to up: about axis x up, by the angle between.
+		t2.set(t1).cross(0.0, 1.0, 0.0);
+		double sin = t2.length();
+		if (sin < 1.0e-9) {
+			return;
+		}
+		double angle = Math.atan2(sin, t1.y);
+		double nx = t2.x / sin;
+		double ny = t2.y / sin;
+		double nz = t2.z / sin;
+		double w = b.angularInvMass(nx, ny, nz, t3);
+		double lambda = angle / (w + 1.0 / (uprightStiffness * h * h));
+		b.applyAngular(nx * lambda, ny * lambda, nz * lambda, 1.0, t3);
 	}
 
 	private void jointDamping(Joint j, double h) {
@@ -523,7 +557,7 @@ public final class BodySim {
 			double rz2 = t1.z - b.x.z;
 			double wt = b.positionalInvMass(rx2, ry2, rz2, tx, ty, tz, t3);
 			double lt = dt / wt;
-			if (lt < staticFriction * lambda) {
+			if (lt < staticFriction * b.friction * lambda) {
 				b.applyPositional(tx * lt, ty * lt, tz * lt, rx2, ry2, rz2, -1.0, t3);
 			}
 		}
@@ -570,7 +604,7 @@ public final class BodySim {
 		double dvz = 0.0;
 		if (vt > 1.0e-9) {
 			double normalForce = contactLambda[c] / (h * h);
-			double slow = Math.min(dynamicFriction * normalForce * h, vt);
+			double slow = Math.min(dynamicFriction * b.friction * normalForce * h, vt);
 			dvx -= tx / vt * slow;
 			dvy -= ty / vt * slow;
 			dvz -= tz / vt * slow;

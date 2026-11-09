@@ -187,6 +187,13 @@ public final class RemoteCorpses {
 				r.body.centre().y};
 	}
 
+	/** For the client gametest: the reactions a ragdoll died with, or null. */
+	public static java.util.@Nullable Set<dev.captience.realisticdamage.ragdoll.Behaviour.Reaction> ragdollReactions(
+			Entity entity) {
+		RagdollCorpse r = RAGDOLLS.get(entity.getId());
+		return r == null || r.body.behaviour() == null ? null : r.body.behaviour().reactions();
+	}
+
 	/** For the client gametest: the muscles a ragdoll died with, or null. */
 	public static dev.captience.realisticdamage.ragdoll.@Nullable Muscles ragdollMuscles(Entity entity) {
 		RagdollCorpse r = RAGDOLLS.get(entity.getId());

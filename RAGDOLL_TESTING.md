@@ -1,5 +1,38 @@
 # Ragdolls: your in-game checklist
 
+## Phase 3: reflexes (alpha.16)
+
+A dying body still reacts while there's a mind left in it. A headshot, or
+someone already knocked out, does none of this: they just drop. Each item has
+a `/rdmg ragdoll` command to trigger it on a mannequin or the mob you're
+looking at.
+
+- [ ] **Brace.** Something falling forward or sideways puts its arms out and
+      lands on its hands (`/rdmg ragdoll blow`).
+- [ ] **Falling backward.** The arms fling forward and out.
+- [ ] **Hand to the wound.**
+  - Sword to the gut (`/rdmg ragdoll blow torso`): a hand comes across the
+    belly, and the body folds over it once it stops staggering.
+  - Hit in a leg: the hand on that side reaches for the thigh.
+  - Hit in an arm: the other hand reaches for it.
+  - A bleed-out holds its worst wound.
+- [ ] **Stagger.** A blow to someone standing on two good legs. They're held up
+      a moment, shuffling back with arms out, then they go. A broken or
+      missing leg means no stagger.
+- [ ] **Blast** (`/rdmg ragdoll explosion left_leg 0.5`). The arms come up in
+      front of the face and the chin tucks while it tumbles.
+- [ ] **Fire or lava** (`/rdmg ragdoll fire`). It writhes, thrashing on the
+      ground and slowing over about four seconds.
+- [ ] **Lightning** (`/rdmg ragdoll shock`). A stiff, jerking second, then
+      limp.
+- [ ] **Drowning** (`/rdmg ragdoll drowning`, best in water). The arms reach up,
+      then it drifts.
+- [ ] **The void.** Slow, drifting limbs as it falls.
+- [ ] **Death twitch.** A violent death (headshot, crush, big blast) twitches
+      a limb once or twice after it has settled.
+- [ ] **Nothing silly:** no limb spinning, no body sitting itself down, no
+      reaction from a body that should have none.
+
 ## Phase 2: muscles (alpha.15)
 
 Jar: `realistic-damage-1.7.0-alpha.15.jar`, in both Prism instances (alpha.14

@@ -3,6 +3,7 @@ package dev.captience.realisticdamage.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.ragdoll.Behaviour;
 import dev.captience.realisticdamage.ragdoll.Muscles;
 import dev.captience.realisticdamage.systems.AdrenalineMath;
 import dev.captience.realisticdamage.systems.LimpMath;
@@ -131,6 +132,7 @@ final class RagdollCorpse implements RemoteCorpses.View {
 		ragdoll.inheritMotion(parts, before, seen, LIMB_SWING_SHARE, DT);
 		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
 		ragdoll.setMuscles(muscles);
+		ragdoll.setBehaviour(Behaviour.choose(behaviourInput(entity, payload, snapshot, muscles)));
 		launch(ragdoll, entity, payload, feet, seen, muscles);
 		if (System.getenv("RD_RAGDOLL_TRACE") != null) {
 			System.out.printf(java.util.Locale.ROOT,
@@ -247,6 +249,31 @@ final class RagdollCorpse implements RemoteCorpses.View {
 		ragdoll.spin(new Vector3d(dir.z, 0.0, -dir.x).mul(rate), feet);
 	}
 
+	/** Which open wound a dying hand goes to, most serious region first; -1 for none. */
+	private static final BodyPart[] WOUND_ORDER = {BodyPart.TORSO, BodyPart.HEAD, BodyPart.RIGHT_LEG,
+			BodyPart.LEFT_LEG, BodyPart.RIGHT_ARM, BodyPart.LEFT_ARM};
+
+	/** What the reflexes need: the kind of death, where it struck, the worst wound, the push. */
+	private static Behaviour.Input behaviourInput(LivingEntity entity, CorpsePayload payload,
+			@Nullable BodySnapshot snapshot, Muscles muscles) {
+		int hit = payload.hitPart() >= 0 && payload.hitPart() < FROM_BODY_PART.length
+				? FROM_BODY_PART[payload.hitPart()] : -1;
+		int wound = -1;
+		if (snapshot != null) {
+			for (BodyPart part : WOUND_ORDER) {
+				if ((snapshot.woundMask() & (1 << part.ordinal())) != 0) {
+					wound = FROM_BODY_PART[part.ordinal()];
+					break;
+				}
+			}
+		}
+		Vector3d push = new Vector3d(payload.hx(), 0.0, payload.hz());
+		if (push.lengthSquared() < 1.0e-6) {
+			push.set(payload.vx(), 0.0, payload.vz());
+		}
+		return new Behaviour.Input(payload.kind(), payload.violence(), hit, wound, muscles, push, entity.getId());
+	}
+
 	/** What the body knew about itself as it died, from its synced snapshot, in ragdoll part order. */
 	private static Muscles.Input musclesInput(CorpsePayload payload, @Nullable BodySnapshot snapshot) {
 		int hit = payload.hitPart() >= 0 && payload.hitPart() < FROM_BODY_PART.length
@@ -274,9 +301,11 @@ final class RagdollCorpse implements RemoteCorpses.View {
 		if (age <= MAX_AGE && !body.broken()) {
 			body.tick(world, DT * timeScale);
 		}
-		if (TRACE && age <= 40) {
-			System.out.printf(java.util.Locale.ROOT, "[rd] ragdoll %d t%02d lean %.1f spread %.2f motion %.2f y %.2f%n",
-					id, age, body.lean(), body.spread(), body.sim.maxMotion(), body.centre().y);
+		if (TRACE && (age <= 40 || age % 5 == 0) && age <= 80) {
+			System.out.printf(java.util.Locale.ROOT,
+					"[rd] ragdoll %d t%02d lean %.1f spread %.2f gap %.3f motion %.2f y %.2f asleep %s%n",
+					id, age, body.lean(), body.spread(), body.worstSeparation(), body.sim.maxMotion(), body.centre().y,
+					body.asleep());
 		}
 	}
 

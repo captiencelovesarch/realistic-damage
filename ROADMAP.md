@@ -421,6 +421,14 @@ adrenaline holds on longer. Straight legs now stop folding at about 80 degrees
 Phase 4 gained knockdown ragdolls: a blast or heavy hit that doesn't kill
 throws you, and you get back up.
 
+**Active ragdolls, phase 3: reflexes** (Nov 10 2026, alpha.16). A dying body
+reacts while there is a mind left: arms out to meet the ground (or flung out
+going over backward), a hand to the wound (doubled over a gut wound), a stagger
+on two good legs, arms over the face in a blast, writhing in fire, a rigid
+jerking second from lightning, reaching up drowning, slow limbs in the void,
+and a twitch after a violent death settles. All through the muscles, so gravity,
+the ground and the joint limits still decide what happens (`ragdoll/Behaviour`).
+
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here
   shipped early in 1.6.2 and is ready for mobs to reuse.)

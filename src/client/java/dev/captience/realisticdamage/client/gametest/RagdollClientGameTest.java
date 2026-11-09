@@ -227,6 +227,119 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("rd_ragdoll_06_ledge_close");
 
 			muscles(context, singleplayer, px, py, pz);
+			reflexes(context, singleplayer, px, py, pz);
+		}
+	}
+
+	/**
+	 * Phase 3: four zombies whose deaths each leave a reflex: burned (writhes),
+	 * electrocuted (convulses), blasted (arms up over the face) and struck in
+	 * the gut while standing (staggers, a hand to the belly, then the brace).
+	 */
+	private static void reflexes(ClientGameTestContext context, TestSingleplayerContext singleplayer,
+			double px, double py, double pz) {
+		double bx = Math.floor(px) - 14.0;
+		double by = Math.floor(py);
+		double bz = Math.floor(pz) + 6.0;
+		List<Victim> row = List.of(
+				new Victim("burned", bx - 3.5, by, bz + 0.5, 180.0F,
+						new Corpses.Script(DeathKind.FIRE, null, new Vec3(0.0, 0.0, 1.0), 0.0, 0.3)),
+				new Victim("shocked", bx - 1.0, by, bz + 0.5, 180.0F,
+						new Corpses.Script(DeathKind.SHOCK, null, new Vec3(0.0, 0.0, 1.0), 0.0, 0.3)),
+				new Victim("blasted", bx + 1.5, by, bz + 0.5, 180.0F,
+						new Corpses.Script(DeathKind.EXPLOSION, BodyPart.LEFT_LEG, new Vec3(0.3, 0.0, 1.0), 0.3, 0.5)),
+				new Victim("gut", bx + 4.0, by, bz + 0.5, 180.0F,
+						new Corpses.Script(DeathKind.BLOW, BodyPart.TORSO, new Vec3(0.0, 0.0, 1.0), 0.2, 0.3)));
+		List<java.util.EnumSet<dev.captience.realisticdamage.ragdoll.Behaviour.Reaction>> expect = List.of(
+				java.util.EnumSet.of(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.WRITHE),
+				java.util.EnumSet.of(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.CONVULSE),
+				java.util.EnumSet.of(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.PROTECT_HEAD),
+				java.util.EnumSet.of(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.STAGGER,
+						dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.CLUTCH,
+						dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.BRACE));
+		List<Integer> ids = new ArrayList<>();
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			for (Victim v : row) {
+				LivingEntity body = EntityTypes.ZOMBIE.create(level, EntitySpawnReason.COMMAND);
+				body.snapTo(v.x(), v.y(), v.z(), v.yaw(), 0.0F);
+				body.setYHeadRot(v.yaw());
+				body.yBodyRot = v.yaw();
+				((Mob) body).setNoAi(true);
+				((Mob) body).setPersistenceRequired();
+				body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD,
+						new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.LEATHER_HELMET));
+				level.addFreshEntity(body);
+				RealisticDamageData data = RDAttachments.get(body);
+				data.reset();
+				RDAttachments.pushSnapshot(body);
+				MobAnatomy.track(body);
+				ids.add(body.getId());
+			}
+		});
+		context.runOnClient(client -> {
+			client.player.setPos(bx + 0.25, py + 0.5, bz - 6.0);
+			client.player.setYRot(0.0F);
+			client.player.setXRot(12.0F);
+		});
+		context.waitTicks(30);
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			for (int i = 0; i < row.size(); i++) {
+				LivingEntity body = (LivingEntity) level.getEntity(ids.get(i));
+				Corpses.script(body, row.get(i).script());
+				body.invulnerableTime = 0;
+				body.kill(level);
+			}
+		});
+		context.waitTicks(2);
+		List<String> failures = new ArrayList<>();
+		for (int i = 0; i < row.size(); i++) {
+			int id = ids.get(i);
+			var reactions = context.computeOnClient(client -> {
+				Entity e = client.level.getEntity(id);
+				return e == null ? null : RemoteCorpses.ragdollReactions(e);
+			});
+			if (reactions == null || !reactions.containsAll(expect.get(i))) {
+				failures.add(row.get(i).name() + " died with " + reactions + ", expected at least " + expect.get(i));
+			}
+		}
+		context.waitTicks(3);
+		context.takeScreenshot("rd_ragdoll_20_reflexes_quarter_second");
+		context.waitTicks(7);
+		context.takeScreenshot("rd_ragdoll_21_reflexes_half_second");
+		context.waitTicks(20);
+		context.takeScreenshot("rd_ragdoll_22_reflexes_one_and_a_half");
+		context.waitTicks(30);
+		context.takeScreenshot("rd_ragdoll_23_reflexes_three_seconds");
+		StringBuilder report = new StringBuilder();
+		for (int i = 0; i < row.size(); i++) {
+			Victim v = row.get(i);
+			int id = ids.get(i);
+			double[] check = context.computeOnClient(client -> {
+				Entity e = client.level.getEntity(id);
+				return e == null ? null : RemoteCorpses.ragdollCheck(e);
+			});
+			if (check == null) {
+				failures.add(v.name() + ": no ragdoll by the time it should have landed");
+				continue;
+			}
+			report.append(String.format(java.util.Locale.ROOT,
+					"[rd] reflexes %s: inside %.3f, joint gap %.3f, lean %.1f, at rest %s%n",
+					v.name(), check[0], check[1], check[2], check[3] > 0.5));
+			if (check[0] > 0.06) {
+				failures.add(v.name() + " ended " + check[0] + " inside a block");
+			}
+			if (check[1] > 0.06) {
+				failures.add(v.name() + " came apart at a joint by " + check[1]);
+			}
+			if (check[2] < 35.0) {
+				failures.add(v.name() + " is still standing (lean " + check[2] + ")");
+			}
+		}
+		System.out.print(report);
+		if (!failures.isEmpty()) {
+			throw new AssertionError(String.join("; ", failures));
 		}
 	}
 

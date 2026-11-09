@@ -13,15 +13,41 @@ class RagdollTraceTest {
 			return;
 		}
 		HumanoidRagdollTest.FakeWorld world = new HumanoidRagdollTest.FakeWorld().blockFloor(30, 0.0);
-		HumanoidRagdoll r = new HumanoidRagdoll(HumanoidRagdoll.playerParts(false), new Vector3d(0.5, 0.0, 0.5), 0.0F,
-				0.9375 / 16.0, new float[18]);
+		HumanoidRagdoll.Part[] parts = HumanoidRagdoll.playerParts(false);
+		double unit = 0.9375 / 16.0;
+		if (System.getenv("RD_SKELETON") != null) {
+			parts = new HumanoidRagdoll.Part[] {
+					new HumanoidRagdoll.Part(0, 0, 0, -4, -8, -4, 4, 0, 4),
+					new HumanoidRagdoll.Part(0, 0, 0, -4, 0, -2, 4, 12, 2),
+					new HumanoidRagdoll.Part(-5, 2, 0, -1, -2, -1, 1, 10, 1),
+					new HumanoidRagdoll.Part(5, 2, 0, -1, -2, -1, 1, 10, 1),
+					new HumanoidRagdoll.Part(-2, 12, 0, -1, 0, -1, 1, 12, 1),
+					new HumanoidRagdoll.Part(2, 12, 0, -1, 0, -1, 1, 12, 1),
+			};
+			unit = 1.0 / 16.0;
+		}
+		HumanoidRagdoll r = new HumanoidRagdoll(parts, new Vector3d(0.5, 0.0, 0.5),
+				Float.parseFloat(System.getenv().getOrDefault("RD_YAW", "0")), unit, new float[18]);
 		dev.captience.realisticdamage.damage.DeathKind kind = dev.captience.realisticdamage.damage.DeathKind.valueOf(
 				System.getenv().getOrDefault("RD_KIND", "BLOW"));
-		r.setMuscles(Muscles.forDeath(Muscles.Input.healthy(kind,
+		Muscles muscles = Muscles.forDeath(Muscles.Input.healthy(kind,
 				Double.parseDouble(System.getenv().getOrDefault("RD_VIOLENCE", "0.4")),
-				Integer.parseInt(System.getenv().getOrDefault("RD_HIT", "-1")))));
+				Integer.parseInt(System.getenv().getOrDefault("RD_HIT", "-1"))));
+		r.setMuscles(muscles);
+		if (System.getenv("RD_BEHAVE") != null) {
+			Behaviour b = Behaviour.choose(new Behaviour.Input(kind,
+					Double.parseDouble(System.getenv().getOrDefault("RD_VIOLENCE", "0.4")),
+					Integer.parseInt(System.getenv().getOrDefault("RD_HIT", "-1")), -1, muscles,
+					new Vector3d(0.0, 0.0, -1.0), 7));
+			System.out.println("reactions " + b.reactions() + " awake " + muscles.awake);
+			r.setBehaviour(b);
+		}
 		double rate = Double.parseDouble(System.getenv().getOrDefault("RD_RATE", "2.2"));
 		r.spin(new Vector3d(1.0, 0.0, 0.0).mul(rate), new Vector3d(0.5, 0.0, 0.5));
+		if (System.getenv("RD_KICKHEAD") != null) {
+			r.kick(HumanoidRagdoll.HEAD, 0.0, 0.0, 7.0);
+			r.push(0.0, 0.0, 1.75);
+		}
 		if (System.getenv("RD_BLAST") != null) {
 			r.push(4.9, 10.0, -12.26);
 			r.kick(HumanoidRagdoll.LEFT_LEG, 0.37 * 8.0, 0.0, -0.93 * 8.0);
