@@ -55,7 +55,9 @@ class InjuryMessageKeysTest {
 	 * commit as the key, which is the whole mechanism: the number moving is what
 	 * forces somebody to look at this file and decide.
 	 */
-	private static final int SHIPPED_MESSAGE_KEYS = 72;
+	// 74 (active ragdolls phase 4): knocked_down.blast and .blow report the body, like knocked_down;
+	// Injury Text may swallow them.
+	private static final int SHIPPED_MESSAGE_KEYS = 74;
 
 	@Test
 	void everyShippedMessageKeyIsClassifiedDeliberately() throws IOException {

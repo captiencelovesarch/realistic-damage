@@ -167,6 +167,7 @@ side. It follows the **Death Camera** toggle.
 | `enableMobAnatomy` | true | Mobs in the `realisticdamage:has_anatomy` tag (humanoids by default) take regional trauma, bleed, break, lose limbs and collapse like players |
 | `spawnSeveredLimbs` | true | A lost limb is thrown into the world, lands, bleeds for a minute and is gone; nested under limb destruction |
 | `enableKnockdown` | true | Hard landings put you on the ground for a moment |
+| `knockdownFromBlows` | true | A blast or a heavy blow that does not kill knocks you down too (with `enableKnockdown`) |
 | `enableMicrosleeps` | true | Consciousness cuts out in episodes on the way down |
 | `disabledArmsLoseGrip` | true | An arm driven to Disabled can't grip until it heals: no raised shield or item use in that hand, no bows/crossbows/spears, and a limp main arm fights like a missing one |
 | `enableAdrenaline` | true | Dropping to the last two hearts gives a few seconds of adrenaline (faster, pain masked), then a crash (heavy legs, short winded sprints) |
