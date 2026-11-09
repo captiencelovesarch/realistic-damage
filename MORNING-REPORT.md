@@ -1,172 +1,102 @@
-# Realistic Damage 1.6 — Morning Report
+# Realistic Damage: active ragdolls, morning report (Nov 10 2026)
 
-1.6 **Consequence** is complete on `1.6-consequence`. The branch started at
-`07d25dd` (1.5.0), keeps that base intact, and now builds a versioned 1.6.0 jar.
-Nothing was tagged, merged to `main`, or pushed.
+You went to bed after phase 2 ("works swell") and asked me to build through
+phase 5. **All of it is built, committed on `1.7-anatomy`, and installed in
+both Prism instances as `realistic-damage-1.7.0-alpha.21.jar`.** Older jars
+are in `mods/replaced-jars/`. Nothing was pushed, tagged or merged.
 
-The interrupted handoff was recovered at `dd357d3`: all four headline features
-were implemented and individually verified, but the adversarial review, the last
-three blood consequences, ship documentation, and this report were unfinished.
-Those pieces are now done.
+Your checklist is **[RAGDOLL_TESTING.md](RAGDOLL_TESTING.md)**: newest phase on
+top, a `/rdmg ragdoll …` command beside most items. The plan with what was
+built is [RAGDOLL_PLAN.md](RAGDOLL_PLAN.md).
 
-## What shipped
+## What you'll see
 
-### Long-term injuries
+| Phase | What happens | Setting |
+|---|---|---|
+| 3 Reflexes | A dying body reacts while it's still conscious. The arms go out to break the fall, a hand goes to the wound, a struck body staggers before it falls, the arms come up against a blast. It writhes in fire, jerks from lightning, and reaches up while drowning. A violent death twitches after it settles. | (always on) |
+| 4a Bodies stay | Bodies keep lying where they fell after the server removes them, then sink into the ground. Your own body stays after you respawn. | **Bodies Stay** 5 s / 30 s / 2 min / 5 min |
+| 4b Your own death | First person rides your ragdoll's eyes, smoothed. F5 shows your ragdoll. | **Death View** Ragdoll / Classic |
+| 4c Knockdowns (your ask) | A blast or big hit that doesn't kill throws you as a ragdoll. You lie there, then get up as the view blends back. Hard landings and passing out work the same way. If you die while down, the same body becomes the corpse. | **Knockdown Ragdolls**; server rule `knockdownFromBlows` |
+| 4d Other mobs | Cows, pigs, spiders, chickens, creepers, villagers and the rest ragdoll from their own models. Animals keel over onto their sides, and spiders often end up on their backs. | (with Bodies) |
+| 5 Hit flinches | A body that's hit and stays standing flinches where it was struck, on top of its animation. | **Hit Flinches** |
 
-`enableLongTermInjuries` is an optional server rule and defaults off. A region
-loses one recovery rung when it is newly driven to Disabled, when a limb newly
-breaks, or when a limb is newly destroyed. Multiple qualifying outcomes in the
-same damage event still cost one rung, so the outcome is deterministic and a
-single complicated hit cannot be counted twice.
+What now knocks you down, measured on a 20-health body:
+- a hard landing, or passing out (as before);
+- a non-lethal blast of about 7.5 damage or more;
+- any hit from an iron golem, ravager, warden, hoglin or zoglin of about
+  4.5 damage or more;
+- any single blow of about 13.5 damage or more.
 
-The ceiling is stored as a band on each `BodyPartData`, persisted with the body,
-packed into the versioned `BodySnapshot`, and shown on the body panel as the
-familiar Hurt / Injured / Critical boundary rather than as a figure. Limbs may
-bottom out at Critical. Head and torso stop at Hurt; a deeper head ceiling would
-make the consciousness ladder permanently active, which is punishment without a
-recovery loop rather than a useful hardcore rule.
+## Commits
 
-Food, natural regeneration, potions and time heal condition only as far as the
-ceiling. Sleep and totems do not raise it. Death creates a fresh body at its old
-ceilings while the rule is enabled; disabling the rule prevents new rungs and
-lets death clear existing ones. `/rdmg ceiling` is the explicit admin escape.
+- `099c435` phases 0 and 2 (the checkpoint before bed)
+- `6297f3b` phase 3, reflexes
+- `79ebfd5` phase 4a, bodies stay
+- `35b249f` phase 4b, your own death
+- `dc74bae` + `62dcb87` phase 4c, knockdowns (plus a README and test fix)
+- `1466965` phase 4d, other mobs
+- `d5e1898` phase 5, flinches
 
-### Explosive dismemberment
+## Tests
 
-TNT, creepers and other server explosions now capture their real centre,
-exposure and pre-health-bar blast amount. Only the nearest limb is eligible for
-direct destruction, at a deterministic threshold equal to 45% of that limb's
-full condition after the normal localized armour reduction and server trauma
-multipliers. This avoids the old contradiction where better armour or absorption
-could erase the physical event entirely, while still letting armour protect the
-limb.
+- **Unit tests:** all pass, 313 in all, 32 of them new ragdoll engine tests
+  that run in a fake world.
+- **Server game tests:** all 231 pass, 5 of them new (knockdown thresholds).
+- **Client game tests:** the full suite passes. New ones:
+  - `RagdollClientGameTest`, with scenes for stairs and ledge, muscles,
+    reflexes, bodies staying, and the animal row;
+  - `OwnRagdollClientGameTest`;
+  - `KnockdownClientGameTest`, which includes a flinch.
 
-The rule is nested under `enableLimbDestruction` and its own
-`enableExplosiveDismemberment` switch. It never takes a head or torso directly:
-vanilla is already deciding whether a core-range blast killed the player, and a
-second bypass-armour core kill would mostly punish totem saves. A qualifying
-limb goes through the existing destruction choke point, so the wound, scar,
-missing model part, impairment, sound, message and internal damage safeguards
-cannot diverge between ordinary and explosive loss.
+What the tests measured:
+- Joint gaps under 2 cm.
+- No body ends inside a block.
+- At rest, the camera sits within 1.5 mm of your ragdoll's eyes.
+- After a knockdown you're back at exactly standing eye height.
 
-### Scarring
+## Things I changed in old tests (so you know)
 
-Every body region records a cosmetic history rung: none, once broken, or once
-destroyed. The rung is raised inside the state setters rather than at individual
-damage call sites, so commands and future injury paths cannot forget it. It is
-persisted, synced to all tracking clients, and carried through death even when
-long-term injuries are off.
+- **Multiplayer "quiet death":** it now checks that the body is still once
+  it's down, not the moment of impact. A full-violence death drops in a heap
+  now (phase 2), which is on purpose.
+- **Classic death-camera tests:** they pin Death View to Classic, so they keep
+  testing the classic camera exactly.
+- **Mob anatomy "collapsed zombie":** a knockdown ragdoll counts as laid out.
 
-Scars appear in the body panel and on an overlay-free player mesh, beneath the
-inflated hat, jacket and sleeves. A currently missing limb has no geometry to
-mark; its destroyed scar appears on the next body. Scars are never read by
-healing, impairment, prey scoring, or any other outcome. They have a dedicated
-client toggle and remain outside the sensory panic button because they are body
-information, like the diagram and status icons.
+## Bugs found and fixed along the way
 
-### Injury-aware mob AI and visible posture
+- **Twitch spinning a limb:** a skeleton's thin limb spun up to the speed cap,
+  because the twitch kept re-aiming every tick.
+- **Stagger sitting the body down:** it fought the "doubled over" reflex, so
+  the body sat down.
+- **Third-person view:** first it put the camera inside your own head, then it
+  framed the wrong spot. Now it frames your ragdoll.
+- **Animals rolling the wrong way:** they were rolled against the push. Found
+  because the spider fell anyway and landed on its back.
+- **Wrong knockdown message:** a blast or blow said "The landing takes your
+  legs…". They have their own lines now.
+- **My own process slip:** one commit went in while two guard tests were red.
+  They were fixed straight after in `62dcb87`. Commits are now gated on the
+  test exit codes.
 
-Injured arms are carried against the body and damaged legs turn out and shorten
-their step, including the armour model. The pose scales the rotations vanilla
-already calculated instead of copying Mojang's walk equation. A lost limb is not
-posed; its absence is the stronger cue.
+## Not verified (please look at these)
 
-The client pose and the server prey score both call `LimpMath`, so a mob cannot
-react to a limp the player model does not show. Hostile target resolution is
-enforced at `Mob.setTarget` by substituting the best valid player, not by clearing
-a target that vanilla would immediately reacquire. The ranking is downed body,
-missing leg, broken leg, visible condition limp, then a running wound. MINOR
-wounds, scars, Blood and Consciousness do not count. Existing targets receive a
-switching margin, revenge a stronger hold, and ties resolve by distance then
-entity id. Candidate scoring happens before geometry and line of sight, so a
-healthy server performs no extra raycasts.
+- **VR:** nothing was tested in a headset. By design your own ragdoll view and
+  your own knockdown ragdoll are off in VR, and others' bodies still ragdoll.
+- **Multiplayer knockdowns:** a friend's knockdown ragdoll following their
+  real position (the tether) is only tested in singleplayer.
+- **Dragging an unconscious friend:** should drag their ragdoll. Untested.
+- **Odd mob models:** only cow, pig, spider, chicken, creeper and villager were
+  tested. Horses, llamas, foxes, goats, axolotls, frogs, camels and sniffers
+  are untested, and some may look strange.
+- **Shaders, EntityCulling, many bodies at once:** untested here.
+- **`/rdragdoll debug`:** the boxes are drawn, but they never showed in test
+  screenshots, so I've never seen them on screen.
+- **Getting up:** a straight blend about the hips, not a full get-up animation.
+  It might look stiff; tell me.
 
-Non-hostile mobs are never redirected. Neutral hostiles are redirected only to
-players they are already angry with. Brain-driven hostiles that do not use
-`Mob.setTarget` remain explicitly outside this rule rather than being only partly
-supported.
+## How to roll back
 
-### The final blood/consequence sweep
-
-The user chose a mark now and a physical severed limb later. A severance therefore
-throws 36 deterministic drops — 1.8 times the ordinary Critical opening — in a
-wider, downward-biased cone. It is deliberately the same blood transport and
-same destruction choke point; the visible flying limb stays in 1.7.
-
-A bleeding body pressed against a collision face now transfers a bounded share
-of visible wound flow to that wall. The 7.5 cm envelope includes Minecraft's
-roughly 5.6 cm client/server settling quantum, which the client test exposed,
-without reaching across a useful gap. Large wet marks on vertical faces advance
-a deterministic phase, shed a real gravity-driven drop from the lower edge, pay
-radius for it, and slow as they dry.
-
-Both wall behaviors are client presentation over the existing 768-mark bounded
-field. They add no block entities, chunks, save fields, packets or unbounded
-world state. Persistent per-face blood would make blood decoration rather than a
-temporary readout and was deliberately not smuggled into this release.
-
-## Review findings closed
-
-- The public `BodyView` API had gained ceiling and scar reads but `API.md` still
-  documented only fractures and vitals. The new methods, player-facing band rule,
-  and `ScarLevel` stability promise are documented now.
-- The design document still described an obsolete owning-client custom-payload
-  sync path. It now describes the persistent server data plus all-tracking-client
-  versioned snapshot actually in the code.
-- README still said death reset everything. It now distinguishes active injury,
-  scars, and optional long-term ceilings.
-- The first contact-transfer test found that a client reconciles a nominally
-  one-millimetre server placement to 5.6 cm from the wall. Collision-shape lookup
-  and the explicit contact envelope now cover the live position, and the test
-  passes on the reconciled client rather than on an assumed server coordinate.
-- A second audit pass found no further correctness, determinism, persistence,
-  sync, performance, design-rule, or vacuous-test defects.
-
-## Verification and exact counts
-
-Baseline at `07d25dd`:
-
-- **119** unit tests, passing.
-- **90** required server game tests, passing.
-- **4** client game-test classes under Xvfb, passing.
-
-Final 1.6.0 tree:
-
-- **239** unit tests across 29 result files, 0 failures (**+120**).
-- **164** required server game tests, all passed (**+74**).
-- **6** client game-test classes under Xvfb, all passed (**+2**), producing
-  **76** screenshots in the final run.
-
-Final commands:
-
-```sh
-JAVA_HOME=/usr/lib/jvm/java-25-openjdk ./gradlew build test --no-daemon
-JAVA_HOME=/usr/lib/jvm/java-25-openjdk ./gradlew runGametest --no-daemon
-JAVA_HOME=/usr/lib/jvm/java-25-openjdk xvfb-run -a -s '-screen 0 1600x1000x24' \
-  ./gradlew runClientGametest --no-daemon
-```
-
-The release artifact is `build/libs/realistic-damage-1.6.0.jar` (557 KiB in the
-verified build), and its embedded `fabric.mod.json` reports version `1.6.0`.
-
-## Could not verify
-
-No headline feature is blocked. The automated suite includes a real dedicated
-server/client socket test, but it is not a substitute for a populated production
-server or a large modpack. TACZ still has no compatible Fabric build for this
-Minecraft version, so the optional firearm tags remain verified against stand-in
-damage types rather than the real mod. Rasterizer-specific blood appearance under
-Fabulous graphics also remains a human playtest item; behavior, bounds and
-render-pipeline startup are covered by the client suite.
-
-## Deliberately left out
-
-- A flying severed-limb entity: scheduled with the entity/anatomy work in 1.7.
-- Persistent blood stored on blocks or chunks: a possible later world-state
-  system, not a late extension of the particle field.
-- Body anatomy and injury behavior for mobs, including the brain-driven hostile
-  families that bypass `Mob.setTarget`: 1.7 scope.
-- Medical items, splints, surgery, infection and a wound screen: still explicit
-  non-goals. Food and time remain the cure.
-- A tag, merge to `main`, or push: the original release instructions explicitly
-  reserved all three.
+If anything is badly off, drop
+`mods/replaced-jars/realistic-damage-1.7.0-alpha.15.jar` (phase 2, which you
+already approved) back in, and move the alpha.21 jar out.
