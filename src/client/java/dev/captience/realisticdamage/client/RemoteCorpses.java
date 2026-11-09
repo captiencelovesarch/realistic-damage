@@ -145,6 +145,7 @@ public final class RemoteCorpses {
 			lastLevel = level;
 		}
 		LiveRagdolls.tick(level, timeScale);
+		Flinches.tick();
 		int stay = Math.max(0, ClientEffectsConfig.get().bodiesStay) * 20;
 		var rit = RAGDOLLS.int2ObjectEntrySet().fastIterator();
 		while (rit.hasNext()) {
@@ -282,6 +283,7 @@ public final class RemoteCorpses {
 		RAGDOLLS.clear();
 		ORPHANS.clear();
 		LiveRagdolls.clear();
+		Flinches.clear();
 	}
 
 	/** How many bodies are being simulated, either way; for the gametest. */

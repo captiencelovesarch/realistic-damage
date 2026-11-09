@@ -135,6 +135,11 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.knockdown_ragdolls"),
 								(button, value) -> config.knockdownRagdolls = value));
 		this.list.addSmall(
+				CycleButton.onOffBuilder(config.hitFlinches)
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.hit_flinches"),
+								(button, value) -> config.hitFlinches = value),
+				null);
+		this.list.addSmall(
 				CycleButton.<Integer>builder(
 								limit -> Component.literal(Integer.toString(limit)),
 								config.ragdollLimit)

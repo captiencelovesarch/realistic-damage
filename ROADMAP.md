@@ -429,6 +429,15 @@ jerking second from lightning, reaching up drowning, slow limbs in the void,
 and a twitch after a violent death settles. All through the muscles, so gravity,
 the ground and the joint limits still decide what happens (`ragdoll/Behaviour`).
 
+**Active ragdolls, phases 4 and 5** (Nov 10 2026, alpha.17 to 21). Bodies
+stay where they fell after the server removes them (Bodies Stay), then sink.
+Your own death is seen from inside your own ragdoll (Death View: Ragdoll /
+Classic). Being knocked down without dying (a blast, a big hitter, a huge
+blow, a hard landing, passing out) throws you as a ragdoll and you get back
+up (Knockdown Ragdolls; server rule knockdownFromBlows). Cows, pigs, spiders,
+chickens, creepers, villagers and the rest ragdoll from their own models. And
+a living body that is hit flinches where it was struck (Hit Flinches).
+
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here
   shipped early in 1.6.2 and is ready for mobs to reuse.)

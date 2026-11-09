@@ -20,6 +20,7 @@ public abstract class ModelFeatureRendererMixin {
 					shift = At.Shift.AFTER))
 	private void realisticdamage$afterPose(ModelFeatureRenderer.Submit<?> submit, CallbackInfo ci) {
 		dev.captience.realisticdamage.client.RemoteCorpses.pose(submit.model(), submit.state());
+		dev.captience.realisticdamage.client.Flinches.pose(submit.model(), submit.state());
 		GenericLimbs.afterPose(submit.model(), submit.state());
 	}
 

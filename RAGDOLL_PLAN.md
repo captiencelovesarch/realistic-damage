@@ -16,6 +16,12 @@ Status (Nov 9 2026):
   (any model's top-level parts jointed to the biggest, limits from each
   part's rest angle, a keel computed from the body's own shape) and
   `client/GenericCorpse`; `SimulatedCorpse` is the base both kinds share.
+- **Phase 5 (hit flinches) built** (alpha.21): `damage/Flinches` (server: the
+  struck part and the blow's direction from the trauma pipeline),
+  `ragdoll/Flinch` (damped springs per part and the lean),
+  `client/Flinches` (played on top of vanilla's animation).
+- **All phases built overnight Nov 9-10.** Awaiting the user's morning
+  playtest of 3, 4a-4d and 5.
 - Phases 3 and 4 follow. Phase 4 now also covers knockdown ragdolls (being
   thrown without dying).
 

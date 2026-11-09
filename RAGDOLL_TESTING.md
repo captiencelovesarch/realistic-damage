@@ -1,5 +1,20 @@
 # Ragdolls: your in-game checklist
 
+## Phase 5: hit flinches (alpha.21)
+
+New setting **Hit Flinches** (On/Off). A living body that's hit and stays
+standing reacts where it was struck, on top of its normal animation, and
+springs back within about half a second.
+
+- [ ] **Hit in the head:** it snaps back (or sideways, from the side).
+- [ ] **Hit in an arm:** that arm jerks back.
+- [ ] **Hit in a leg:** the leg buckles and the body dips for a step.
+- [ ] **Hit in the body:** the whole body rocks away from the blow.
+- [ ] **A friend fighting:** you see them flinch. You see your own flinch in
+      F5.
+- [ ] **A flurry of hits:** they stack but never fling a limb silly.
+- [ ] **Hit Flinches off:** the vanilla red flash only.
+
 ## Phase 4d: animals and other mobs (alpha.20)
 
 Mobs that aren't humanoids now ragdoll too, built from their own models: cows,

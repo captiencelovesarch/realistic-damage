@@ -35,8 +35,9 @@ public final class DamageHooks {
 			if (applied < 0) {
 				applied = damageTaken; // no capture (shouldn't happen) — degrade to the pre-armor amount
 			}
-			TraumaPipeline.handle(entity, data, source, baseDamageTaken, damageTaken, applied, blocked);
+			var trauma = TraumaPipeline.handle(entity, data, source, baseDamageTaken, damageTaken, applied, blocked);
 			Knockdowns.afterHit(entity, data, source, baseDamageTaken);
+			Flinches.afterHit(entity, source, trauma, damageTaken);
 			RDAttachments.pushSnapshot(entity);
 			MobAnatomy.track(entity);
 		});

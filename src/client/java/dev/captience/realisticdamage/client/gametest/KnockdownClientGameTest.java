@@ -61,6 +61,34 @@ public class KnockdownClientGameTest implements FabricClientGameTest {
 			});
 			context.waitTicks(20);
 
+			// Phase 5 first: a light blow it shrugs off. It flinches, and the flinch
+			// is over inside a second.
+			long playedBefore = context.computeOnClient(client -> dev.captience.realisticdamage.client.Flinches.played());
+			singleplayer.getServer().runOnServer(server -> {
+				ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+				ServerLevel level = player.level();
+				LivingEntity zombie = (LivingEntity) level.getEntity(id[0]);
+				zombie.hurtServer(level, level.damageSources().playerAttack(player), 4.0F);
+			});
+			context.waitTicks(3);
+			context.takeScreenshot("rd_knock_20_zombie_flinch");
+			long playedAfter = context.computeOnClient(client -> dev.captience.realisticdamage.client.Flinches.played());
+			if (playedAfter <= playedBefore) {
+				throw new AssertionError("a blow the zombie shrugged off played no flinch");
+			}
+			context.waitTicks(20);
+			int still = context.computeOnClient(client -> dev.captience.realisticdamage.client.Flinches.active());
+			if (still != 0) {
+				throw new AssertionError("a flinch was still playing a second later");
+			}
+			if (context.computeOnClient(client -> {
+				Entity e = client.level.getEntity(id[0]);
+				return e == null ? 0 : LiveRagdolls.stage(e);
+			}) >= 0) {
+				throw new AssertionError("a light blow knocked the zombie down");
+			}
+			context.waitTicks(20);
+
 			// The zombie, thrown sideways by a blast it lives through.
 			singleplayer.getServer().runOnServer(server -> {
 				ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();

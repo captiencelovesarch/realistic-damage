@@ -34,6 +34,7 @@ public abstract class LivingEntityRendererMixin {
 	private void realisticdamage$carryBody(LivingEntity entity, LivingEntityRenderState state, float partialTicks, CallbackInfo ci) {
 		LimbStateExtractor.extract(entity, state);
 		dev.captience.realisticdamage.client.RemoteCorpses.extract(entity, state, partialTicks);
+		dev.captience.realisticdamage.client.Flinches.extract(entity, state, partialTicks);
 	}
 
 	@org.spongepowered.asm.mixin.Shadow
@@ -48,6 +49,7 @@ public abstract class LivingEntityRendererMixin {
 			net.minecraft.client.renderer.SubmitNodeCollector collector,
 			net.minecraft.client.renderer.state.level.CameraRenderState camera, CallbackInfo ci) {
 		dev.captience.realisticdamage.client.RemoteCorpses.pose(this.model, state);
+		dev.captience.realisticdamage.client.Flinches.pose(this.model, state);
 	}
 
 	@Inject(method = "setupRotations", at = @At("TAIL"))
@@ -55,6 +57,7 @@ public abstract class LivingEntityRendererMixin {
 		if (dev.captience.realisticdamage.client.RemoteCorpses.applyRotation(state, poseStack)) {
 			return;
 		}
+		dev.captience.realisticdamage.client.Flinches.applyRotation(state, poseStack);
 		if (state instanceof AvatarRenderState || state.deathTime > 0.0F) {
 			return;
 		}

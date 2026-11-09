@@ -248,6 +248,12 @@ public final class ClientEffectsConfig {
 	 */
 	public boolean knockdownRagdolls = true;
 
+	/**
+	 * Hit and still standing (active ragdolls phase 5): the struck part jerks
+	 * with the blow and the body rocks, on top of its animation.
+	 */
+	public boolean hitFlinches = true;
+
 	public enum RagdollMode {
 		OFF,
 		SIMPLE,
