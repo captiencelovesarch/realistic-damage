@@ -26,6 +26,7 @@
 			"dev.captience.realisticdamage.client.gametest.MultiplayerClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.RagdollClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.OwnRagdollClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.KnockdownClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.BloodClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.DeathClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.DeathCameraClientGameTest",
@@ -41,6 +42,7 @@
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
 			"dev.captience.realisticdamage.gametest.CorpseGameTest",
+			"dev.captience.realisticdamage.gametest.KnockdownGameTest",
 			"dev.captience.realisticdamage.gametest.DamageRoutingGameTest",
 			"dev.captience.realisticdamage.gametest.ImpairmentGameTest",
 			"dev.captience.realisticdamage.gametest.BleedingGameTest",

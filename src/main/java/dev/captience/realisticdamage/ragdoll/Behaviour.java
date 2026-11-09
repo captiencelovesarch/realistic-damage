@@ -89,6 +89,13 @@ public final class Behaviour {
 		this.staggerFor = staggerFor;
 	}
 
+	/** The same reactions for a body that lives through it (a knockdown): no death twitch. */
+	public Behaviour withoutTwitch() {
+		EnumSet<Reaction> set = reactions.clone();
+		set.remove(Reaction.TWITCH);
+		return new Behaviour(set, clutchPart, push, awake, seed, staggerFor);
+	}
+
 	public boolean has(Reaction r) {
 		return reactions.contains(r);
 	}

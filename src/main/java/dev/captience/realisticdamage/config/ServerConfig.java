@@ -38,6 +38,12 @@ public final class ServerConfig {
 	 * briefly, is the one part of this that some players will simply not want.
 	 */
 	public boolean enableKnockdown = true;
+	/**
+	 * A blast or a heavy blow that does not kill knocks the body down as well
+	 * (active ragdolls phase 4), not only a hard landing. Under
+	 * {@link #enableKnockdown}.
+	 */
+	public boolean knockdownFromBlows = true;
 	/** Consciousness cuts out in episodes on the way down (1.4). */
 	public boolean enableMicrosleeps = true;
 	/**

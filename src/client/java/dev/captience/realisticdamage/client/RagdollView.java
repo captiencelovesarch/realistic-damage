@@ -44,7 +44,7 @@ public final class RagdollView {
 	public static boolean active() {
 		// First person only: in third person vanilla's camera already looks at
 		// the body, and riding the head there would put the view inside it.
-		return DeathCamera.active() && ClientEffectsConfig.get().ownRagdoll
+		return (DeathCamera.active() || LiveRagdolls.own() != null) && ClientEffectsConfig.get().ownRagdoll
 				&& !dev.captience.realisticdamage.client.compat.Vr.active()
 				&& !Minecraft.getInstance().gameRenderer.mainCamera().isDetached() && own() != null;
 	}
@@ -54,7 +54,7 @@ public final class RagdollView {
 	 * the ragdoll rather than the unseen vanilla body underneath it.
 	 */
 	public static boolean orbiting() {
-		return DeathCamera.active() && ClientEffectsConfig.get().ownRagdoll
+		return (DeathCamera.active() || LiveRagdolls.own() != null) && ClientEffectsConfig.get().ownRagdoll
 				&& !dev.captience.realisticdamage.client.compat.Vr.active()
 				&& Minecraft.getInstance().gameRenderer.mainCamera().isDetached() && own() != null;
 	}
@@ -72,7 +72,17 @@ public final class RagdollView {
 	/** Your own body's ragdoll, while you are dead. */
 	static @Nullable RagdollCorpse own() {
 		LocalPlayer player = Minecraft.getInstance().player;
-		return player == null ? null : RemoteCorpses.ownRagdoll(player);
+		if (player == null) {
+			return null;
+		}
+		LiveRagdolls.Live live = LiveRagdolls.own();
+		return live != null ? live.ragdoll : RemoteCorpses.ownRagdoll(player);
+	}
+
+	/** 1 while the body lies, falling to 0 as a knocked-down body gets up. */
+	private static float down(float partial) {
+		LiveRagdolls.Live live = LiveRagdolls.own();
+		return live == null ? 1.0F : live.blend(partial);
 	}
 
 	/** Whether the body is still going anywhere: the blackout waits for it. */
@@ -82,7 +92,7 @@ public final class RagdollView {
 	}
 
 	/** Once a frame: the view chases the head. */
-	static void frame(double deltaTicks) {
+	public static void frame(double deltaTicks) {
 		RagdollCorpse r = own();
 		LocalPlayer player = Minecraft.getInstance().player;
 		if (r == null || player == null || !active()) {
@@ -103,6 +113,12 @@ public final class RagdollView {
 		Quaterniond target = basis(forward, up, new Quaterniond());
 		double follow = Math.max(0.3, Math.min(1.0, ClientEffectsConfig.get().deathIntensity()));
 		new Quaterniond(start).slerp(target, follow, target);
+		// Getting up: back to where you are looking.
+		float down = down(partial);
+		if (down < 1.0F) {
+			Quaterniond looking = look(player.getYRot(), player.getXRot(), new Quaterniond());
+			looking.slerp(target, down, target);
+		}
 		// Chase it: smoothed, and never faster than a head can be watched turning.
 		double dt = deltaTicks / 20.0;
 		double angle = view.angle() == 0.0 && target.angle() == 0.0 ? 0.0 : angleBetween(view, target);
@@ -124,7 +140,13 @@ public final class RagdollView {
 		Vector3d centre = new Vector3d(r.body.body(HumanoidRagdoll.HEAD).tickX)
 				.lerp(r.body.body(HumanoidRagdoll.HEAD).x, partial);
 		Vector3d eye = head.transform(new Vector3d(0.0, EYE_Y, EYE_Z).mul(r.body.unit)).add(centre);
-		return new Vec3(eye.x, eye.y, eye.z);
+		Vec3 ragdollEye = new Vec3(eye.x, eye.y, eye.z);
+		float down = down(partial);
+		LocalPlayer player = Minecraft.getInstance().player;
+		if (down < 1.0F && player != null) {
+			return player.getEyePosition(partial).lerp(ragdollEye, down);
+		}
+		return ragdollEye;
 	}
 
 	/** The camera's yaw and pitch this frame, degrees, Minecraft's conventions. */

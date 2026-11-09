@@ -1323,4 +1323,15 @@ public final class Balance {
 	public static final double CORPSE_KICK_SHOT_MAX = 0.35;
 	public static final double CORPSE_KICK_BLAST_MIN = 0.20;
 	public static final double CORPSE_KICK_BLAST_MAX = 0.50;
+
+	// --- Thrown off your feet without dying (active ragdolls phase 4) ---
+	// Violence as DeathMath scores a blow: the raw damage against one and a half
+	// health bars. For a 20-health body: a blast from 7.5, a big hitter from
+	// 4.5, any other blow that lands on the body from 13.5.
+	public static final double KNOCKDOWN_BLAST_VIOLENCE = 0.25;
+	public static final double KNOCKDOWN_HEAVY_VIOLENCE = 0.15;
+	public static final double KNOCKDOWN_BLOW_VIOLENCE = 0.45;
+	/** How long a blast or a blow keeps the body down, ticks, at violence 0 and 1. */
+	public static final int KNOCKDOWN_HIT_TICKS_MIN = 25;
+	public static final int KNOCKDOWN_HIT_TICKS_MAX = 70;
 }

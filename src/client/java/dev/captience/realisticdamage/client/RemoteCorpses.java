@@ -92,6 +92,12 @@ public final class RemoteCorpses {
 		}
 		CORPSES.remove(body.getId());
 		RAGDOLLS.remove(body.getId());
+		// Knocked down and now dead where it lies: the same ragdoll, so nothing jumps.
+		RagdollCorpse taken = LiveRagdolls.takeForDeath(body, payload);
+		if (taken != null) {
+			RAGDOLLS.put(body.getId(), taken);
+			return;
+		}
 		if (config.ragdolls == ClientEffectsConfig.RagdollMode.FULL && (own || RAGDOLLS.size() < config.ragdollLimit
 				&& client.gameRenderer.mainCamera().position().distanceTo(body.position()) < RAGDOLL_RANGE)) {
 			RagdollCorpse ragdoll = RagdollCorpse.create(body, payload, level);
@@ -129,8 +135,10 @@ public final class RemoteCorpses {
 			// A new world or dimension: nothing lying in the old one is here.
 			RAGDOLLS.clear();
 			ORPHANS.clear();
+			LiveRagdolls.clear();
 			lastLevel = level;
 		}
+		LiveRagdolls.tick(level, timeScale);
 		int stay = Math.max(0, ClientEffectsConfig.get().bodiesStay) * 20;
 		var rit = RAGDOLLS.int2ObjectEntrySet().fastIterator();
 		while (rit.hasNext()) {
@@ -267,6 +275,7 @@ public final class RemoteCorpses {
 		CORPSES.clear();
 		RAGDOLLS.clear();
 		ORPHANS.clear();
+		LiveRagdolls.clear();
 	}
 
 	/** How many bodies are being simulated, either way; for the gametest. */
@@ -281,6 +290,10 @@ public final class RemoteCorpses {
 
 	/** The simulated body for this entity, or null. */
 	public static @Nullable View of(Entity entity) {
+		LiveRagdolls.Live live = LiveRagdolls.of(entity);
+		if (live != null) {
+			return live.ragdoll;
+		}
 		if (!RAGDOLLS.isEmpty()) {
 			RagdollCorpse ragdoll = RAGDOLLS.get(entity.getId());
 			if (ragdoll != null && ragdoll.entity.get() == entity) {
@@ -339,6 +352,9 @@ public final class RemoteCorpses {
 	static Iterable<RagdollCorpse> ragdolls() {
 		java.util.List<RagdollCorpse> all = new java.util.ArrayList<>(RAGDOLLS.values());
 		all.addAll(ORPHANS.values());
+		for (RagdollCorpse r : LiveRagdolls.ragdolls()) {
+			all.add(r);
+		}
 		return all;
 	}
 
@@ -371,6 +387,32 @@ public final class RemoteCorpses {
 	 * simulation has it and swaps vanilla's roll for the simulation's.
 	 */
 	public static void extract(LivingEntity entity, LivingEntityRenderState state, float partialTicks) {
+		LiveRagdolls.Live live = state instanceof HumanoidRenderState ? LiveRagdolls.of(entity) : null;
+		if (live != null) {
+			// Knocked down (phase 4): the ragdoll, or part of the way back up from it.
+			HumanoidRenderState humanoid = (HumanoidRenderState) state;
+			RagdollCorpse.Frame frame = live.ragdoll.frame(partialTicks, new Vec3(state.x, state.y, state.z),
+					state.bodyRot, live.blend(partialTicks));
+			humanoid.swimAmount = 0.0F;
+			humanoid.isFallFlying = false;
+			humanoid.isVisuallySwimming = false;
+			humanoid.isCrouching = false;
+			state.isAutoSpinAttack = false;
+			state.isUpsideDown = false;
+			state.pose = net.minecraft.world.entity.Pose.STANDING;
+			state.x = frame.root().x;
+			state.y = frame.root().y;
+			state.z = frame.root().z;
+			state.bodyRot = 180.0F;
+			state.yRot = 0.0F;
+			state.xRot = 0.0F;
+			state.walkAnimationSpeed *= 1.0F - frame.blend();
+			state.deathTime = 0.0F;
+			state.shadowRadius = 0.0F;
+			state.shadowPieces.clear();
+			((CorpseHolder) state).realisticdamage$setCorpse(frame);
+			return;
+		}
 		if (!(state instanceof HumanoidRenderState) || (CORPSES.isEmpty() && RAGDOLLS.isEmpty())) {
 			((CorpseHolder) state).realisticdamage$setCorpse(null);
 			return;

@@ -98,6 +98,9 @@ public class RealisticDamageClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.CorpsePayload.TYPE,
 				(payload, context) -> RemoteCorpses.start(payload));
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.KnockdownPayload.TYPE,
+				(payload, context) -> LiveRagdolls.start(payload));
 
 		// Reachable without Mod Menu, per the "no config-file editing" rule.
 		KeyMapping.Category category = KeyMapping.Category.register(RealisticDamage.id("main"));

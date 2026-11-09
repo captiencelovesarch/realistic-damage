@@ -153,7 +153,11 @@ public class MobAnatomyClientGameTest implements FabricClientGameTest {
 			context.waitTicks(10);
 			long down = context.computeOnClient(client -> DownPose.applications());
 			context.waitTicks(5);
-			if (context.computeOnClient(client -> DownPose.applications()) <= down) {
+			// Laid out either way: as a knockdown ragdoll (active ragdolls phase 4,
+			// the default), or by the classic pose hook with those turned off.
+			boolean ragdolled = context.computeOnClient(client ->
+					dev.captience.realisticdamage.client.LiveRagdolls.count() > 0);
+			if (!ragdolled && context.computeOnClient(client -> DownPose.applications()) <= down) {
 				throw new AssertionError("a collapsed zombie was never laid out");
 			}
 			context.takeScreenshot("rd_mob_04_zombie_collapsed");

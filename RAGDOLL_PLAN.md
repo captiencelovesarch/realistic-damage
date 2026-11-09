@@ -9,6 +9,9 @@ Status (Nov 9 2026):
 - **Phase 4a (bodies that stay) and 4b (your own death) built** (alpha.17 and
   18). 4b is a new Death View setting (Ragdoll / Classic) so the classic
   camera and its tests stay intact.
+- **Phase 4c (knockdown ragdolls) built** (alpha.19): `damage/Knockdowns`
+  (server: non-lethal blasts, big hitters, huge blows) and
+  `client/LiveRagdolls` (thrown, then down, then the get-up blend).
 - Phases 3 and 4 follow. Phase 4 now also covers knockdown ragdolls (being
   thrown without dying).
 

@@ -1,5 +1,40 @@
 # Ragdolls: your in-game checklist
 
+## Phase 4c: knockdown ragdolls (alpha.19) — your ask
+
+New settings: **Knockdown Ragdolls** (On/Off, client) and the server rule
+**knockdownFromBlows** (`/rdmg config`).
+
+**What knocks you down now:**
+- a hard landing (as before);
+- passing out (as before);
+- **new:** a blast that doesn't kill (about 7.5 damage or more to a
+  20-health body);
+- **new:** a blow from a big hitter (iron golem, ravager, warden, hoglin,
+  zoglin);
+- **new:** any single blow of about 13.5 damage or more.
+
+- [ ] **A creeper that doesn't kill you.** You're thrown as a ragdoll, your
+      view rides your head down, you lie there a moment, then you get up and
+      the view blends back to where you're looking.
+- [ ] **An iron golem's swing** knocks a zombie (or you) down as a ragdoll, and
+      it gets back up.
+- [ ] **Passing out** collapses you as a ragdoll. While you're out, a friend
+      dragging you drags the ragdoll across the ground. When you come to, you
+      get up.
+- [ ] **A hard landing:** the same, from the fall.
+- [ ] **Dying while down:** the same body carries on as the corpse, with no
+      jump.
+- [ ] **No legs:** a body with both legs gone stays down (the crawl), as
+      before.
+- [ ] **Getting up** looks like sitting up and rising, not a plank swinging
+      up from its feet.
+- [ ] **Watching a friend** get knocked down: their ragdoll stays where their
+      body is, and doesn't wander off from it.
+- [ ] **Knockdown Ragdolls off:** the old prone drop.
+- [ ] **VR:** your own knockdown stays the old prone drop (no view turns);
+      others still ragdoll.
+
 ## Phase 4a and 4b: bodies that stay, and your own death (alpha.17 and 18)
 
 New settings: **Bodies Stay** (5 s / 30 s / 2 min / 5 min, default 30 s) and

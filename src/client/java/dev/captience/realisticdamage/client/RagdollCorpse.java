@@ -101,6 +101,14 @@ final class RagdollCorpse implements RemoteCorpses.View {
 
 	/** A ragdoll for this body, or null when its model is not a humanoid one. */
 	static @Nullable RagdollCorpse create(LivingEntity entity, CorpsePayload payload, ClientLevel level) {
+		return create(entity, payload, level, false);
+	}
+
+	/**
+	 * As above; {@code live} for a body thrown off its feet that will get up
+	 * again (phase 4 knockdowns): the same reflexes, without the death twitch.
+	 */
+	static @Nullable RagdollCorpse create(LivingEntity entity, CorpsePayload payload, ClientLevel level, boolean live) {
 		EntityRenderer<?, ?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(entity);
 		if (!(renderer instanceof LivingEntityRenderer<?, ?, ?> living)
 				|| !(living.getModel() instanceof HumanoidModel<?> model)) {
@@ -148,7 +156,8 @@ final class RagdollCorpse implements RemoteCorpses.View {
 		ragdoll.inheritMotion(parts, before, seen, LIMB_SWING_SHARE, DT);
 		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
 		ragdoll.setMuscles(muscles);
-		ragdoll.setBehaviour(Behaviour.choose(behaviourInput(entity, payload, snapshot, muscles)));
+		Behaviour behaviour = Behaviour.choose(behaviourInput(entity, payload, snapshot, muscles));
+		ragdoll.setBehaviour(live ? behaviour.withoutTwitch() : behaviour);
 		launch(ragdoll, entity, payload, feet, seen, muscles);
 		if (System.getenv("RD_RAGDOLL_TRACE") != null) {
 			System.out.printf(java.util.Locale.ROOT,
@@ -311,6 +320,31 @@ final class RagdollCorpse implements RemoteCorpses.View {
 				adrenaline == AdrenalineMath.Phase.SURGE, adrenaline == AdrenalineMath.Phase.CRASH);
 	}
 
+	/**
+	 * The launch a knockdown packet carries, onto a ragdoll already started from
+	 * the knocked-down flag (whichever reached this client first).
+	 */
+	void relaunch(LivingEntity entity, CorpsePayload payload) {
+		Vector3d feet = new Vector3d(entity.getX(), entity.getY(), entity.getZ());
+		launch(body, entity, payload, feet, new Vector3d(), body.muscles());
+	}
+
+	/**
+	 * A knocked-down body that dies where it lies: the same ragdoll, now with
+	 * the muscles and reflexes of the death (no new body, so nothing jumps).
+	 */
+	void becomeDeath(LivingEntity entity, CorpsePayload payload) {
+		BodySnapshot snapshot = entity.getAttached(RDAttachments.SNAPSHOT);
+		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
+		body.setMuscles(muscles);
+		body.setBehaviour(Behaviour.choose(behaviourInput(entity, payload, snapshot, muscles)));
+		if (payload.hitPart() >= 0 && payload.hitPart() < FROM_BODY_PART.length && payload.kick() > 0.0F) {
+			double k = payload.kick() * 20.0;
+			body.kick(FROM_BODY_PART[payload.hitPart()], payload.hx() * k, payload.hy() * k, payload.hz() * k);
+		}
+		body.wake();
+	}
+
 	/** Once per client tick. */
 	void tick(double timeScale) {
 		age++;
@@ -410,14 +444,45 @@ final class RagdollCorpse implements RemoteCorpses.View {
 		// The model's root turn: the torso, undoing vanilla's Rz(180) that follows.
 		Quaternionf root = new Quaternionf((float) torsoQ.x, (float) torsoQ.y, (float) torsoQ.z, (float) torsoQ.w)
 				.rotateZ(Mth.PI);
-		return new Frame(new Vec3(torsoPivot.x, torsoPivot.y, torsoPivot.z), root, modelScale, parts);
+		return new Frame(new Vec3(torsoPivot.x, torsoPivot.y, torsoPivot.z), root, modelScale, parts, 1.0F, null);
 	}
+
+	/**
+	 * This frame, part of the way back to standing (phase 4: getting up):
+	 * {@code blend} 1 is the ragdoll, 0 the pose vanilla gives the living body
+	 * at {@code feet} facing {@code bodyYaw}. The whole body turns about the
+	 * hips between the two, so it reads as sitting up and rising rather than a
+	 * plank swinging up about its feet; the parts blend in {@link Frame#pose}.
+	 */
+	Frame frame(float partialTicks, Vec3 feet, float bodyYaw, float blend) {
+		Frame ragdoll = frame(partialTicks);
+		if (blend >= 1.0F) {
+			return ragdoll;
+		}
+		double unit = body.unit;
+		Quaterniond torsoQ = body.orientation(HumanoidRagdoll.TORSO, partialTicks, new Quaterniond());
+		Vector3d torsoPivot = body.pivot(HumanoidRagdoll.TORSO, partialTicks, new Vector3d());
+		Quaterniond standing = HumanoidRagdoll.modelRotation(bodyYaw);
+		Vector3d hipLocal = new Vector3d(0.0, 12.0 * unit, 0.0);
+		Vector3d hipRagdoll = torsoQ.transform(new Vector3d(hipLocal)).add(torsoPivot);
+		Vector3d hipStanding = new Vector3d(feet.x, feet.y + (HIP_FROM_FEET_PX) * unit, feet.z);
+		Quaterniond turn = new Quaterniond(standing).slerp(torsoQ, blend);
+		Vector3d hip = new Vector3d(hipStanding).lerp(hipRagdoll, blend);
+		Vector3d root = hip.sub(turn.transform(new Vector3d(hipLocal)));
+		Quaternionf rotation = new Quaternionf((float) turn.x, (float) turn.y, (float) turn.z, (float) turn.w).rotateZ(Mth.PI);
+		return new Frame(new Vec3(root.x, root.y, root.z), rotation, modelScale, ragdoll.parts(), blend,
+				new java.util.IdentityHashMap<>());
+	}
+
+	/** The hip pivot of a standing humanoid model, pixels above its feet (vanilla's 24.016 drop, less the 12 of the torso). */
+	private static final double HIP_FROM_FEET_PX = 12.016;
 
 	/**
 	 * One frame of a ragdoll: where the torso's pivot is (the render state's
 	 * position), how the model root turns, and each part's offset and angles.
 	 */
-	record Frame(Vec3 root, Quaternionf rotation, float modelScale, float[] parts) implements RemoteCorpses.Frame {
+	record Frame(Vec3 root, Quaternionf rotation, float modelScale, float[] parts, float blend,
+			java.util.@Nullable IdentityHashMap<Object, float[]> vanilla) implements RemoteCorpses.Frame {
 		@Override
 		public void applyRotation(PoseStack poseStack) {
 			// After this, vanilla does Rz(180), its renderer scale and a 1.501
@@ -432,16 +497,58 @@ final class RagdollCorpse implements RemoteCorpses.View {
 			if (!(model instanceof HumanoidModel<?> humanoid)) {
 				return;
 			}
-			humanoid.body.setPos(0.0F, 0.0F, 0.0F);
-			humanoid.body.setRotation(0.0F, 0.0F, 0.0F);
-			set(humanoid.head, HumanoidRagdoll.HEAD);
-			set(humanoid.rightArm, HumanoidRagdoll.RIGHT_ARM);
-			set(humanoid.leftArm, HumanoidRagdoll.LEFT_ARM);
-			set(humanoid.rightLeg, HumanoidRagdoll.RIGHT_LEG);
-			set(humanoid.leftLeg, HumanoidRagdoll.LEFT_LEG);
+			ModelPart[] parts = {humanoid.head, humanoid.body, humanoid.rightArm, humanoid.leftArm, humanoid.rightLeg,
+					humanoid.leftLeg};
+			if (blend >= 1.0F || vanilla == null) {
+				for (int i = 0; i < parts.length; i++) {
+					set(parts[i], i);
+				}
+				return;
+			}
+			// Getting up: part of the way between where vanilla poses the living
+			// body and where the ragdoll lies. Vanilla's pose is read once per
+			// model per frame, before the first blend writes over it (this runs
+			// more than once a frame for the same model).
+			float[] v = vanilla.computeIfAbsent(model, m -> capture(parts));
+			org.joml.Quaternionf a = new org.joml.Quaternionf();
+			org.joml.Quaternionf b = new org.joml.Quaternionf();
+			Vector3f euler = new Vector3f();
+			for (int i = 0; i < parts.length; i++) {
+				int o = i * 6;
+				float rx = i == HumanoidRagdoll.TORSO ? 0.0F : this.parts[o];
+				float ry = i == HumanoidRagdoll.TORSO ? 0.0F : this.parts[o + 1];
+				float rz = i == HumanoidRagdoll.TORSO ? 0.0F : this.parts[o + 2];
+				a.rotationZYX(v[o + 5], v[o + 4], v[o + 3]);
+				b.rotationZYX(this.parts[o + 5], this.parts[o + 4], this.parts[o + 3]);
+				if (i == HumanoidRagdoll.TORSO) {
+					b.identity();
+				}
+				a.slerp(b, blend).getEulerAnglesZYX(euler);
+				parts[i].setPos(Mth.lerp(blend, v[o], rx), Mth.lerp(blend, v[o + 1], ry), Mth.lerp(blend, v[o + 2], rz));
+				parts[i].setRotation(euler.x, euler.y, euler.z);
+			}
+		}
+
+		private static float[] capture(ModelPart[] parts) {
+			float[] v = new float[parts.length * 6];
+			for (int i = 0; i < parts.length; i++) {
+				int o = i * 6;
+				v[o] = parts[i].x;
+				v[o + 1] = parts[i].y;
+				v[o + 2] = parts[i].z;
+				v[o + 3] = parts[i].xRot;
+				v[o + 4] = parts[i].yRot;
+				v[o + 5] = parts[i].zRot;
+			}
+			return v;
 		}
 
 		private void set(ModelPart part, int index) {
+			if (index == HumanoidRagdoll.TORSO) {
+				part.setPos(0.0F, 0.0F, 0.0F);
+				part.setRotation(0.0F, 0.0F, 0.0F);
+				return;
+			}
 			int o = index * 6;
 			part.setPos(parts[o], parts[o + 1], parts[o + 2]);
 			part.setRotation(parts[o + 3], parts[o + 4], parts[o + 5]);

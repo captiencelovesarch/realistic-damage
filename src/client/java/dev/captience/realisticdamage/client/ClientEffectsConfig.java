@@ -241,6 +241,13 @@ public final class ClientEffectsConfig {
 	 */
 	public boolean ownRagdoll = true;
 
+	/**
+	 * Knocked down without dying (active ragdolls phase 4): the body falls as a
+	 * ragdoll and gets back up, instead of dropping into the prone pose. Your
+	 * own body only with Death View on Ragdoll, and never in VR.
+	 */
+	public boolean knockdownRagdolls = true;
+
 	public enum RagdollMode {
 		OFF,
 		SIMPLE,

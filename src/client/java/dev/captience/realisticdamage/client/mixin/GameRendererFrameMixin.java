@@ -65,6 +65,10 @@ public abstract class GameRendererFrameMixin {
 			// the picture lags the impulse by one frame and never by a partial one.
 			CameraMotion.frame(deltaTracker.getGameTimeDeltaTicks());
 			DeathCamera.frame(deltaTracker.getGameTimeDeltaTicks());
+			if (!DeathCamera.active()) {
+				// Knocked down (phase 4): the same ragdoll view, without the death.
+				dev.captience.realisticdamage.client.RagdollView.frame(deltaTracker.getGameTimeDeltaTicks());
+			}
 		}
 	}
 
@@ -81,13 +85,17 @@ public abstract class GameRendererFrameMixin {
 		CameraMotion.apply(poseStack);
 		// The collapse on top (1.7): a dead body's view rolls over and sags.
 		DeathCamera.apply(poseStack);
+		if (!DeathCamera.active() && dev.captience.realisticdamage.client.RagdollView.active()) {
+			poseStack.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(
+					(float) dev.captience.realisticdamage.client.RagdollView.roll()));
+		}
 	}
 
 	// A body on the floor is not holding its hand up in front of its face.
 	@Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
 	private void realisticdamage$deadHand(CameraRenderState cameraState, float deltaPartialTick,
 			org.joml.Matrix4fc modelViewMatrix, CallbackInfo ci) {
-		if (DeathCamera.hideHand()) {
+		if (DeathCamera.hideHand() || dev.captience.realisticdamage.client.RagdollView.active()) {
 			ci.cancel();
 		}
 	}
