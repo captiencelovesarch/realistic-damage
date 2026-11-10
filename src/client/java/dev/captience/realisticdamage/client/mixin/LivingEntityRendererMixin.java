@@ -32,6 +32,7 @@ public abstract class LivingEntityRendererMixin {
 
 	@Inject(method = "extractRenderState", at = @At("TAIL"))
 	private void realisticdamage$carryBody(LivingEntity entity, LivingEntityRenderState state, float partialTicks, CallbackInfo ci) {
+		((dev.captience.realisticdamage.client.EntityIdHolder) state).realisticdamage$setEntityId(entity.getId());
 		LimbStateExtractor.extract(entity, state);
 		dev.captience.realisticdamage.client.RemoteCorpses.extract(entity, state, partialTicks);
 		dev.captience.realisticdamage.client.Flinches.extract(entity, state, partialTicks);
@@ -48,6 +49,9 @@ public abstract class LivingEntityRendererMixin {
 	private void realisticdamage$poseForLayers(LivingEntityRenderState state, PoseStack poseStack,
 			net.minecraft.client.renderer.SubmitNodeCollector collector,
 			net.minecraft.client.renderer.state.level.CameraRenderState camera, CallbackInfo ci) {
+		// The model this body is drawn with, for its ragdoll (a baby's, a variant's).
+		dev.captience.realisticdamage.client.ModelMemory.remember(
+				((dev.captience.realisticdamage.client.EntityIdHolder) state).realisticdamage$entityId(), this.model);
 		dev.captience.realisticdamage.client.RemoteCorpses.pose(this.model, state);
 		dev.captience.realisticdamage.client.Flinches.pose(this.model, state);
 	}
@@ -63,7 +67,14 @@ public abstract class LivingEntityRendererMixin {
 		}
 		int down = ((LimbStateHolder) state).realisticdamage$downMask();
 		if (down != 0) {
-			poseStack.mulPose(Axis.ZP.rotationDegrees(getFlipDegrees()));
+			float flip = getFlipDegrees();
+			if (flip > 135.0F) {
+				// Onto its back (a spider): rolled about its feet it would lie
+				// under the ground, so it is lifted by its height first, the way
+				// vanilla turns an upside-down body over.
+				poseStack.translate(0.0F, state.boundingBoxHeight / scale, 0.0F);
+			}
+			poseStack.mulPose(Axis.ZP.rotationDegrees(flip));
 			DownPose.applied();
 		}
 	}

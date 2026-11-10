@@ -76,6 +76,16 @@ public final class GenericRagdoll {
 	 * @param density kilograms per cubic pixel
 	 */
 	public GenericRagdoll(List<Part> parts, Vector3d origin, Quaterniond model, double unit, double density) {
+		this(parts, origin, model, unit, density, -1);
+	}
+
+	/**
+	 * As above, with the part every other one hangs from given ({@code hub}),
+	 * or -1 for the biggest. The biggest is not always the body: a villager's
+	 * head outweighs its chest.
+	 */
+	public GenericRagdoll(List<Part> parts, Vector3d origin, Quaterniond model, double unit, double density,
+			int hub) {
 		int n = parts.size();
 		this.unit = unit;
 		this.bodies = new Body[n];
@@ -90,7 +100,7 @@ public final class GenericRagdoll {
 				biggest = i;
 			}
 		}
-		this.torso = biggest;
+		this.torso = hub >= 0 && hub < n ? hub : biggest;
 		for (int i = 0; i < n; i++) {
 			Part p = parts.get(i);
 			double hx = Math.max(0.5, (p.maxX() - p.minX()) * 0.5) * unit;

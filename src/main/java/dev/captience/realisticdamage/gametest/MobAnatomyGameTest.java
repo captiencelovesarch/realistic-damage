@@ -212,13 +212,14 @@ public class MobAnatomyGameTest {
 			data.drainConsciousness(Balance.CONSCIOUSNESS_MAX);
 			tick(zombie, data, 1);
 			helper.assertTrue(data.unconscious(), "at zero it is out");
-			helper.assertTrue(zombie.isNoAi(), "and it stops thinking");
+			helper.assertTrue(MobAnatomy.down(zombie) && !zombie.isNoAi(),
+					"and it stops thinking (its AI skipped, not switched off: it still falls)");
 			// Long enough out, and enough consciousness back, and it comes round.
 			data.setUnconsciousTicks(Balance.MIN_UNCONSCIOUS_TICKS);
 			data.restoreConsciousness(Balance.CONSCIOUSNESS_MAX);
 			tick(zombie, data, 1);
 			helper.assertTrue(!data.unconscious(), "awake again");
-			helper.assertTrue(!zombie.isNoAi(), "and thinking again");
+			helper.assertTrue(!MobAnatomy.down(zombie) && !zombie.isNoAi(), "and thinking again");
 		} finally {
 			zombie.discard();
 		}

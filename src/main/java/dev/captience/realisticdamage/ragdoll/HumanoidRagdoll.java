@@ -662,6 +662,11 @@ public final class HumanoidRagdoll {
 		return sim.broken();
 	}
 
+	/** A part's orientation as the body was built (the pose it died in), world. */
+	public Quaterniond startOrientation(int part) {
+		return new Quaterniond(startQ[part]);
+	}
+
 	public double age() {
 		return age;
 	}

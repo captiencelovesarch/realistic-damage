@@ -14,7 +14,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class MobStrikeMixin {
 	@Inject(method = "doHurtTarget", at = @At("HEAD"), cancellable = true)
 	private void realisticdamage$noArmsNoStrike(ServerLevel level, Entity target, CallbackInfoReturnable<Boolean> cir) {
-		if (!MobAnatomy.canStrike((Mob) (Object) this)) {
+		// Nor one that is down: out cold or knocked flat, it strikes at nothing.
+		if (!MobAnatomy.canStrike((Mob) (Object) this) || MobAnatomy.down((Mob) (Object) this)) {
 			cir.setReturnValue(false);
 		}
 	}

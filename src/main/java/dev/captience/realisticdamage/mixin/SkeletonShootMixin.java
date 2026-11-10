@@ -18,7 +18,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class SkeletonShootMixin {
 	@Inject(method = "performRangedAttack", at = @At("HEAD"), cancellable = true)
 	private void realisticdamage$noArmNoShot(LivingEntity target, float power, CallbackInfo ci) {
-		if (!MobAnatomy.canShoot((Mob) (Object) this)) {
+		// Nor one that is down.
+		if (!MobAnatomy.canShoot((Mob) (Object) this) || MobAnatomy.down((Mob) (Object) this)) {
 			ci.cancel();
 		}
 	}

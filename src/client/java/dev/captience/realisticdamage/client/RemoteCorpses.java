@@ -68,6 +68,9 @@ public final class RemoteCorpses {
 
 	/** Farther than this from the camera, blocks, a body falls the simple way: nobody can tell. */
 	private static final double RAGDOLL_RANGE = 64.0;
+	private static final boolean TRACE = System.getenv("RD_RAGDOLL_TRACE") != null;
+	/** Ticks a new ragdoll waits for this client to learn that its body has died. */
+	private static final int DEATH_NEWS_TICKS = 10;
 
 	/** The ragdoll clock, for slow-motion tuning ({@code /rdragdoll slowmo}); 1 is real time. */
 	static double timeScale = 1.0;
@@ -142,6 +145,7 @@ public final class RemoteCorpses {
 			RAGDOLLS.clear();
 			ORPHANS.clear();
 			LiveRagdolls.clear();
+			ModelMemory.clear();
 			lastLevel = level;
 		}
 		LiveRagdolls.tick(level, timeScale);
@@ -151,13 +155,24 @@ public final class RemoteCorpses {
 		while (rit.hasNext()) {
 			SimulatedCorpse ragdoll = rit.next().getValue();
 			Entity entity = level.getEntity(ragdoll.id);
+			// The server says it died as the killing hit lands, and this client
+			// may only hear its health is gone with the next tick's update (a
+			// bleed-out's last point lands after that tick's update has gone): a
+			// new ragdoll is given a few ticks for the news to arrive.
 			boolean still = entity instanceof LivingEntity body && entity == ragdoll.entity.get() && !body.isRemoved()
-					&& body.isDeadOrDying();
+					&& (body.isDeadOrDying() || ragdoll.age < DEATH_NEWS_TICKS);
 			if (ragdoll.expired()) {
+				if (TRACE) {
+					System.out.println("[rd] ragdoll " + ragdoll.id + " dropped: it broke, age " + ragdoll.age);
+				}
 				rit.remove();
 				continue;
 			}
 			if (!still) {
+				if (TRACE) {
+					System.out.println("[rd] ragdoll " + ragdoll.id + " let go by the server: entity " + entity + ", age "
+							+ ragdoll.age);
+				}
 				rit.remove();
 				// The server is done with it (or a respawn took its id). Kept here,
 				// lying where it fell, if this client wants bodies to stay.
@@ -338,6 +353,26 @@ public final class RemoteCorpses {
 		return new double[] {deepest, r.gap(), r.angle(), r.asleep() ? 1.0 : 0.0, r.centreOf().y};
 	}
 
+	/** For the client gametest: how tall this entity's ragdoll is, its lowest corner to its highest, blocks; -1 for none. */
+	public static double ragdollHeight(Entity entity) {
+		SimulatedCorpse r = RAGDOLLS.get(entity.getId());
+		if (r == null) {
+			return -1.0;
+		}
+		double low = Double.POSITIVE_INFINITY;
+		double high = Double.NEGATIVE_INFINITY;
+		org.joml.Vector3d p = new org.joml.Vector3d();
+		for (var b : r.bodies()) {
+			for (int k = 0; k < 8; k++) {
+				p.set((k & 1) == 0 ? -b.hx : b.hx, (k & 2) == 0 ? -b.hy : b.hy, (k & 4) == 0 ? -b.hz : b.hz);
+				b.q.transform(p).add(b.x);
+				low = Math.min(low, p.y);
+				high = Math.max(high, p.y);
+			}
+		}
+		return high - low;
+	}
+
 	/** The ragdoll of this entity id, still with its entity or kept after it (an orphan); null for none. */
 	static @Nullable SimulatedCorpse simulated(int entityId) {
 		SimulatedCorpse r = RAGDOLLS.get(entityId);
@@ -380,6 +415,11 @@ public final class RemoteCorpses {
 	/** For the client gametest: the lean of this entity's ragdoll, degrees, or -1 for none. */
 	public static double leanOf(int entityId) {
 		return RagdollCorpse.leanOf(entityId);
+	}
+
+	/** For the client gametest: see {@link RagdollCorpse#limbAngleOf}. */
+	public static double limbAngleOf(int entityId, int part) {
+		return RagdollCorpse.limbAngleOf(entityId, part);
 	}
 
 	/** For the client gametest: whether this body is simulated by the any-model rig. */

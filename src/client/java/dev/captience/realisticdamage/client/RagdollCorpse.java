@@ -24,6 +24,7 @@ import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
@@ -118,8 +119,9 @@ final class RagdollCorpse extends SimulatedCorpse {
 	 */
 	static @Nullable RagdollCorpse create(LivingEntity entity, CorpsePayload payload, ClientLevel level, boolean live) {
 		EntityRenderer<?, ?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(entity);
+		// The model this body is drawn with: a baby has its own, smaller one.
 		if (!(renderer instanceof LivingEntityRenderer<?, ?, ?> living)
-				|| !(living.getModel() instanceof HumanoidModel<?> model)) {
+				|| !(ModelMemory.of(living, entity) instanceof HumanoidModel<?> model)) {
 			return null;
 		}
 		HumanoidRagdoll.Part[] parts = {
@@ -167,8 +169,16 @@ final class RagdollCorpse extends SimulatedCorpse {
 			stride = (float) Math.min(1.0, Math.hypot(seen.x, seen.z) * DT * 4.0);
 			phase = Math.floorMod(entity.getId() * 0x9E3779B9L, 4096L) / 4096.0F * Mth.TWO_PI / 0.6662F;
 		}
-		float[] now = deathPose(entity, 1.0F, -phase, stride);
-		float[] before = deathPose(entity, 1.0F, stride - phase, stride);
+		// The pose it was drawn in (a zombie's arms out, a skeleton drawing its
+		// bow), the tick before for how it was moving; the walk cycle as worked
+		// out above.
+		float walk = entity.walkAnimation.position(1.0F) + phase;
+		float[] now = modelPose(living, model, entity, 1.0F, walk, stride);
+		float[] before = modelPose(living, model, entity, 0.0F, walk - stride, stride);
+		if (now == null || before == null) {
+			now = deathPose(entity, 1.0F, -phase, stride);
+			before = deathPose(entity, 1.0F, stride - phase, stride);
+		}
 		HumanoidRagdoll ragdoll = new HumanoidRagdoll(parts, feet, yaw, unit, now, present);
 		ragdoll.inheritMotion(parts, before, seen, LIMB_SWING_SHARE, DT);
 		StandTestPayload stand = STAND_TESTS.remove(entity.getId());
@@ -294,6 +304,21 @@ final class RagdollCorpse extends SimulatedCorpse {
 		return corpse instanceof RagdollCorpse r ? r.body.lean() : -1.0;
 	}
 
+	/**
+	 * For the client gametest: how far a limb of this entity's ragdoll was from
+	 * hanging straight down the torso as it was built (the pose it died in),
+	 * degrees (an arm held out in front is about 90); -1 for none.
+	 */
+	public static double limbAngleOf(int entityId, int part) {
+		SimulatedCorpse corpse = RemoteCorpses.simulated(entityId);
+		if (!(corpse instanceof RagdollCorpse r) || !r.body.present(part)) {
+			return -1.0;
+		}
+		org.joml.Vector3d down = r.body.startOrientation(HumanoidRagdoll.TORSO).transform(new org.joml.Vector3d(0.0, 1.0, 0.0));
+		org.joml.Vector3d limb = r.body.startOrientation(part).transform(new org.joml.Vector3d(0.0, 1.0, 0.0));
+		return Math.toDegrees(Math.acos(Math.max(-1.0, Math.min(1.0, down.dot(limb)))));
+	}
+
 	/** For the client gametest: where the torso of this entity's ragdoll is, world, or null for none. */
 	public static org.joml.@Nullable Vector3d torsoOf(int entityId) {
 		SimulatedCorpse corpse = RemoteCorpses.simulated(entityId);
@@ -350,10 +375,46 @@ final class RagdollCorpse extends SimulatedCorpse {
 	}
 
 	/**
+	 * The parts' rotations in the body's last moment, as its own model poses
+	 * them: everything the renderer knows (where it looked, what its arms were
+	 * doing: a zombie's reach, a drawn bow, a swing), with the walk cycle at
+	 * {@code walkPos} and {@code walkSpeed}. {@code partialTicks} 0 is the tick
+	 * before. Null if the model would not pose (a renderer that needs more than
+	 * a body to describe it): {@link #deathPose} then.
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static float @Nullable [] modelPose(LivingEntityRenderer<?, ?, ?> renderer, HumanoidModel<?> model,
+			LivingEntity entity, float partialTicks, float walkPos, float walkSpeed) {
+		try {
+			LivingEntityRenderState state = (LivingEntityRenderState) ((EntityRenderer) renderer)
+					.createRenderState(entity, partialTicks);
+			state.walkAnimationPos = walkPos;
+			state.walkAnimationSpeed = walkSpeed;
+			((HumanoidModel) model).setupAnim(state);
+			ModelPart[] parts = {model.head, model.body, model.rightArm, model.leftArm, model.rightLeg, model.leftLeg};
+			float[] r = new float[18];
+			for (int i = 0; i < parts.length; i++) {
+				r[i * 3] = parts[i].xRot;
+				r[i * 3 + 1] = parts[i].yRot;
+				r[i * 3 + 2] = parts[i].zRot;
+			}
+			for (float f : r) {
+				if (!Float.isFinite(f)) {
+					return null;
+				}
+			}
+			return r;
+		} catch (RuntimeException e) {
+			return null;
+		}
+	}
+
+	/**
 	 * The parts' rotations in the body's last moment, the way vanilla's
 	 * {@code HumanoidModel.setupAnim} would have posed them: head where it was
 	 * looking, arms and legs where the walk cycle had them. {@code back} is how
-	 * far to wind the walk back, for the pose a tick earlier.
+	 * far to wind the walk back, for the pose a tick earlier. The fallback for
+	 * {@link #modelPose}.
 	 */
 	private static float[] deathPose(LivingEntity entity, float partialTicks, float back, float stride) {
 		float[] r = new float[18];

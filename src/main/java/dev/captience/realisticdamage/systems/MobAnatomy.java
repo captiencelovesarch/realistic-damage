@@ -346,20 +346,39 @@ public final class MobAnatomy {
 		}
 	}
 
-	/** Consciousness gone: the mob stops thinking until it comes round. */
+	/**
+	 * Consciousness gone: the mob stops thinking until it comes round ({@link
+	 * #down}), and forgets what it was after.
+	 */
 	public static void collapse(LivingEntity entity) {
-		if (entity instanceof Mob mob && !(entity instanceof Player) && !mob.isNoAi()) {
-			mob.setNoAi(true);
+		if (entity instanceof Mob mob) {
 			mob.setTarget(null);
-			putOut.add(mob);
+			mob.getNavigation().stop();
 		}
 	}
 
-	/** Awake again: AI back, but only if this class took it away. */
+	/**
+	 * Awake again: its AI comes back by itself ({@link #down}). A mob put out
+	 * by a version that switched its AI off instead gets it back here.
+	 */
 	public static void wake(LivingEntity entity) {
 		if (entity instanceof Mob mob && putOut.remove(mob)) {
 			mob.setNoAi(false);
 		}
+	}
+
+	/**
+	 * Out cold or knocked flat: a mob that is down does nothing of its own (no
+	 * goals, no brain, no strikes, no shots, no fuse), though it still falls,
+	 * slides and is thrown. Switching its AI off would stop those too: a mob
+	 * with no AI does not move at all. Server side; players never.
+	 */
+	public static boolean down(LivingEntity entity) {
+		if (!(entity instanceof Mob) || entity.level().isClientSide()) {
+			return false;
+		}
+		RealisticDamageData data = entity.getAttached(RDAttachments.DATA);
+		return data != null && (data.unconscious() || data.knockedDown());
 	}
 
 	/** Can this mob still swing at something? Not with both arms gone. */

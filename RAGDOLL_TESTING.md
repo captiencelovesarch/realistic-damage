@@ -1,5 +1,35 @@
 # Ragdolls: your in-game checklist
 
+## Your seven nitpicks (alpha.26)
+
+- [ ] **1. Ragdolls start in the pose the mob was in.** Kill a zombie: its
+      arms are still out as it goes down. Kill a skeleton while it's drawing
+      its bow: it falls with its arms up and out, bow pose. Players, piglins
+      and the rest too: whatever the model was doing (a swing, a look) is
+      where the ragdoll starts. (Before, every body started from a made-up
+      walk pose with its arms at its sides.)
+- [ ] **2. Down means down.** An unconscious or knocked-down mob does nothing
+      of its own: a zombie doesn't hit you, a skeleton doesn't shoot, a
+      creeper's fuse dies away (one you lit with flint and steel still goes).
+      Knocked-down mobs used to keep their AI, and an unconscious creeper
+      that was already hissing kept counting. Unconscious mobs also fall
+      now if they pass out in mid-air (before, they hung there).
+- [ ] **3. Spiders aren't launched.** A dead spider collapses where it
+      stands, legs splayed. (It was being rolled over legs that reach a
+      block out, which spun it into the air.)
+- [ ] **4. Unconscious spiders lie on their backs**, legs up, on top of the
+      ground, not sunk into it.
+- [ ] **5. Baby mobs are their own size.** Baby zombies, baby villagers,
+      piglets, calves: the ragdoll is built from the small model the baby is
+      drawn with, not the adult's.
+- [ ] **6. Villagers** fall with their head jointed at the neck, and their
+      hat brim and robe no longer count as part of the body they land on.
+      (The head, hat brim, chest and robe were one big box.)
+- [ ] **7. Bleed-out death in first person** rides your ragdoll like every
+      other death. (Your ragdoll was being thrown away in its first tick,
+      because the news that you'd died reached your client a tick after the
+      ragdoll did.)
+
 ## Stumbling deaths, IK phase 2: Arcade (alpha.25)
 
 Arcade is the **cinematic** one: readable, a bit theatrical, about the same

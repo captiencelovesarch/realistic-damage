@@ -230,6 +230,7 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 			reflexes(context, singleplayer, px, py, pz);
 			bodiesStay(context, singleplayer, px, py, pz);
 			animals(context, singleplayer, px, py, pz);
+			poses(context, singleplayer, px, py, pz);
 		}
 	}
 
@@ -237,7 +238,9 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 	 * Phase 4: bodies that are not humanoids, from their own models: a cow, a
 	 * pig, a spider, a chicken, a creeper and a villager. Each is ragdolled by
 	 * the any-model rig, lands on the blocks in one piece, and ends over on its
-	 * side (or toppled, on two legs).
+	 * side (or toppled, on two legs). Except the spider: it collapses where it
+	 * stands, legs splayed, flat on the ground, and is never thrown up (rolled
+	 * over legs that reach that far, it was).
 	 */
 	private static void animals(ClientGameTestContext context, TestSingleplayerContext singleplayer,
 			double px, double py, double pz) {
@@ -283,6 +286,7 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 		});
 		context.waitTicks(2);
 		List<String> failures = new ArrayList<>();
+		double[] highest = new double[ids.size()];
 		for (int i = 0; i < ids.size(); i++) {
 			int id = ids.get(i);
 			boolean generic = context.computeOnClient(client -> {
@@ -292,10 +296,29 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 			if (!generic) {
 				failures.add(types.get(i).toShortString() + " was not ragdolled by the any-model rig");
 			}
+			highest[i] = Double.NEGATIVE_INFINITY;
 		}
-		context.waitTicks(8);
-		context.takeScreenshot("rd_ragdoll_41_animals_falling");
-		context.waitTicks(50);
+		// How high each body's centre goes as it falls, above where it started.
+		double[] start = new double[ids.size()];
+		for (int tick = 0; tick < 58; tick++) {
+			for (int i = 0; i < ids.size(); i++) {
+				int id = ids.get(i);
+				double[] check = context.computeOnClient(client -> {
+					Entity e = client.level.getEntity(id);
+					return e == null ? null : RemoteCorpses.ragdollCheck(e);
+				});
+				if (check != null) {
+					if (tick == 0) {
+						start[i] = check[4];
+					}
+					highest[i] = Math.max(highest[i], check[4] - start[i]);
+				}
+			}
+			if (tick == 8) {
+				context.takeScreenshot("rd_ragdoll_41_animals_falling");
+			}
+			context.waitTick();
+		}
 		context.takeScreenshot("rd_ragdoll_42_animals_down");
 		StringBuilder report = new StringBuilder();
 		for (int i = 0; i < ids.size(); i++) {
@@ -309,15 +332,23 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 				failures.add(name + ": no ragdoll by the time it should have landed");
 				continue;
 			}
-			report.append(String.format(java.util.Locale.ROOT, "[rd] animal %s: inside %.3f, joint gap %.3f, lean %.1f, at rest %s%n",
-					name, check[0], check[1], check[2], check[3] > 0.5));
+			report.append(String.format(java.util.Locale.ROOT,
+					"[rd] animal %s: inside %.3f, joint gap %.3f, lean %.1f, at rest %s, centre %.2f above the ground, rose %.2f%n",
+					name, check[0], check[1], check[2], check[3] > 0.5, check[4] - by, highest[i]));
 			if (check[0] > 0.08) {
 				failures.add(name + " ended " + check[0] + " inside a block");
 			}
 			if (check[1] > 0.06) {
 				failures.add(name + " came apart at a joint by " + check[1]);
 			}
-			if (check[2] < 45.0) {
+			if (types.get(i) == EntityTypes.SPIDER) {
+				if (highest[i] > 0.3) {
+					failures.add("the spider was thrown up " + highest[i] + " blocks");
+				}
+				if (check[4] - by > 0.45) {
+					failures.add("the spider is still standing, its centre " + (check[4] - by) + " above the ground");
+				}
+			} else if (check[2] < 45.0) {
 				failures.add(name + " is still standing (lean " + check[2] + ")");
 			}
 		}
@@ -669,4 +700,131 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 			throw new AssertionError(e);
 		}
 	}
+
+	/**
+	 * Bodies ragdolled from the model they are drawn with, in the pose it had:
+	 * a zombie's arms held out in front, a skeleton drawing its bow; a baby
+	 * zombie and a baby villager at their own size, not stretched over an
+	 * adult's (their renderers hold a separate, smaller model). And a spider
+	 * out cold lies on its back, not rolled into the ground.
+	 */
+	private static void poses(ClientGameTestContext context, TestSingleplayerContext singleplayer,
+			double px, double py, double pz) {
+		double bx = Math.floor(px) + 0.5;
+		double by = Math.floor(py);
+		double bz = Math.floor(pz) + 34.0;
+		String[] names = {"zombie", "baby zombie", "skeleton", "villager", "baby villager"};
+		List<Integer> ids = new ArrayList<>();
+		double[] tall = new double[names.length];
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			List<LivingEntity> bodies = List.of(EntityTypes.ZOMBIE.create(level, EntitySpawnReason.COMMAND),
+					EntityTypes.ZOMBIE.create(level, EntitySpawnReason.COMMAND),
+					EntityTypes.SKELETON.create(level, EntitySpawnReason.COMMAND),
+					EntityTypes.VILLAGER.create(level, EntitySpawnReason.COMMAND),
+					EntityTypes.VILLAGER.create(level, EntitySpawnReason.COMMAND));
+			for (int i = 0; i < bodies.size(); i++) {
+				LivingEntity body = bodies.get(i);
+				body.snapTo(bx - 6.0 + i * 3.0, by, bz, 180.0F, 0.0F);
+				body.setYHeadRot(180.0F);
+				body.yBodyRot = 180.0F;
+				Mob mob = (Mob) body;
+				mob.setNoAi(true);
+				mob.setPersistenceRequired();
+				if (i == 1) {
+					((net.minecraft.world.entity.monster.zombie.Zombie) body).setBaby(true);
+				}
+				if (i == 2) {
+					// Drawing its bow at someone.
+					body.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
+							new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BOW));
+					mob.setAggressive(true);
+				}
+				if (i == 4) {
+					((net.minecraft.world.entity.npc.villager.Villager) body).setAge(-24000);
+				}
+				level.addFreshEntity(body);
+				RDAttachments.get(body).reset();
+				RDAttachments.pushSnapshot(body);
+				MobAnatomy.track(body);
+				ids.add(body.getId());
+				tall[i] = body.getBbHeight();
+			}
+		});
+		context.runOnClient(client -> {
+			client.player.setPos(bx, py + 1.0, bz - 7.0);
+			client.player.setYRot(0.0F);
+			client.player.setXRot(10.0F);
+		});
+		context.waitTicks(30);
+		context.takeScreenshot("rd_ragdoll_50_poses_standing");
+		singleplayer.getServer().runOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			for (int id : ids) {
+				LivingEntity body = (LivingEntity) level.getEntity(id);
+				Corpses.script(body, new Corpses.Script(DeathKind.BLOW, BodyPart.TORSO, new Vec3(0.0, 0.0, 1.0), 0.1, 0.2));
+				body.invulnerableTime = 0;
+				body.kill(level);
+			}
+		});
+		context.waitTicks(2);
+		context.takeScreenshot("rd_ragdoll_51_poses_at_death");
+		List<String> failures = new ArrayList<>();
+		StringBuilder report = new StringBuilder();
+		double[] height = new double[names.length];
+		for (int i = 0; i < names.length; i++) {
+			int id = ids.get(i);
+			height[i] = context.computeOnClient(client -> {
+				Entity e = client.level.getEntity(id);
+				return e == null ? -1.0 : RemoteCorpses.ragdollHeight(e);
+			});
+			double arm = context.computeOnClient(client -> RemoteCorpses.limbAngleOf(id,
+					dev.captience.realisticdamage.ragdoll.HumanoidRagdoll.RIGHT_ARM));
+			report.append(String.format(java.util.Locale.ROOT, "[rd] pose %s: ragdoll %.2f tall (the body %.2f), right arm %.0f deg%n",
+					names[i], height[i], tall[i], arm));
+			if (height[i] < 0.0) {
+				failures.add(names[i] + " was not ragdolled");
+				continue;
+			}
+			// Its own size: as tall as the body it was, give or take a third.
+			if (height[i] < tall[i] * 0.65 || height[i] > tall[i] * 1.35) {
+				failures.add(names[i] + "'s ragdoll is " + height[i] + " tall, the body " + tall[i]);
+			}
+			if ((i == 0 || i == 2) && arm < 50.0) {
+				failures.add(names[i] + "'s arms started " + arm + " degrees off its sides, not held out");
+			}
+		}
+		System.out.print(report);
+		context.waitTicks(40);
+		context.takeScreenshot("rd_ragdoll_52_poses_down");
+
+		// A spider out cold.
+		int spider = singleplayer.getServer().computeOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			LivingEntity body = EntityTypes.SPIDER.create(level, EntitySpawnReason.COMMAND);
+			// In front of the others, side on to the camera.
+			body.snapTo(bx + 1.5, by, bz - 3.5, 90.0F, 0.0F);
+			((Mob) body).setPersistenceRequired();
+			level.addFreshEntity(body);
+			RealisticDamageData data = RDAttachments.get(body);
+			data.reset();
+			data.setConsciousness(0.0);
+			data.setUnconscious(true);
+			RDAttachments.pushSnapshot(body);
+			MobAnatomy.track(body);
+			return body.getId();
+		});
+		context.waitTicks(20);
+		context.takeScreenshot("rd_ragdoll_53_spider_out_cold");
+		singleplayer.getServer().runOnServer(server -> {
+			Entity body = server.getPlayerList().getPlayers().getFirst().level().getEntity(spider);
+			if (body != null) {
+				body.discard();
+			}
+		});
+		if (!failures.isEmpty()) {
+			throw new AssertionError(String.join("; ", failures));
+		}
+	}
+
 }

@@ -13,7 +13,20 @@ import org.spongepowered.asm.mixin.Unique;
  */
 @Mixin(LivingEntityRenderState.class)
 public abstract class LivingRenderStateMixin implements LimbStateHolder, BloodStainHolder, dev.captience.realisticdamage.client.CorpseHolder,
-		dev.captience.realisticdamage.client.FlinchHolder {
+		dev.captience.realisticdamage.client.FlinchHolder, dev.captience.realisticdamage.client.EntityIdHolder {
+	@Unique
+	private int realisticdamage$entityId = -1;
+
+	@Override
+	public int realisticdamage$entityId() {
+		return this.realisticdamage$entityId;
+	}
+
+	@Override
+	public void realisticdamage$setEntityId(int id) {
+		this.realisticdamage$entityId = id;
+	}
+
 	@Unique
 	private float @org.jspecify.annotations.Nullable [] realisticdamage$flinch;
 

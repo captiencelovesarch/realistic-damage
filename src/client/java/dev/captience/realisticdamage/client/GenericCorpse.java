@@ -37,10 +37,15 @@ import org.jspecify.annotations.Nullable;
  * box ({@link GenericRagdoll}), parts that share a pivot and a rest angle (a
  * chicken's head, beak and wattle) one box between them.
  *
- * <p>Four legs and more keel over onto the side; the upright ones topple the
- * way they were pushed. Bosses, and bodies that would make no sense as jointed
- * boxes (a slime, a fish, a ghast, a guardian and its spikes), keep vanilla's
- * death.
+ * <p>Four legs keel over onto the side; the upright ones topple the way they
+ * were pushed; a spider collapses where it stands (its legs reach so far that
+ * rolling it over them throws it). Bosses, and bodies that would make no
+ * sense as jointed boxes (a slime, a fish, a ghast, a guardian and its
+ * spikes), keep vanilla's death.
+ *
+ * <p>Built from the model the body is drawn with ({@link ModelMemory}: a
+ * baby's own, a variant's), without the layers drawn over it (a villager's
+ * hat and robe), hung from the part called "body" where there is one.
  */
 final class GenericCorpse extends SimulatedCorpse {
 	private static final double DT = 0.05;
@@ -86,7 +91,8 @@ final class GenericCorpse extends SimulatedCorpse {
 		if (!(renderer instanceof LivingEntityRenderer<?, ?, ?> living)) {
 			return null;
 		}
-		Model<?> model = living.getModel();
+		// The model this body is drawn with: a baby's, a variant's.
+		Model<?> model = ModelMemory.of(living, entity);
 		if (model instanceof HumanoidModel<?>) {
 			return null;
 		}
@@ -115,9 +121,13 @@ final class GenericCorpse extends SimulatedCorpse {
 			if (box == null) {
 				continue;
 			}
+			// Parts that share a pivot and a rest angle are one piece when one
+			// is a small thing on the other (a chicken's beak and wattle on its
+			// head), not when they are two of the body's big pieces (a
+			// villager's head on its chest: the neck).
 			int same = -1;
 			for (int i = 0; i < poses.size(); i++) {
-				if (samePose(poses.get(i), rest)) {
+				if (samePose(poses.get(i), rest) && attached(boxes.get(i), box)) {
 					same = i;
 					break;
 				}
@@ -151,10 +161,38 @@ final class GenericCorpse extends SimulatedCorpse {
 		Quaterniond qm = HumanoidRagdoll.modelRotation(entity.yBodyRot);
 		Vector3d feet = new Vector3d(entity.getX(), entity.getY(), entity.getZ());
 		Vector3d origin = qm.transform(new Vector3d(0.0, -24.016 * unit, 0.0)).add(feet);
-		GenericRagdoll ragdoll = new GenericRagdoll(parts, origin, qm, unit, DENSITY);
+		// Everything hangs from the body where the model has one.
+		int torso = -1;
+		for (int i = 0; i < names.size(); i++) {
+			if (names.get(i).contains("body")) {
+				torso = i;
+				break;
+			}
+		}
+		GenericRagdoll ragdoll = new GenericRagdoll(parts, origin, qm, unit, DENSITY, torso);
 		launch(ragdoll, entity, payload, plan, feet, names);
 		return new GenericCorpse(entity, ragdoll, names, modelScale, level);
 	}
+
+	/** Whether the smaller of two boxes is a small thing on the larger: a beak on a head, not a head on a chest. */
+	private static boolean attached(double[] a, double[] b) {
+		double va = (a[3] - a[0]) * (a[4] - a[1]) * (a[5] - a[2]);
+		double vb = (b[3] - b[0]) * (b[4] - b[1]) * (b[5] - b[2]);
+		return Math.min(va, vb) <= SMALL_SHARE * Math.max(va, vb);
+	}
+
+	/** The most of the hit's upward hop a dead spider keeps, blocks a second. */
+	private static final double ARTHROPOD_HOP = 1.5;
+
+	/** A part this much of another's size, or less, that shares its pivot is part of it. */
+	private static final double SMALL_SHARE = 0.35;
+
+	/**
+	 * Layers drawn over a part rather than parts of the body (a villager's hat
+	 * and its brim, its robe): not what it lies on. The robe hangs to the
+	 * knees, and as part of the chest's box it would stand the body on it.
+	 */
+	private static final java.util.Set<String> OVERLAYS = java.util.Set.of("hat", "hat_rim", "jacket");
 
 	private static boolean samePose(PartPose a, PartPose b) {
 		return Math.abs(a.x() - b.x()) < 1.0e-4 && Math.abs(a.y() - b.y()) < 1.0e-4 && Math.abs(a.z() - b.z()) < 1.0e-4
@@ -172,6 +210,11 @@ final class GenericCorpse extends SimulatedCorpse {
 		part.loadPose(PartPose.ZERO);
 		try {
 			part.visit(new PoseStack(), (pose, path, index, cube) -> {
+				for (String step : path.split("/")) {
+					if (OVERLAYS.contains(step)) {
+						return;
+					}
+				}
 				Matrix4f m = pose.pose();
 				for (ModelPart.Polygon polygon : cube.polygons) {
 					for (ModelPart.Vertex v : polygon.vertices()) {
@@ -202,7 +245,12 @@ final class GenericCorpse extends SimulatedCorpse {
 			seen.normalize(MAX_INHERITED_SPEED);
 		}
 		Vector3d sent = new Vector3d(payload.vx(), payload.vy(), payload.vz()).mul(20.0);
-		Vector3d moving = sent.lengthSquared() > seen.lengthSquared() ? sent : seen;
+		Vector3d moving = new Vector3d(sent.lengthSquared() > seen.lengthSquared() ? sent : seen);
+		if (plan == BodyPlan.ARTHROPOD && payload.kind() != DeathKind.EXPLOSION && moving.y > ARTHROPOD_HOP) {
+			// The hop a hit gives a living mob (8 blocks a second up) throws a
+			// light, sprawling body into the air: a spider that is killed drops.
+			moving.y = ARTHROPOD_HOP;
+		}
 		ragdoll.push(moving.x, moving.y, moving.z);
 		if (payload.kick() > 0.0F) {
 			int part = ragdoll.torso;
@@ -220,6 +268,11 @@ final class GenericCorpse extends SimulatedCorpse {
 		double yaw = Math.toRadians(entity.yBodyRot);
 		Vector3d forward = new Vector3d(-Math.sin(yaw), 0.0, Math.cos(yaw));
 		Vector3d flat = new Vector3d(moving.x, 0.0, moving.z);
+		if (plan == BodyPlan.ARTHROPOD) {
+			// Eight legs reach far past its body: rolled over them it is thrown,
+			// not keeled. It collapses where it stands, legs splaying.
+			return;
+		}
 		if (keels(plan)) {
 			// Onto the side the push sends it, or the side its position picks.
 			Vector3d right = new Vector3d(forward).cross(0.0, 1.0, 0.0);
