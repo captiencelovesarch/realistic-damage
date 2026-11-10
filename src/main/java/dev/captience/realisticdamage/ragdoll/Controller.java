@@ -13,4 +13,9 @@ public interface Controller {
 
 	/** Whether it is still holding the body up. A body being held never falls asleep. */
 	boolean holding();
+
+	/** Whether it is not done with a body it has let go of: one it is not done with does not fall asleep either. */
+	default boolean restless() {
+		return false;
+	}
 }

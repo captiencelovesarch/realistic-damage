@@ -19,6 +19,15 @@ import org.jspecify.annotations.Nullable;
  * at all (the position always follows; a camera left floating where you stood
  * while your body flew away would be worse than none).
  *
+ * <p>A death that stumbles is the exception while the body is still on its
+ * feet. Its head hangs loose and whips about on the neck with every step
+ * (right for a body seen from outside, a blur from inside), so until it goes
+ * down the view is carried by the chest instead: it turns as the chest has
+ * turned since you died, from where you were looking, and sits where your
+ * eyes were on it. That leaves what a stumble is, the lurch, the steps and
+ * the going over, and drops the whipping. Once the body is let go of the view
+ * eases back to the head for the fall.
+ *
  * <p>{@link DeathCamera} still decides everything else (the blackout held
  * while the body moves, the death screen fading in) and still runs the classic
  * view when Death View is set to Classic. Never in VR: the headset is the view
@@ -34,11 +43,21 @@ public final class RagdollView {
 	/** The eyes, from the head's centre, in model pixels: a little up and forward, inside the head. */
 	private static final double EYE_Y = -0.5;
 	private static final double EYE_Z = -1.0;
+	/** The same two for a body still on its feet, carried by its chest: slower, to read as a lurch. */
+	private static final double STEADY_TURN = 3.0;
+	private static final double STEADY_LAG = 0.16;
+	/** Seconds for the view to go from the chest back to the head once the body is let go of. */
+	private static final double STEADY_EASE = 0.3;
 
 	private static final Quaterniond view = new Quaterniond();
 	private static final Quaterniond start = new Quaterniond();
 	private static boolean started;
 	private static double roll;
+	/** 1 while the chest carries the view (a body still on its feet), 0 riding the head. */
+	private static double steady;
+	/** The chest's turn when it began to carry the view, and where the eyes were on it. */
+	private static final Quaterniond chestStart = new Quaterniond();
+	private static final Vector3d eyeOnChest = new Vector3d();
 
 	/** Whether the camera is riding the ragdoll this frame. */
 	public static boolean active() {
@@ -85,10 +104,20 @@ public final class RagdollView {
 		return live == null ? 1.0F : live.blend(partial);
 	}
 
-	/** Whether the body is still going anywhere: the blackout waits for it. */
+	/**
+	 * Whether the body is still going anywhere: the blackout waits for it. A
+	 * body still on its feet (a death that stumbles) has yet to fall, however
+	 * still it stands.
+	 */
 	public static boolean moving() {
 		RagdollCorpse r = own();
-		return r != null && !r.body.asleep() && r.body.sim.maxMotion() > 0.4;
+		if (r == null) {
+			return false;
+		}
+		if (r.body.controller() != null && r.body.controller().holding()) {
+			return true;
+		}
+		return !r.body.asleep() && r.body.sim.maxMotion() > 0.4;
 	}
 
 	/** Once a frame: the view chases the head. */
@@ -98,19 +127,35 @@ public final class RagdollView {
 		if (r == null || player == null || !active()) {
 			started = false;
 			roll = 0.0;
+			steady = 0.0;
 			return;
 		}
 		float partial = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
+		double dt = deltaTicks / 20.0;
+		boolean onFeet = r.body.controller() != null && r.body.controller().holding();
 		if (!started) {
 			look(player.getYRot(), player.getXRot(), start);
 			view.set(start);
 			started = true;
+			steady = onFeet ? 1.0 : 0.0;
+			if (onFeet) {
+				r.body.orientation(HumanoidRagdoll.TORSO, partial, chestStart);
+				chestStart.transformInverse(headEye(r, partial, eyeOnChest).sub(centre(r, HumanoidRagdoll.TORSO, partial)));
+			}
+		} else if (!onFeet) {
+			steady = Math.max(0.0, steady - dt / STEADY_EASE);
 		}
 		// Where the face points, as a camera orientation (forward -Z, up +Y).
 		Quaterniond head = r.body.orientation(HumanoidRagdoll.HEAD, partial, new Quaterniond());
 		Vector3d forward = head.transform(new Vector3d(0.0, 0.0, -1.0));
 		Vector3d up = head.transform(new Vector3d(0.0, -1.0, 0.0));
 		Quaterniond target = basis(forward, up, new Quaterniond());
+		if (steady > 0.0) {
+			// Where you were looking, turned as the chest has turned since.
+			Quaterniond chest = r.body.orientation(HumanoidRagdoll.TORSO, partial, new Quaterniond());
+			Quaterniond carried = chest.mul(new Quaterniond(chestStart).conjugate()).mul(start);
+			target.slerp(carried, steady);
+		}
 		double follow = Math.max(0.3, Math.min(1.0, ClientEffectsConfig.get().deathIntensity()));
 		new Quaterniond(start).slerp(target, follow, target);
 		// Getting up: back to where you are looking.
@@ -120,11 +165,10 @@ public final class RagdollView {
 			looking.slerp(target, down, target);
 		}
 		// Chase it: smoothed, and never faster than a head can be watched turning.
-		double dt = deltaTicks / 20.0;
 		double angle = view.angle() == 0.0 && target.angle() == 0.0 ? 0.0 : angleBetween(view, target);
 		if (angle > 1.0e-6) {
-			double t = 1.0 - Math.exp(-dt / LAG);
-			t = Math.min(t, MAX_TURN * dt / angle);
+			double t = 1.0 - Math.exp(-dt / (LAG + (STEADY_LAG - LAG) * steady));
+			t = Math.min(t, (MAX_TURN + (STEADY_TURN - MAX_TURN) * steady) * dt / angle);
 			view.slerp(target, Math.min(1.0, t));
 		}
 		roll = rollOf(view);
@@ -136,10 +180,13 @@ public final class RagdollView {
 		if (r == null) {
 			return null;
 		}
-		Quaterniond head = r.body.orientation(HumanoidRagdoll.HEAD, partial, new Quaterniond());
-		Vector3d centre = new Vector3d(r.body.body(HumanoidRagdoll.HEAD).tickX)
-				.lerp(r.body.body(HumanoidRagdoll.HEAD).x, partial);
-		Vector3d eye = head.transform(new Vector3d(0.0, EYE_Y, EYE_Z).mul(r.body.unit)).add(centre);
+		Vector3d eye = headEye(r, partial, new Vector3d());
+		if (steady > 0.0) {
+			// Where the eyes were on the chest, wherever the head has lolled to since.
+			Quaterniond chest = r.body.orientation(HumanoidRagdoll.TORSO, partial, new Quaterniond());
+			Vector3d onChest = chest.transform(new Vector3d(eyeOnChest)).add(centre(r, HumanoidRagdoll.TORSO, partial));
+			eye.lerp(onChest, steady);
+		}
 		Vec3 ragdollEye = new Vec3(eye.x, eye.y, eye.z);
 		float down = down(partial);
 		LocalPlayer player = Minecraft.getInstance().player;
@@ -147,6 +194,22 @@ public final class RagdollView {
 			return player.getEyePosition(partial).lerp(ragdollEye, down);
 		}
 		return ragdollEye;
+	}
+
+	/** The eyes in the ragdoll's head, wherever it is between the last two ticks. */
+	private static Vector3d headEye(RagdollCorpse r, float partial, Vector3d out) {
+		Quaterniond head = r.body.orientation(HumanoidRagdoll.HEAD, partial, new Quaterniond());
+		return head.transform(out.set(0.0, EYE_Y, EYE_Z).mul(r.body.unit)).add(centre(r, HumanoidRagdoll.HEAD, partial));
+	}
+
+	/** A part's centre between the last two ticks. */
+	private static Vector3d centre(RagdollCorpse r, int part, float partial) {
+		return new Vector3d(r.body.body(part).tickX).lerp(r.body.body(part).x, partial);
+	}
+
+	/** Whether the chest is carrying the view (a body still on its feet), for the tests. */
+	public static boolean steady() {
+		return steady >= 1.0;
 	}
 
 	/** The camera's yaw and pitch this frame, degrees, Minecraft's conventions. */
@@ -168,6 +231,7 @@ public final class RagdollView {
 	public static void reset() {
 		started = false;
 		roll = 0.0;
+		steady = 0.0;
 	}
 
 	/** A camera orientation for a yaw and pitch (forward -Z, up +Y). */

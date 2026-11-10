@@ -397,7 +397,11 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 	/**
 	 * Phase 3: four zombies whose deaths each leave a reflex: burned (writhes),
 	 * electrocuted (convulses), blasted (arms up over the face) and struck in
-	 * the gut while standing (staggers, a hand to the belly, then the brace).
+	 * the gut while standing (a hand to the belly, then the brace). The last
+	 * one dies on its feet: with Death Stumble on (the default) the stumble
+	 * has taken the stagger's place, so it must have one and must not stagger
+	 * as well. (The stagger itself, with the setting off, is checked in
+	 * {@link StumbleClientGameTest}.)
 	 */
 	private static void reflexes(ClientGameTestContext context, TestSingleplayerContext singleplayer,
 			double px, double py, double pz) {
@@ -417,8 +421,7 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 				java.util.EnumSet.of(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.WRITHE),
 				java.util.EnumSet.of(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.CONVULSE),
 				java.util.EnumSet.of(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.PROTECT_HEAD),
-				java.util.EnumSet.of(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.STAGGER,
-						dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.CLUTCH,
+				java.util.EnumSet.of(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.CLUTCH,
 						dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.BRACE));
 		List<Integer> ids = new ArrayList<>();
 		singleplayer.getServer().runOnServer(server -> {
@@ -466,6 +469,17 @@ public class RagdollClientGameTest implements FabricClientGameTest {
 			if (reactions == null || !reactions.containsAll(expect.get(i))) {
 				failures.add(row.get(i).name() + " died with " + reactions + ", expected at least " + expect.get(i));
 			}
+		}
+		int gut = ids.get(3);
+		var gutReactions = context.computeOnClient(client -> {
+			Entity e = client.level.getEntity(gut);
+			return e == null ? null : RemoteCorpses.ragdollReactions(e);
+		});
+		if (context.computeOnClient(client -> RemoteCorpses.stumbleOf(gut)) == null) {
+			failures.add("gut: struck standing, with Death Stumble on, and it did not die on its feet");
+		} else if (gutReactions != null
+				&& gutReactions.contains(dev.captience.realisticdamage.ragdoll.Behaviour.Reaction.STAGGER)) {
+			failures.add("gut: it stumbles and staggers at once");
 		}
 		context.waitTicks(3);
 		context.takeScreenshot("rd_ragdoll_20_reflexes_quarter_second");

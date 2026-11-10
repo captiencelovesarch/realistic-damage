@@ -254,6 +254,28 @@ public final class ClientEffectsConfig {
 	 */
 	public boolean hitFlinches = true;
 
+	/**
+	 * Death Stumble (stumbling deaths, IK phase 1): a body killed by a blow, an
+	 * arrow or a bleed-out, with a mind and two legs left, stays on its feet for
+	 * a moment, stepping after its balance as it weakens, and then goes down.
+	 * {@code GROUNDED} is the physical one (the hit jolts what it struck and
+	 * hardly moves the body, so only a body that was going somewhere has much to
+	 * catch); {@code OFF} is the stagger from before. Full ragdolls only. Each
+	 * player picks their own: the server never decides this. (Arcade arrives
+	 * with phase 2.)
+	 */
+	public DeathStumble deathStumble = DeathStumble.GROUNDED;
+
+	/** Never null (a file naming a style this version does not have reads as null); use this rather than the field. */
+	public DeathStumble deathStumble() {
+		return deathStumble == null ? DeathStumble.GROUNDED : deathStumble;
+	}
+
+	public enum DeathStumble {
+		OFF,
+		GROUNDED
+	}
+
 	public enum RagdollMode {
 		OFF,
 		SIMPLE,
@@ -452,6 +474,7 @@ public final class ClientEffectsConfig {
 		concussionEffectsValue = 1.0;
 		lowHealthEffectsValue = 1.0;
 		breathingVolumeValue = 1.0;
+		deathStumble = DeathStumble.GROUNDED;
 	}
 
 	/**

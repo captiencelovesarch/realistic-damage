@@ -72,6 +72,15 @@ public final class Behaviour {
 	private final int seed;
 	/** How long the stagger holds the body up, seconds. */
 	private final double staggerFor;
+	/**
+	 * When the body starts to go down, seconds since death: what waits for
+	 * the fall (bracing, doubling over) is timed from here. At once, unless
+	 * something is keeping it on its feet (a {@linkplain Stumble stumble}),
+	 * which says when it lets go.
+	 */
+	private double fallFrom;
+	/** How much it has left for the fall by then, 0..1. */
+	private double fallStrength = 1.0;
 
 	/** Per arm: it has met the ground while bracing and given way. */
 	private final boolean[] gave = new boolean[HumanoidRagdoll.PARTS];
@@ -93,7 +102,44 @@ public final class Behaviour {
 	public Behaviour withoutTwitch() {
 		EnumSet<Reaction> set = reactions.clone();
 		set.remove(Reaction.TWITCH);
-		return new Behaviour(set, clutchPart, push, awake, seed, staggerFor);
+		Behaviour b = new Behaviour(set, clutchPart, push, awake, seed, staggerFor);
+		b.fallFrom = fallFrom;
+		b.fallStrength = fallStrength;
+		return b;
+	}
+
+	/**
+	 * The body is going down now, {@code t} seconds since death, with this much
+	 * of its strength left: for one that was kept on its feet until now.
+	 */
+	public void fallsFrom(double t, double strength) {
+		fallFrom = t;
+		fallStrength = Math.max(0.0, Math.min(1.0, strength));
+	}
+
+	/**
+	 * The arm that goes to the wound, or -1 if none does: whatever keeps the
+	 * body on its feet leaves that arm alone.
+	 */
+	public int clutchArm(HumanoidRagdoll r) {
+		if (!has(Reaction.CLUTCH) || awake <= 0.0) {
+			return -1;
+		}
+		int arm = switch (clutchPart) {
+			case HumanoidRagdoll.TORSO, HumanoidRagdoll.HEAD, HumanoidRagdoll.LEFT_ARM, HumanoidRagdoll.RIGHT_LEG ->
+					HumanoidRagdoll.RIGHT_ARM;
+			case HumanoidRagdoll.RIGHT_ARM, HumanoidRagdoll.LEFT_LEG -> HumanoidRagdoll.LEFT_ARM;
+			default -> -1;
+		};
+		if (arm < 0) {
+			return -1;
+		}
+		if (!r.usable(arm)) {
+			int other = arm == HumanoidRagdoll.RIGHT_ARM ? HumanoidRagdoll.LEFT_ARM : HumanoidRagdoll.RIGHT_ARM;
+			boolean central = clutchPart == HumanoidRagdoll.TORSO || clutchPart == HumanoidRagdoll.HEAD;
+			return central && r.usable(other) ? other : -1;
+		}
+		return arm;
 	}
 
 	public boolean has(Reaction r) {
@@ -112,6 +158,17 @@ public final class Behaviour {
 
 	/** The reactions a death leaves the body with. */
 	public static Behaviour choose(Input in) {
+		return choose(in, false);
+	}
+
+	/**
+	 * The reactions a death leaves the body with.
+	 *
+	 * @param stumbles something else keeps it on its feet for a while (a
+	 *                 {@linkplain Stumble stumble}): it does not stagger, and what
+	 *                 waits for the fall waits until {@link #fallsFrom} says so
+	 */
+	public static Behaviour choose(Input in, boolean stumbles) {
 		Muscles m = in.muscles();
 		EnumSet<Reaction> set = EnumSet.noneOf(Reaction.class);
 		double v = Math.max(0.0, Math.min(1.0, in.violence()));
@@ -148,7 +205,7 @@ public final class Behaviour {
 					clutch = in.woundPart();
 				}
 				boolean legsSound = m.limb[HumanoidRagdoll.RIGHT_LEG] > 0.0 && m.limb[HumanoidRagdoll.LEFT_LEG] > 0.0;
-				if (m.awake >= 0.5 && v < 0.8 && legsSound && push.lengthSquared() > 0.0) {
+				if (!stumbles && m.awake >= 0.5 && v < 0.8 && legsSound && push.lengthSquared() > 0.0) {
 					set.add(Reaction.STAGGER);
 					stagger = (0.35 + 0.35 * (1.0 - v)) * m.awake;
 				}
@@ -171,7 +228,11 @@ public final class Behaviour {
 				set.add(Reaction.DOUBLE_OVER);
 			}
 		}
-		return new Behaviour(set, clutch, push, m.awake, in.seed(), stagger);
+		Behaviour b = new Behaviour(set, clutch, push, m.awake, in.seed(), stagger);
+		if (stumbles) {
+			b.fallFrom = Double.POSITIVE_INFINITY;
+		}
+		return b;
 	}
 
 	// --- Doing ------------------------------------------------------------------------
@@ -193,8 +254,9 @@ public final class Behaviour {
 		if (has(Reaction.CLUTCH)) {
 			clutch(r, t, busy);
 		}
-		if (has(Reaction.BRACE) && t < 1.6) {
-			brace(r, world, t, busy);
+		double falling = t - fallFrom;
+		if (has(Reaction.BRACE) && falling >= 0.0 && falling < 1.6) {
+			brace(r, world, falling, busy);
 		}
 		if (has(Reaction.WRITHE) && t < 4.5) {
 			writhe(r, t);
@@ -332,9 +394,9 @@ public final class Behaviour {
 		// Doubling over waits for a stagger to end: folding at the hips while
 		// the stagger holds the torso up would swing the legs out and sit the
 		// body down.
-		double fold = t - staggerFor;
+		double fold = t - Math.max(staggerFor, fallFrom);
 		if (has(Reaction.DOUBLE_OVER) && fold >= 0.0 && fold < 1.0) {
-			double d = awake * (1.0 - fold);
+			double d = awake * fallStrength * (1.0 - fold);
 			r.target(HumanoidRagdoll.RIGHT_LEG, -0.55, 0.05, 0.0);
 			r.target(HumanoidRagdoll.LEFT_LEG, -0.55, -0.05, 0.0);
 			r.reflex(HumanoidRagdoll.RIGHT_LEG, 1.6 * d);
@@ -363,7 +425,7 @@ public final class Behaviour {
 		Vector3d facing = r.facing();
 		Vector3d flatFacing = new Vector3d(facing.x, 0.0, facing.z);
 		double forward = flatFacing.lengthSquared() > 1.0e-6 ? toward.dot(flatFacing.normalize()) : 0.0;
-		double f = awake * Math.exp(-t / 1.4);
+		double f = awake * fallStrength * Math.exp(-t / 1.4);
 		for (int arm : new int[] {HumanoidRagdoll.RIGHT_ARM, HumanoidRagdoll.LEFT_ARM}) {
 			if (!r.usable(arm) || busy[arm]) {
 				continue;

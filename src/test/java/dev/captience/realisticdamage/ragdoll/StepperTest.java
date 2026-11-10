@@ -42,8 +42,8 @@ class StepperTest {
 				w.box(-6, -5.0, 4.2, 6, -3.0, 9.0);
 			}
 			case "ledge" -> {
-				// Flat to z = 1.3, then a three-block drop.
-				w.box(-6, -1.0, -6.0, 6, 0.0, 1.3);
+				// Flat to z = 1.3, then a three-block drop down a cliff.
+				w.box(-6, -4.0, -6.0, 6, 0.0, 1.3);
 				w.box(-6, -4.0, 1.3, 6, -3.0, 9.0);
 			}
 			case "wall" -> {

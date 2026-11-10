@@ -369,6 +369,7 @@ public final class HumanoidRagdoll {
 				b.sink = 0.0;
 			}
 			sim.uprightStiffness = 0.0;
+			sim.uprightAxis.set(0.0, -1.0, 0.0);
 			sim.facingStiffness = 0.0;
 			sim.supported = null;
 			sim.supportAccel = 0.0;
@@ -390,8 +391,9 @@ public final class HumanoidRagdoll {
 		// At rest when nothing is moving, or when nothing has moved: two
 		// constraints pressing against each other (a limb at its limit on the
 		// floor) can leave a body reporting speed while its pose stays put, and
-		// it would never sleep. A body still being held on its feet never is.
-		boolean held = controller != null && controller.holding();
+		// it would never sleep. A body still being held on its feet never is,
+		// nor one its controller is not done with.
+		boolean held = controller != null && (controller.holding() || controller.restless());
 		boolean still = !held && (sim.maxMotion() < STILL_SPEED || poseUnchanged());
 		if (still) {
 			if (++stillTicks >= STILL_TICKS) {

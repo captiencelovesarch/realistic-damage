@@ -68,6 +68,12 @@ public final class Stepper {
 
 	/** The torso held upright, in multiples of the body's weight per radian. */
 	public double uprightHold = 1.0;
+	/**
+	 * How far forward of upright the torso is held, radians: a dying body
+	 * hunches over, and one that has caught itself does not stand up straight
+	 * again. Zero holds it upright.
+	 */
+	public double hunch = 0.0;
 	/** The torso's facing held, the same units. */
 	public double facingHold = 0.5;
 	/** Share of the body's weight held up under the torso. */
@@ -119,6 +125,23 @@ public final class Stepper {
 	public double overshoot = 0.0;
 	/** How much of the body's travel while the foot is in the air the step leads by. */
 	public double lead = 0.35;
+	/**
+	 * Each leg's own strength, {@link HumanoidRagdoll#RIGHT_LEG} then the left,
+	 * 1 sound: a wounded leg swings and holds with less.
+	 */
+	public final double[] legStrength = {1.0, 1.0};
+	/**
+	 * Arms the stepper leaves alone, the right then the left: one that hangs
+	 * limp, or is busy with something else (a hand on a wound).
+	 */
+	public final boolean[] leaveArm = new boolean[2];
+	/** Whether the stepper holds the head up; if not, the neck is as strong as the body's own muscles are. */
+	public boolean holdHead = true;
+	/**
+	 * How well a planted foot holds, 1 fast: below it the foot slides the way
+	 * the body pushes on it, the faster the less it holds.
+	 */
+	public double grip = 1.0;
 	/** How much of a swing brushes through the floor; after this it lands as soon as it touches. */
 	private static final double GHOST_UNTIL = 0.6;
 	/** From here to {@link #GHOST_UNTIL} the floor comes back up under the swinging foot. */
@@ -134,6 +157,8 @@ public final class Stepper {
 	private static final double STEP_DOWN = 1.1;
 	/** A swinging foot this near its spot along the ground may land before its time is up, blocks. */
 	private static final double NEAR = 0.1;
+	/** A swinging foot this far ahead of the other, blocks, has come through: a stride, landed or not. */
+	private static final double THROUGH = 0.25;
 	/** The torso further over than this, degrees, for {@link #LOST_FOR} seconds: it is falling, not stumbling. */
 	private static final double OVER = 55.0;
 	/** The hips lower than this share of a leg above the ground the feet are on: it is down. */
@@ -151,6 +176,61 @@ public final class Stepper {
 	private static final double PROPPED_FOR = 0.3;
 	/** A step into a hole is given this much longer than its swing to find ground, as a share of it. */
 	private static final double HOLE_PATIENCE = 0.3;
+
+	/**
+	 * How far back a leg may go at the hip while the body is on its feet,
+	 * radians. A dead hip stops at about 26 degrees, as a living one does, but a
+	 * living leg left behind bends its knee and comes up on its toes; a straight
+	 * one that stopped there would lever the torso over forwards with every
+	 * stride (and a body that died walking has a leg further back than that
+	 * already). It goes back to what the joint had once the body is let go of,
+	 * over {@link #HIP_BACK_FOR} seconds. Zero leaves the joint as it is.
+	 */
+	public double hipBack = 0.0;
+	/**
+	 * A body caught mid-stride with both feet in the air (the walk it died in
+	 * swings its legs far wider than they are long, so neither foot of a
+	 * walking body is on the ground for most of its stride) is carried, its
+	 * whole weight, for this share of the swing that brings its leading foot
+	 * down. Left to drop it lands low on a leg stuck out in front, which stops
+	 * it dead and sits it down. Zero carries nothing.
+	 */
+	public double carry = 0.0;
+	/**
+	 * With no foot down and one on its way, this much of the body's weight is
+	 * carried for each unit of its strength (never more than all of it). A
+	 * body going faster than its feet can be put down under it is in the air
+	 * for a moment of every stride, as anything running is, and at twenty
+	 * ticks a second it would otherwise have dropped onto its hips by the time
+	 * the foot arrived. It goes with the body's strength, so later strides sag.
+	 * Zero carries nothing.
+	 */
+	public double flight = 0.0;
+	/**
+	 * How far the hips may come down for a step, blocks. These legs are
+	 * straight: one reaches only so far ahead of its hip before the hip has to
+	 * come down to it, and a body going fast that lands on a leg stuck out
+	 * further than that is stopped dead by it, hips on the floor. Negative for
+	 * no limit: a body catching a shove takes as long a step as it needs.
+	 */
+	public double hipDrop = -1.0;
+	/**
+	 * A foot is put down only once it is out of the floor it swung through,
+	 * and that is judged by the lowest corner of its sole. A leg raked far
+	 * forward (the leading foot of a body going down at a run, its hips sunk)
+	 * has a corner under the ground for as long as it is raked, however its
+	 * sole lies, and judged like that it is never put down at all: the body
+	 * rides over a foot it is not standing on. This much of the tilt is
+	 * forgiven: 0 none, 1 all of it (the middle of the sole is what counts).
+	 */
+	public double rakedFoot = 0.0;
+	private static final double HIP_BACK_FOR = 0.35;
+
+	/** How stiffly a foot that holds fast is pinned, blocks per unit of force. */
+	private static final double PIN = 1.0 / (HumanoidRagdoll.totalMass() * 32.0 * 2000.0);
+	/** A foot with no grip at all is pinned this many times softer, and its spot follows it this fast, a second. */
+	private static final double SLIP_SOFT = 400.0;
+	private static final double SLIP_RATE = 9.0;
 
 	private static final int[] LEGS = {HumanoidRagdoll.RIGHT_LEG, HumanoidRagdoll.LEFT_LEG};
 
@@ -171,7 +251,13 @@ public final class Stepper {
 	private final Quaterniond[] standPose = {new Quaterniond(), new Quaterniond()};
 	private final Vector3d facing = new Vector3d();
 	private int steps;
+	/** Let go of with a foot swung through ahead of the other and not yet down. */
+	private boolean strideCut;
+	/** Which of {@link #LEGS} landed last, or -1 before any has. */
+	private int landed = -1;
 	private double lastLanding = -1.0;
+	/** The furthest any planted foot has slipped for want of grip, blocks. */
+	private double slipped;
 	/** The furthest a pinned foot has slid since it was planted, blocks; for the tests. */
 	private double worstDrift;
 	/** The step in the air is aimed at a hole. */
@@ -180,6 +266,10 @@ public final class Stepper {
 	/** The pose it died in, joint by joint. */
 	private final Quaterniond[] diedIn = new Quaterniond[HumanoidRagdoll.PARTS];
 
+	/** How many times further back than its joint allows each leg may go at the hip, for now. */
+	private final double[] hipWider = {1.0, 1.0};
+
+	private boolean carried;
 	private boolean hole;
 	/** The height of the ground the foot stood on had when the step in the air began. */
 	private double stoodY;
@@ -212,7 +302,7 @@ public final class Stepper {
 			return;
 		}
 		if (!started) {
-			start(r);
+			start(r, world);
 		}
 		double s = Math.max(0.0, strength);
 		Balance.centreOfMass(r, com);
@@ -226,16 +316,40 @@ public final class Stepper {
 			return;
 		}
 		double lift = support * s;
+		if (carried && (swing < 0 || (t - swingStart) / swingTime >= carry)) {
+			carried = false;
+		}
 		omega = Balance.omega(r.sim.gravity * (1.0 - lift), com.y - ground);
 		Balance.capturePoint(com, vel, omega, ground, capture);
 
-		r.holdUpright(uprightHold * s * Math.max(0.0, Math.min(1.0, balance)));
+		// Carried, its torso is held as well: the leg coming down under it would
+		// otherwise throw it back the other way.
+		r.holdUpright(uprightHold * s * (carried ? 1.0 : Math.max(0.0, Math.min(1.0, balance))));
+		if (hunch != 0.0) {
+			// The torso's own axis that is brought to upright leans back by as
+			// much (its +Z is its back), which leaves the torso leaning forward.
+			r.sim.uprightAxis.set(0.0, -Math.cos(hunch), Math.sin(hunch));
+		}
 		r.holdFacing(facing, facingHold * s);
-		r.support(lift);
+		boolean flying = flight > 0.0 && swing >= 0 && !pins[0].active && !pins[1].active;
+		r.support(Math.max(lift, carried ? 1.0 : flying ? Math.min(1.0, flight * s) : 0.0));
 		arms(r, s, dt);
+		double loose = Math.max(0.0, Math.min(1.0, 1.0 - grip));
 		for (int k = 0; k < 2; k++) {
+			pins[k].compliance = PIN * (1.0 + SLIP_SOFT * loose);
 			if (pins[k].active) {
-				worstDrift = Math.max(worstDrift, pins[k].drift());
+				if (loose > 0.0) {
+					// A foot losing its grip: the spot it holds goes after it.
+					Vector3d sole = r.tip(LEGS[k]);
+					double a = Math.min(1.0, loose * SLIP_RATE * dt);
+					double dx = (sole.x - pins[k].world.x) * a;
+					double dz = (sole.z - pins[k].world.z) * a;
+					pins[k].world.x += dx;
+					pins[k].world.z += dz;
+					slipped += Math.hypot(dx, dz);
+				} else {
+					worstDrift = Math.max(worstDrift, pins[k].drift());
+				}
 			}
 		}
 
@@ -252,20 +366,32 @@ public final class Stepper {
 		double sway = speed() < SWAY_SPEED ? SWAY : 0.0;
 		double outside = Balance.outside(capture, a, b, r.body(LEGS[0]).hx * 0.7 + sway);
 		int dangling = -1;
+		boolean[] inAir = new boolean[2];
 		for (int k = 0; k < 2; k++) {
-			if (!pins[k].active && r.present(LEGS[k]) && !touching(r, LEGS[k], world)) {
+			if (!pins[k].active && r.present(LEGS[k]) && !down(r, k, world)) {
 				dangling = k;
+				inAir[k] = true;
 			}
 		}
+		// Nothing planted, going somewhere, and the foot out in front is in the
+		// air: caught mid-stride (a body that died walking has its feet where
+		// the stride left them).
+		int leading = behind(r, 0) <= behind(r, 1) ? 0 : 1;
+		boolean midStride = !pins[0].active && !pins[1].active && r.present(LEGS[0]) && r.present(LEGS[1])
+				&& inAir[leading] && speed() > SETTLED;
 		if (dangling >= 0 && pins[1 - dangling].active) {
 			// A foot in the air is no support: it comes down first.
-			beginStep(r, world, t, s, dangling, false);
+			beginStep(r, world, t, s, dangling, false, false);
+		} else if (midStride) {
+			// The foot in front comes down first, under the body and not
+			// wherever the stride had it.
+			beginStep(r, world, t, s, leading, false, true);
 		} else if (outside > 0.0) {
-			beginStep(r, world, t, s, choose(r, a, b), false);
+			beginStep(r, world, t, s, choose(r, a, b), false, false);
 		} else if (speed() < SETTLED && t - lastLanding > 0.3 && awkward(r, a, b)) {
 			// Caught, but standing anyhow: square up, bringing the foot that
 			// is furthest out back in beside the other.
-			beginStep(r, world, t, s, furthestOut(a, b), true);
+			beginStep(r, world, t, s, furthestOut(a, b), true, false);
 		}
 		if (swing >= 0) {
 			swinging(r, world, t, dt, s);
@@ -281,7 +407,7 @@ public final class Stepper {
 			// A foot that peeled off and was not needed for a step: down again
 			// where it is, once the body has slowed or if it is not being left
 			// behind.
-			if (!pins[k].active && r.present(LEGS[k]) && touching(r, LEGS[k], world)
+			if (!pins[k].active && r.present(LEGS[k]) && down(r, k, world)
 					&& (!moving || behind(r, k) < toeOff * 0.5)) {
 				pins[k].plant(r.tipLocal(LEGS[k], new Vector3d()));
 				hold(r, k);
@@ -295,7 +421,7 @@ public final class Stepper {
 				give(r, k, dt);
 			}
 			r.target(LEGS[k], standPose[k]);
-			r.setTone(LEGS[k], (moving ? brakeTone : standTone) * s);
+			r.setTone(LEGS[k], (moving ? brakeTone : standTone) * s * legStrength[k]);
 		}
 	}
 
@@ -404,7 +530,7 @@ public final class Stepper {
 		return da >= db ? 0 : 1;
 	}
 
-	private void start(HumanoidRagdoll r) {
+	private void start(HumanoidRagdoll r, PhysicsWorld world) {
 		started = true;
 		for (int part = 0; part < HumanoidRagdoll.PARTS; part++) {
 			if (r.jointOf(part) != null) {
@@ -420,10 +546,18 @@ public final class Stepper {
 		for (int k = 0; k < 2; k++) {
 			Body leg = r.body(LEGS[k]);
 			pins[k] = new Pin(leg);
-			pins[k].compliance = 1.0 / (HumanoidRagdoll.totalMass() * 32.0 * 2000.0);
+			pins[k].compliance = PIN;
+			pins[k].active = false;
 			r.sim.pins.add(pins[k]);
-			if (r.present(LEGS[k])) {
+			// Only a foot that is down: a body that died mid-stride has one in
+			// the air, or both, and a foot pinned in the air holds it there.
+			if (r.present(LEGS[k]) && down(r, k, world)) {
 				pins[k].plant(r.tipLocal(LEGS[k], new Vector3d()));
+			}
+			Joint hip = r.jointOf(LEGS[k]);
+			if (hip != null && hip.swingXMax > 0.0 && hip.swingXMax < hipBack) {
+				hipWider[k] = hipBack / hip.swingXMax;
+				hip.swingXMax *= hipWider[k];
 			}
 		}
 		capturePose(r);
@@ -435,6 +569,12 @@ public final class Stepper {
 			return;
 		}
 		released = true;
+		if (started && swing >= 0 && speed() > SETTLED) {
+			// The foot in the air, against the other, along the way it is going.
+			Vector3d ahead = foot(r, swing, tmp);
+			Vector3d other = foot(r, 1 - swing, tmp2);
+			strideCut = ((ahead.x - other.x) * vel.x + (ahead.z - other.z) * vel.z) / speed() > THROUGH;
+		}
 		for (Pin p : pins) {
 			if (p != null) {
 				p.active = false;
@@ -470,6 +610,16 @@ public final class Stepper {
 		for (int part = 0; part < HumanoidRagdoll.PARTS; part++) {
 			if (diedIn[part] != null) {
 				r.restTarget(part).slerp(diedIn[part], a);
+			}
+		}
+		// Its hips stop where a body's do again. As a factor, so whatever else
+		// has widened or narrowed the joint since (its muscles letting go) stays.
+		for (int k = 0; k < 2; k++) {
+			Joint hip = r.jointOf(LEGS[k]);
+			if (hip != null && hipWider[k] > 1.0) {
+				double next = Math.max(1.0, hipWider[k] - 3.0 * dt / HIP_BACK_FOR);
+				hip.swingXMax *= next / hipWider[k];
+				hipWider[k] = next;
 			}
 		}
 	}
@@ -584,9 +734,9 @@ public final class Stepper {
 		return da >= db ? 0 : 1;
 	}
 
-	private void beginStep(HumanoidRagdoll r, PhysicsWorld world, double t, double s, int k, boolean settle) {
+	private void beginStep(HumanoidRagdoll r, PhysicsWorld world, double t, double s, int k, boolean settle, boolean fromAir) {
 		int stance = 1 - k;
-		if (!r.present(LEGS[k]) || !pins[stance].active && r.present(LEGS[stance])) {
+		if (!r.present(LEGS[k]) || !fromAir && !pins[stance].active && r.present(LEGS[stance])) {
 			// One leg, or nothing to stand on while it swings: no step to take.
 			return;
 		}
@@ -594,8 +744,9 @@ public final class Stepper {
 		pins[k].active = false;
 		from.set(r.tip(LEGS[k]));
 		// Where the standing foot was pinned, not where its sole is: one that
-		// has peeled off since is up on its toes.
-		stoodY = r.present(LEGS[stance]) ? pins[stance].world.y : from.y;
+		// has peeled off since is up on its toes. With neither down, the ground
+		// under the body.
+		stoodY = fromAir ? ground : r.present(LEGS[stance]) ? pins[stance].world.y : from.y;
 		// The faster it is going, the quicker the steps: a slow step taken at a
 		// run lets the body carry on over the foot it stands on until there is
 		// no height left in that leg.
@@ -603,6 +754,7 @@ public final class Stepper {
 		swingTime = settle ? swingMax * 1.3 : swingMax - (swingMax - swingMin) * hurry;
 		swingStart = t;
 		settling = settle;
+		carried = fromAir && carry > 0.0 && steps == 0;
 		plan(r, world, k, swingTime);
 	}
 
@@ -639,7 +791,14 @@ public final class Stepper {
 		}
 		// Within the leg's reach of where its hip will be, in the body's frame.
 		Vector3d rel = new Vector3d(target).sub(hip);
-		double fwd = Math.max(-reachBack, Math.min(reachForward, rel.dot(facing)));
+		double forward = reachForward;
+		if (carried || hipDrop >= 0.0) {
+			// No further ahead than the leg reaches the ground from where the hip is.
+			double h = Math.max(0.0, r.joint(LEGS[k], tmp).y - stoodY - Math.max(0.0, hipDrop));
+			double length = r.length(LEGS[k]);
+			forward = Math.min(forward, Math.sqrt(Math.max(0.0, length * length - h * h)));
+		}
+		double fwd = Math.max(-reachBack, Math.min(forward, rel.dot(facing)));
 		double lat = rel.dot(right) * side(r, k);
 		lat = Math.max(-reachOut * 0.4, Math.min(reachOut, lat));
 		target.set(hip).fma(fwd, facing).fma(lat * side(r, k), right);
@@ -705,7 +864,7 @@ public final class Stepper {
 			Reach.skim(hip, along, length, floor, dir);
 		}
 		r.aimWorld(leg, dir);
-		r.setTone(leg, swingTone * s);
+		r.setTone(leg, swingTone * s * legStrength[k]);
 		// Brushing through the top of the floor for most of the swing, the
 		// floor coming back up under it over the last of it, a centimetre or so
 		// a tick, so the foot is pushed out gently rather than thrown.
@@ -721,7 +880,7 @@ public final class Stepper {
 			// The leg stood on brakes the body going over it, giving as it does.
 			give(r, stance, dt);
 			r.target(LEGS[stance], standPose[stance]);
-			r.setTone(LEGS[stance], brakeTone * s);
+			r.setTone(LEGS[stance], brakeTone * s * legStrength[stance]);
 		}
 		// Ground lower than a straight leg can be put down on while the other
 		// still stands on the higher (a stair, a slab, a block's edge): an edge.
@@ -730,7 +889,10 @@ public final class Stepper {
 		// floor and is about where it was going: a foot put down halfway there
 		// is a foot put down behind the body.
 		boolean there = done >= 1.0 || Math.hypot(soleNow.x - to.x, soleNow.z - to.z) < NEAR;
-		if (done >= GHOST_UNTIL && there && buried <= SINK && touching(r, leg, world)) {
+		// How far into the floor it still is. Raked, its lowest corner is under
+		// the ground for as long as it is raked, with its sole on it.
+		double deep = buried - rakedFoot * Math.max(0.0, soleNow.y - lowestSole(r.body(leg)));
+		if (done >= GHOST_UNTIL && there && deep <= SINK && touching(r, leg, world)) {
 			land(r, k, t);
 		} else if ((hole || edge || Double.isNaN(under)) && done > 1.0 + HOLE_PATIENCE) {
 			// Stepped into a hole or off an edge, or came down over one, and
@@ -745,6 +907,17 @@ public final class Stepper {
 			swing = -1;
 			r.body(leg).sink = 0.0;
 		}
+	}
+
+	/**
+	 * Whether a foot is down on something it can stand on. One nearly level
+	 * with its own hip is not: a leg stuck out that far (the stride of a body
+	 * that died walking, its foot on the stair ahead or against its riser)
+	 * holds nothing up, and pinned there it would stop the body dead.
+	 */
+	private boolean down(HumanoidRagdoll r, int k, PhysicsWorld world) {
+		return touching(r, LEGS[k], world)
+				&& r.joint(LEGS[k], tmp2).y - r.tip(LEGS[k]).y >= HIPS_DOWN * r.length(LEGS[k]);
 	}
 
 	/** Whether a leg's sole is on the ground. */
@@ -779,10 +952,12 @@ public final class Stepper {
 			pins[1 - k].active = false;
 		}
 		swing = -1;
+		carried = false;
 		lastSwing = settling ? -1 : k;
 		settling = false;
 		hole = false;
 		steps++;
+		landed = k;
 		lastLanding = t;
 		hold(r, k);
 	}
@@ -794,7 +969,9 @@ public final class Stepper {
 	 * again once it has caught itself.
 	 */
 	private void arms(HumanoidRagdoll r, double s, double dt) {
-		r.setTone(HumanoidRagdoll.HEAD, neckTone * s);
+		if (holdHead) {
+			r.setTone(HumanoidRagdoll.HEAD, neckTone * s);
+		}
 		double want = Math.max(0.0, Math.min(1.0, (speed() - SETTLED) / Math.max(0.1, flailAt - SETTLED)));
 		// Up fast, down slowly.
 		armsUp += (want - armsUp) * Math.min(1.0, dt * (want > armsUp ? 14.0 : 3.0));
@@ -803,7 +980,7 @@ public final class Stepper {
 		double v = speed();
 		for (int a = 0; a < 2; a++) {
 			int arm = a == 0 ? HumanoidRagdoll.RIGHT_ARM : HumanoidRagdoll.LEFT_ARM;
-			if (!r.present(arm)) {
+			if (!r.present(arm) || leaveArm[a]) {
 				continue;
 			}
 			double side = a == 0 ? 1.0 : -1.0;
@@ -822,9 +999,49 @@ public final class Stepper {
 
 	// --- Reading it back -----------------------------------------------------------
 
-	/** Steps taken so far. */
+	/** Steps taken so far: feet put down. */
 	public int steps() {
 		return steps;
+	}
+
+	/**
+	 * Strides taken: the steps that landed, and the one it was let go of in
+	 * the middle of, if that foot had already come through ahead of the other.
+	 * A body that goes over as its second foot comes down has taken two
+	 * strides and landed one step.
+	 */
+	public int strides() {
+		return steps + (strideCut ? 1 : 0);
+	}
+
+	/** Which leg is in the air, 0 the right and 1 the left, or -1 with neither. */
+	public int swingLeg() {
+		return swing;
+	}
+
+	/** Which leg landed last, 0 the right and 1 the left, or -1 before any step. */
+	public int landedLeg() {
+		return landed;
+	}
+
+	/** Whether a leg's foot is planted, 0 the right and 1 the left. */
+	public boolean planted(int k) {
+		return started && pins[k].active;
+	}
+
+	/** Where a leg's foot is planted (valid while {@link #planted}), 0 the right and 1 the left. */
+	public Vector3d plantedAt(int k) {
+		return new Vector3d(pins[k].world);
+	}
+
+	/** How far its planted feet have slipped for want of grip, blocks, all told. */
+	public double slipped() {
+		return slipped;
+	}
+
+	/** The body's right along the ground, as it faced when it died. */
+	public Vector3d rightward() {
+		return right(new Vector3d());
 	}
 
 	/** Both feet down and the capture point between them, as of the last tick. */

@@ -83,6 +83,45 @@ public final class Muscles {
 	}
 
 	/**
+	 * These muscles, taking {@code by} times as long over everything: for a
+	 * body kept on its feet, whose arms and neck go as its stumble does rather
+	 * than before it has taken a step.
+	 */
+	public Muscles stretched(double by) {
+		Muscles m = copy();
+		for (int g = 0; g < GROUPS; g++) {
+			m.delay[g] = delay[g] * by;
+			m.fade[g] = fade[g] * by;
+		}
+		return m;
+	}
+
+	/**
+	 * These muscles with the legs giving way from {@code atSeconds} on, from
+	 * no more than {@code tone}: the end of a stumble. The arms and the neck
+	 * carry on as they were going.
+	 */
+	public Muscles legsGiving(double atSeconds, double tone) {
+		Muscles m = copy();
+		m.set(LEGS, Math.min(start[LEGS], tone), atSeconds, 0.2);
+		return m;
+	}
+
+	private Muscles copy() {
+		Muscles m = new Muscles();
+		System.arraycopy(start, 0, m.start, 0, GROUPS);
+		System.arraycopy(delay, 0, m.delay, 0, GROUPS);
+		System.arraycopy(fade, 0, m.fade, 0, GROUPS);
+		m.floor = floor;
+		System.arraycopy(limb, 0, m.limb, 0, limb.length);
+		System.arraycopy(limbFloor, 0, m.limbFloor, 0, limbFloor.length);
+		System.arraycopy(looseness, 0, m.looseness, 0, looseness.length);
+		m.stringsCut = stringsCut;
+		m.awake = awake;
+		return m;
+	}
+
+	/**
 	 * These muscles giving way from {@code atSeconds} on, from the ground up: the
 	 * legs go at once, the arms a moment after, the head last. A body let go of
 	 * this way sinks and folds; one whose muscles all go together goes over like

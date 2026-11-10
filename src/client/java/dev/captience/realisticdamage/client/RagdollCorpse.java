@@ -6,11 +6,15 @@ import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.ragdoll.Behaviour;
 import dev.captience.realisticdamage.ragdoll.Muscles;
 import dev.captience.realisticdamage.ragdoll.Stand;
+import dev.captience.realisticdamage.ragdoll.Stepper;
+import dev.captience.realisticdamage.ragdoll.Stumble;
+import dev.captience.realisticdamage.ragdoll.StumbleStyle;
 import dev.captience.realisticdamage.systems.AdrenalineMath;
 import dev.captience.realisticdamage.systems.LimpMath;
 import dev.captience.realisticdamage.damage.DeathKind;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import dev.captience.realisticdamage.net.CorpsePayload;
+import dev.captience.realisticdamage.net.MovingStartPayload;
 import dev.captience.realisticdamage.net.StandTestPayload;
 import dev.captience.realisticdamage.ragdoll.HumanoidRagdoll;
 import net.minecraft.client.Minecraft;
@@ -79,6 +83,21 @@ final class RagdollCorpse extends SimulatedCorpse {
 	private int sinceThud = 100;
 	/** A torso stopping from at least this fast, blocks a second, lands with a sound. */
 	private static final double THUD_SPEED = 3.5;
+	/** Steps of a stumble heard so far, how far its feet had slipped at the last scuff, and ticks since it. */
+	private int stepsHeard;
+	private double slipHeard;
+	private int sinceScuff = 100;
+	/**
+	 * A stumbling body's legs, hip to sole, blocks: the stepper's reaches and
+	 * step heights are in blocks, tuned on a player's 0.7, so a baby zombie or
+	 * an enderman falls the old way.
+	 */
+	private static final double STUMBLE_LEG_MIN = 0.55;
+	private static final double STUMBLE_LEG_MAX = 0.9;
+	/** A stumbling body has ground this close under its feet, blocks. */
+	private static final double STUMBLE_GROUND = 0.75;
+	/** A planted foot that has slipped this much further, blocks, is heard scuffing. */
+	private static final double SCUFF_SLIP = 0.05;
 
 	private RagdollCorpse(LivingEntity entity, HumanoidRagdoll body, float modelScale, ClientLevel level) {
 		super(entity);
@@ -139,8 +158,17 @@ final class RagdollCorpse extends SimulatedCorpse {
 		// own rule is four times the distance a tick, capped at one.
 		float stride = Math.min(entity.walkAnimation.speed(),
 				(float) Math.min(1.0, Math.hypot(seen.x, seen.z) * DT * 4.0));
-		float[] now = deathPose(entity, 1.0F, 0.0F, stride);
-		float[] before = deathPose(entity, 1.0F, stride, stride);
+		float phase = 0.0F;
+		MovingStartPayload moving = MOVING_STARTS.remove(entity.getId());
+		if (moving != null && !live) {
+			// The test command's body, which stood still: as if it had been going
+			// that way, somewhere in its stride (where, by which body it is).
+			seen.set(moving.vx(), 0.0, moving.vz());
+			stride = (float) Math.min(1.0, Math.hypot(seen.x, seen.z) * DT * 4.0);
+			phase = Math.floorMod(entity.getId() * 0x9E3779B9L, 4096L) / 4096.0F * Mth.TWO_PI / 0.6662F;
+		}
+		float[] now = deathPose(entity, 1.0F, -phase, stride);
+		float[] before = deathPose(entity, 1.0F, stride - phase, stride);
 		HumanoidRagdoll ragdoll = new HumanoidRagdoll(parts, feet, yaw, unit, now, present);
 		ragdoll.inheritMotion(parts, before, seen, LIMB_SWING_SHARE, DT);
 		StandTestPayload stand = STAND_TESTS.remove(entity.getId());
@@ -152,22 +180,76 @@ final class RagdollCorpse extends SimulatedCorpse {
 			return new RagdollCorpse(entity, ragdoll, modelScale, level);
 		}
 		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
-		ragdoll.setMuscles(muscles);
-		Behaviour behaviour = Behaviour.choose(behaviourInput(entity, payload, snapshot, muscles));
-		ragdoll.setBehaviour(live ? behaviour.withoutTwitch() : behaviour);
-		launch(ragdoll, entity, payload, feet, seen, muscles);
+		Behaviour.Input input = behaviourInput(entity, payload, snapshot, muscles);
+		// A death on its feet (stumbling deaths), for the deaths that get one;
+		// every other body falls as it always has.
+		Stumble stumble = live ? null : stumble(ragdoll, entity, payload, input, seen, level);
+		if (stumble == null) {
+			ragdoll.setMuscles(muscles);
+			Behaviour behaviour = Behaviour.choose(input);
+			ragdoll.setBehaviour(live ? behaviour.withoutTwitch() : behaviour);
+			launch(ragdoll, entity, payload, feet, seen, muscles);
+		}
 		if (System.getenv("RD_RAGDOLL_TRACE") != null) {
 			System.out.printf(java.util.Locale.ROOT,
-					"[rd] ragdoll launch %s: kind %s violence %.2f sent (%.2f %.2f %.2f) seen (%.2f %.2f %.2f) part %d kick %.2f yaw %.1f stride %.2f%n",
+					"[rd] ragdoll launch %s: kind %s violence %.2f sent (%.2f %.2f %.2f) seen (%.2f %.2f %.2f) part %d kick %.2f yaw %.1f stride %.2f %s%n",
 					entity.getName().getString(), payload.kind(), payload.violence(), payload.vx() * 20, payload.vy() * 20,
-					payload.vz() * 20, seen.x, seen.y, seen.z, payload.hitPart(), payload.kick() * 20, yaw, stride);
+					payload.vz() * 20, seen.x, seen.y, seen.z, payload.hitPart(), payload.kick() * 20, yaw, stride,
+					stumble == null ? "falls" : String.format(java.util.Locale.ROOT, "stumbles for %.2f s (vigor %.2f, weak leg %d)",
+							stumble.onFeet, stumble.vigor, stumble.weakLeg));
 		}
 		return new RagdollCorpse(entity, ragdoll, modelScale, level);
+	}
+
+	/**
+	 * This death on its feet, begun, or null (and nothing done) for a body that
+	 * simply falls: the setting is off, the death is not one that stumbles
+	 * ({@link Stumble#plan}), or the body was not standing on anything.
+	 */
+	private static @Nullable Stumble stumble(HumanoidRagdoll ragdoll, LivingEntity entity, CorpsePayload payload,
+			Behaviour.Input input, Vector3d seen, ClientLevel level) {
+		StumbleStyle style = StumbleStyle.byName(ClientEffectsConfig.get().deathStumble().name());
+		if (style == null || !onItsFeet(ragdoll, entity, level)) {
+			return null;
+		}
+		Vector3d sent = new Vector3d(payload.vx(), payload.vy(), payload.vz()).mul(20.0);
+		Vector3d hitDir = new Vector3d(payload.hx(), payload.hy(), payload.hz());
+		return Stumble.begin(style, ragdoll, input, sent, seen, hitDir.lengthSquared() > 1.0e-6 ? hitDir : null,
+				payload.kick() * 20.0);
+	}
+
+	/** Whether a body died standing on the ground, on legs the stepper can walk. */
+	private static boolean onItsFeet(HumanoidRagdoll ragdoll, LivingEntity entity, ClientLevel level) {
+		if (entity.isInWater() || entity.isInLava() || entity.isSwimming() || entity.isPassenger() || entity.isSleeping()
+				|| entity.isFallFlying() || entity.onClimbable()) {
+			return false;
+		}
+		double leg = ragdoll.length(HumanoidRagdoll.RIGHT_LEG);
+		if (leg < STUMBLE_LEG_MIN || leg > STUMBLE_LEG_MAX) {
+			return false;
+		}
+		Vec3 feet = entity.position();
+		var ground = level.clip(new net.minecraft.world.level.ClipContext(feet.add(0.0, 0.3, 0.0),
+				feet.add(0.0, -STUMBLE_GROUND, 0.0), net.minecraft.world.level.ClipContext.Block.COLLIDER,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, net.minecraft.world.phys.shapes.CollisionContext.empty()));
+		return ground.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK;
 	}
 
 	/** Bodies the next death of which is the stepper's test ({@code /rdmg ragdoll shove}), by entity id. */
 	private static final it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<StandTestPayload> STAND_TESTS =
 			new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>();
+
+	/** Bodies the next death of which starts moving ({@code /rdmg ragdoll <kind> ... walking}), by entity id. */
+	private static final it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<MovingStartPayload> MOVING_STARTS =
+			new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>();
+
+	/** The server says this body's coming death is of a body that was going somewhere; its corpse packet follows. */
+	static void movingStart(MovingStartPayload payload) {
+		if (MOVING_STARTS.size() > 32) {
+			MOVING_STARTS.clear();
+		}
+		MOVING_STARTS.put(payload.entityId(), payload);
+	}
 
 	/** The server says this body's coming death is a stand test; its corpse packet follows. */
 	static void standTest(StandTestPayload payload) {
@@ -184,6 +266,18 @@ final class RagdollCorpse extends SimulatedCorpse {
 			return stand.stepper;
 		}
 		return null;
+	}
+
+	/** For the client gametest: the death on its feet this entity's ragdoll is having, or had, or null. */
+	public static @Nullable Stumble stumbleOf(int entityId) {
+		SimulatedCorpse corpse = RemoteCorpses.simulated(entityId);
+		return corpse instanceof RagdollCorpse r && r.body.controller() instanceof Stumble stumble ? stumble : null;
+	}
+
+	/** For the client gametest: which way this entity's ragdoll faces: -1 face down, +1 on its back; 0 for none. */
+	public static double faceOf(int entityId) {
+		SimulatedCorpse corpse = RemoteCorpses.simulated(entityId);
+		return corpse instanceof RagdollCorpse r ? r.body.facing().y : 0.0;
 	}
 
 	/** For the client gametest: the lean of this entity's ragdoll, degrees (0 upright, 90 lying), or -1 for none. */
@@ -411,6 +505,7 @@ final class RagdollCorpse extends SimulatedCorpse {
 			}
 		}
 		lastFall = fall;
+		footfalls();
 		if (TRACE && (age <= 40 || age % 5 == 0) && age <= 80) {
 			System.out.printf(java.util.Locale.ROOT,
 					"[rd] ragdoll %d t%02d lean %.1f spread %.2f gap %.3f motion %.2f y %.2f asleep %s%n",
@@ -420,6 +515,69 @@ final class RagdollCorpse extends SimulatedCorpse {
 	}
 
 	private static final boolean TRACE = System.getenv("RD_RAGDOLL_TRACE") != null;
+
+	/** The stepper keeping this body on its feet, or that did, or null. */
+	private @Nullable Stepper stepper() {
+		if (body.controller() instanceof Stumble stumble) {
+			return stumble.stepper;
+		}
+		return body.controller() instanceof Stand stand ? stand.stepper : null;
+	}
+
+	/**
+	 * The sound of a body on its feet: each step it lands, heavier and duller
+	 * than a walking one, and its planted feet scuffing as they lose their grip.
+	 */
+	private void footfalls() {
+		Stepper stepper = stepper();
+		sinceScuff++;
+		if (stepper == null || stepper.released()) {
+			return;
+		}
+		if (stepper.steps() > stepsHeard) {
+			stepsHeard = stepper.steps();
+			if (stepper.landedLeg() >= 0) {
+				float weak = (float) Mth.clamp(1.0 - stepper.strength, 0.0, 1.0);
+				footSound(stepper.landedLeg(), 2.0F, 0.9F - 0.2F * weak, 3);
+			}
+		}
+		if (stepper.slipped() - slipHeard > SCUFF_SLIP && sinceScuff > 3) {
+			slipHeard = stepper.slipped();
+			sinceScuff = 0;
+			for (int k = 0; k < 2; k++) {
+				if (stepper.planted(k)) {
+					footSound(k, 0.9F, 0.6F, 2);
+				}
+			}
+		}
+	}
+
+	/**
+	 * A foot on the block under it: that block's step sound, as loud as
+	 * {@code volume} walking steps, and a little of its dust.
+	 */
+	private void footSound(int leg, float volume, float pitch, int dust) {
+		Vector3d sole = body.tip(leg == 0 ? HumanoidRagdoll.RIGHT_LEG : HumanoidRagdoll.LEFT_LEG);
+		net.minecraft.core.BlockPos under = net.minecraft.core.BlockPos.containing(sole.x, sole.y - 0.2, sole.z);
+		var state = level.getBlockState(under);
+		if (state.isAir()) {
+			return;
+		}
+		var type = state.getSoundType();
+		LivingEntity who = entity.get();
+		// Vanilla's own step is the block's volume times 0.15.
+		level.playLocalSound(sole.x, sole.y, sole.z, type.getStepSound(),
+				who == null ? net.minecraft.sounds.SoundSource.NEUTRAL : who.getSoundSource(),
+				type.getVolume() * 0.15F * volume, type.getPitch() * pitch, false);
+		var particle = new net.minecraft.core.particles.BlockParticleOption(
+				net.minecraft.core.particles.ParticleTypes.BLOCK, state);
+		for (int i = 0; i < dust; i++) {
+			// Deterministic, as the thud's dust is: no dice.
+			double a = (stepsHeard * 2.399963 + i * 2.0943951) % (Math.PI * 2.0);
+			level.addParticle(particle, sole.x + Math.cos(a) * 0.1, sole.y + 0.03, sole.z + Math.sin(a) * 0.1,
+					Math.cos(a) * 0.03, 0.04, Math.sin(a) * 0.03);
+		}
+	}
 
 	@Override
 	boolean expired() {

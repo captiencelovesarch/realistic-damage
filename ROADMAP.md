@@ -451,6 +451,20 @@ it was shoved. It is let go at once when a step finds a hole or an edge, or
 when it ends up lying against something. `/rdmg ragdoll shove` takes a third
 argument, the seconds it has on its feet.
 
+**Stumbling deaths, IK phase 1: Grounded** (Nov 9 2026, alpha.24). Real deaths
+use the stepper. A body killed by a blow, an arrow or blood loss stays on its
+feet for a moment (0.3 to 2 seconds, from what its leg muscles have left) and
+stumbles before it falls: a step or two where it stood, a few strides and a
+face-first fall if it was running. A wounded leg gives way under it, feet scuff
+and make their step sounds, it trips on block edges and goes off ledges. Blasts,
+falls, drowning, lightning, headshots and anything knocked out drop the way
+they did. It takes the place of the old stagger reaction. New setting, Death
+Stumble: Grounded / Off (Off is alpha.21's death exactly); it needs Bodies set
+to Ragdoll, and it is all on the client. Your own death is seen from the
+chest while the body is on its feet, so the view does not whip with the head.
+`/rdmg ragdoll` takes a moving start (`walking` or `sprinting`, and a
+direction). Arcade is next ([IK_PLAN.md](IK_PLAN.md)).
+
 - **Mob body regions**, starting with humanoids where the existing hitbox
   geometry transfers directly. (The severed-limb entity originally planned here
   shipped early in 1.6.2 and is ready for mobs to reuse.)

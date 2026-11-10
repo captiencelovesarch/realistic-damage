@@ -362,6 +362,16 @@ public final class RemoteCorpses {
 		return RagdollCorpse.letGo(entityId);
 	}
 
+	/** For the client gametest: the death on its feet this entity's ragdoll is having, or had, or null. */
+	public static dev.captience.realisticdamage.ragdoll.@Nullable Stumble stumbleOf(int entityId) {
+		return RagdollCorpse.stumbleOf(entityId);
+	}
+
+	/** For the client gametest: which way this entity's ragdoll faces: -1 face down, +1 on its back; 0 for none. */
+	public static double faceOf(int entityId) {
+		return RagdollCorpse.faceOf(entityId);
+	}
+
 	/** For the client gametest: where the torso of this entity's ragdoll is, world, or null for none. */
 	public static org.joml.@Nullable Vector3d torsoOf(int entityId) {
 		return RagdollCorpse.torsoOf(entityId);

@@ -4,9 +4,12 @@ Status:
 - **Phase 0 built** (alpha.22), **loosened after your first playtest**
   (alpha.23: "incredibly stiff", and the body held upright in a pit): the
   test body now weakens, stumbles and goes over by itself, and is let go the
-  moment it has nothing to stand on. Awaiting your second look
-  ([RAGDOLL_TESTING.md](RAGDOLL_TESTING.md), top section).
-- Phases 1 to 4 not started.
+  moment it has nothing to stand on. Your second look: "SO much better",
+  no complaints.
+- **Phase 1 built** (alpha.24, Nov 9 2026): Grounded, in real deaths.
+  Awaiting your playtest ([RAGDOLL_TESTING.md](RAGDOLL_TESTING.md), top
+  section).
+- Phases 2 to 4 not started.
 
 It comes after the active-ragdoll work ([RAGDOLL_PLAN.md](RAGDOLL_PLAN.md),
 phases 0 to 5, alpha.21).
@@ -323,6 +326,109 @@ top), a commit, and alpha.N installed in both Prism instances.
 - **Your own death in first person:** the camera rides a walking head now,
   so its smoothing is checked against the bob of the steps.
 - The setting arrives here (Grounded / Off).
+
+**What phase 1 taught (built Nov 9 2026, alpha.24):**
+- **The game's knockback would end it before it began.** A hit sends a body
+  off at 8 blocks a second each way: made to throw a living player back a
+  block, and enough to throw this one off its feet before a step. Grounded
+  keeps 5% of it along the ground and none of the lift. The blow itself goes
+  into the part it struck: all of it into a limb or the head, a fifth into
+  the torso (most of the body's weight).
+- **A body that catches itself topples backward.** The stepper stops it
+  dead and upright, and when the hold goes it tips whichever way it was
+  nudged last, often onto its heels. So the torso is held a little forward
+  of upright (`Stepper.hunch`): 0.1 rad at first, 0.35 at the end. It hunches
+  over the wound and folds forward as it goes, which is also what the plan
+  asked of a torso wound. The stepper's own test body doesn't hunch (off
+  unless a style sets it).
+- **Time on its feet** is twice what the leg muscles alone would take to
+  fade to a tone of 0.5, kept within 0.3 to 2 s. The rest of the body's
+  muscles are stretched over the same time, so the arms and neck weaken on
+  the same clock as the legs. In the real client:
+  - a real arrow in the chest (violence 0.4): 1.08 s planned, one step, off
+    its feet after 0.65 s, 1 block from where it stood, face down;
+  - shot at a sprint (0.7): 0.79 s, two strides (one foot put down, the
+    other swung through), 2.6 blocks, face first;
+  - a walking body shot in the leg: 0.47 s, the leg gave after 0.35 s;
+  - a husk killed by a player's blow: 1.08 s, two steps, 1 block, in a heap;
+  - a bleed-out: 1.35 s, no steps, sinks 1 block from where it stood.
+- **A wounded leg** (broken, limp, or the one the killing blow struck) has
+  40% of a leg's strength and the body 60% of its time. It gives once it has
+  carried the body alone for a tenth of a second, and the body is tipped
+  over it. Two wounded legs, or a missing one, is nothing to stand on: it
+  falls the old way.
+- **Stiff legs prop a dead body up.** Let go of against a wall, a riser or
+  the side of a hole, it can stay leaning there on two sticks: it has no
+  knees to fold. A body still upright 0.6 s after it was let go of loses
+  the grip of its feet and folds at the hips until it sits (4 s at most).
+  "Upright" needed care: leaning less than 45°, head 1.2 above the lower
+  foot, that foot on something, and nothing under the chest for 0.7. One
+  lying up a flight of stairs leans no more than the stairs do, and one
+  hanging in a hole by its arms has nothing under its feet. Neither is
+  standing, and neither is made to slump.
+- **A 1x1 hole has no room to lie down in.** A body that goes in feet first
+  wedges at the shoulders or sits on the bottom. Accepted: the tests ask
+  only that it isn't held up, isn't in a block and is in one piece.
+- **Leg length.** The stepper's reaches and step heights are in blocks,
+  tuned on a player's 0.7 leg. Bodies with legs outside 0.55 to 0.9 (baby
+  zombies, endermen) fall the old way.
+- **The late movement is the twitch.** A body that moves again seconds
+  after it settled is the death twitch from phase 3. Tests must not ask for
+  stillness at a fixed time.
+- **First person: the head is the wrong thing to ride.** Grounded lets the
+  head hang loose, and the view rode it: at a sprint it turned 12.9° a tick
+  (the camera's own limit), 7.4° on average, and rolled 13.8°. While the
+  body is on its feet the view is now carried by the **chest**: it turns as
+  the chest has turned since death, from where the eyes sat on it. Same
+  death: about 5° a tick at most, 2.3° on average, roll 2°, bob 0.06 blocks
+  (8.6° a tick is its limit). Those are from ticks with no screenshot in
+  them: the test framework draws a frame of its own for each one, a whole
+  tick long to the view, which then chases twice in that tick. The head's
+  numbers above were taken with screenshots in, so they read a little high.
+  It eases back to the head over 0.3 s once the body is let go of, and the
+  fall is seen as before. The client game test fails if the head carries it.
+- **Sound.** Each step that lands is heard (duller and heavier than a
+  walking step), and a planted foot that slips another 5 cm scuffs.
+- **A stride is not always a step put down.** A body let go of with a leg
+  swung well ahead of the other (more than 0.25 along its travel) took that
+  stride though the foot never landed: it is counted (`Stepper.strides()`),
+  and the running-death rule is judged by strides.
+- **A raked foot was never put down.** A foot lands once it is out of the
+  floor it swung through, judged by the lowest corner of its sole. The
+  leading leg of a body going down at a run is raked some 45° with the hips
+  sunk, so a corner is always under the ground: the swing was given up
+  after 2.5 times its length and the body hopped over a foot it was not
+  standing on. Grounded forgives the tilt (`rakedFoot 1`: the middle of the
+  sole is what counts). The stepper's own test body does not (0).
+- **Where in its stride it died decides the first step.** The game takes
+  the stride from the body itself, so it differs every death. A body that
+  died with its feet together puts its first foot down short, pivots over
+  that straight leg (past 55° within 0.3 to 0.45 s) and is over before the
+  second foot arrives: one step, face first, 1.3 to 3 blocks on. Some 6% of
+  running deaths; one in seven walking into the shot. Left as it is: it is
+  what a weak hold on the torso does, and it reads as variety.
+- **Measured** over 3744 deaths on flat ground (every kind, part,
+  direction, speed and stride phase), eight seconds each:
+  - every one ends lying down, no part deeper than 0.08 in a block, and
+    in one piece;
+  - none takes more than 4 steps;
+  - standing still: over 80% take one step at most, all lie within 1.6
+    blocks;
+  - walking and sprinting: 95% take two strides or more and get 1.4 blocks
+    or further, 92% end face first, and a sprinter is down within 5.5
+    (that sweep has six points of a stride; see the next);
+  - stairs up and down, a ledge (90% of running bodies go over it), a wall
+    and a pit, each with 168 deaths: the same rules hold.
+- **Measured round the whole stride:** 768 deaths, walking and sprinting,
+  arrow and blow to the torso from every side, at 48 points of a stride:
+  - walking: 93% put two feet down, 94.5% take two strides, 97% get 1.4
+    blocks or further, 99.5% end face first. Walking into the shot is the
+    worst of it: 87.5% two strides, 92% 1.4 blocks, none under 0.95;
+  - sprinting: 95% put two feet down, 99% take two strides, 99.7% get 1.4
+    blocks or further, 98% end face first;
+  - one of the 768 (a sprinter shot in the back) comes down low on a leg
+    stuck out in front of it, is stopped dead by it and topples backward
+    half a block from where it died. Known, rare, left.
 
 ### Phase 2: Arcade
 

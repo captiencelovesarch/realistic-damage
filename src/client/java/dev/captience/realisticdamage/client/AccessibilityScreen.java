@@ -138,7 +138,14 @@ public class AccessibilityScreen extends OptionsSubScreen {
 				CycleButton.onOffBuilder(config.hitFlinches)
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.hit_flinches"),
 								(button, value) -> config.hitFlinches = value),
-				null);
+				CycleButton.<ClientEffectsConfig.DeathStumble>builder(
+						style -> Component.translatable("realisticdamage.config.death_stumble."
+								+ style.name().toLowerCase(java.util.Locale.ROOT)), config.deathStumble())
+						.withValues(java.util.List.of(ClientEffectsConfig.DeathStumble.values()))
+						.withTooltip(style -> net.minecraft.client.gui.components.Tooltip.create(
+								Component.translatable("realisticdamage.config.death_stumble.tooltip")))
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.death_stumble"),
+								(button, value) -> config.deathStumble = value));
 		this.list.addSmall(
 				CycleButton.<Integer>builder(
 								limit -> Component.literal(Integer.toString(limit)),

@@ -1,5 +1,92 @@
 # Ragdolls: your in-game checklist
 
+## Stumbling deaths, IK phase 1: Grounded (alpha.24)
+
+This is the one in normal play. A body killed by **a blow, an arrow or
+blood loss**, that still had a mind and two legs, **stays on its feet for a
+moment** (0.3 to 2 s, from its own leg muscles), stumbling, and then goes
+down. It works on players, zombies, skeletons, piglins and the mannequin.
+
+New setting on the mod's effects screen: **Death Stumble: Grounded / Off**
+(default Grounded; it needs Bodies set to Ragdoll). Arcade comes in phase 2.
+
+Grounded is the **subdued** one, on purpose: an arrow doesn't push a person,
+so a body standing still barely moves from where it stood. The steps come
+from the motion it already had.
+
+You can use real kills, or the test command, which now takes a moving start:
+
+`/rdmg ragdoll <kind> [part] [kick] [walking|sprinting [toward|away|left|right]]`
+
+It places a mannequin 3 blocks in front of you and kills it a second later
+(or kills the live mob under your crosshair instead). With `walking` or
+`sprinting` it dies as if going that way as you see it. Stand to the side to
+watch.
+
+- [ ] **1. Arrow in the chest, standing still:**
+      `/rdmg ragdoll projectile torso 0.3`, and a real bow on a zombie.
+      The chest jolts, it hunches, maybe one step, then it folds forward and
+      lies about where it stood. About a second.
+- [ ] **2. Shot while moving:**
+      `/rdmg ragdoll projectile torso 0.3 sprinting away`
+      `/rdmg ragdoll projectile torso 0.3 walking toward`
+      (also `left`, `right`). Two or three failing strides, each shorter,
+      then down on its face a few blocks on. And for real: shoot a zombie
+      that is walking at you. It differs every time, by where in its stride
+      it died: now and then one pitches straight onto its face after a
+      single step (about one in seventeen; one in seven walking at you).
+      Tell me if that reads as variety or as a mistake.
+- [ ] **3. Arrow in the leg:**
+      `/rdmg ragdoll projectile right_leg 0.3 walking away`
+      `/rdmg ragdoll projectile left_leg 0.3`
+      That leg gives the first time it has to carry the body, and it goes
+      down to that side. Quicker than a chest shot.
+- [ ] **4. Headshot:** `/rdmg ragdoll projectile head 0.3`. No stumble: it
+      drops on the spot. Same for a crush or a huge overkill.
+- [ ] **5. A zombie killed with a sword** (and a skeleton, a piglin). It
+      crumples in a step or two. It isn't thrown back the way it used to be.
+- [ ] **6. Terrain** (use `sprinting away` aimed at each):
+      - stairs up: it trips on them and ends lying on the steps;
+      - stairs down and a ledge: it steps off and falls, limp;
+      - a wall: it goes down against it, doesn't walk on the spot, and
+        doesn't stay propped (it folds at the hips and sits within a few
+        seconds);
+      - a one-wide tunnel: it should go down where it stands. (My tests
+        don't cover this one, so look closely.)
+- [ ] **7. A bleed-out:** `/rdmg ragdoll fade`. It sways, a step at most,
+      then sinks. The longest of them (about 1.3 s).
+- [ ] **8. Your own death, first person** (Death View = Ragdoll): get killed
+      by a skeleton or a zombie, standing and at a sprint. While your body is
+      on its feet the view **lurches with your chest**: it doesn't whip about
+      with the head. Then it goes down with you. Tell me if it makes you feel
+      sick: that's the one thing I can't judge.
+- [ ] **9. A friend watching you die**, if one is on: they see the same
+      stumble (it may end a block off from where you saw it).
+- [ ] **10. No stumble where there shouldn't be one:** killed in water, by a
+      blast, a fall, lightning, freezing, or while unconscious: it falls as
+      before. A burning body writhes as before.
+- [ ] **Sound:** each step lands with a dull footstep, and a planted foot
+      that slips is heard scuffing.
+- [ ] **Death Stumble = Off** gives back alpha.21's deaths exactly (the old
+      stagger).
+
+Known, on purpose or for later:
+- **Baby zombies and endermen fall the old way.** The stepper is tuned on
+  legs about a player's length.
+- **Villagers, illagers and animals don't stumble** (the generic rig).
+- **Block edges are trips.** A stumbling body can't step up or down cleanly:
+  it falls there. That's Grounded's column, and Arcade may get better.
+- **In a 1x1 hole** a body hangs by its arms or sits. There's no room to lie.
+- The mannequin from the command is killed at violence 0.7, so its stumbles
+  are shorter (about 0.8 s) than a real arrow's (about 1.1 s).
+
+What I'd like to hear:
+- **Too subdued, or right?** Standing bodies hardly travel now. If you miss
+  the old throw, that's what Arcade (phase 2) keeps.
+- **Time on its feet:** too short, too long?
+- **Is Grounded the default you want** when no preset has been pressed, or
+  should that be Arcade once it exists?
+
 ## The stepper, loosened (alpha.23)
 
 After your screenshot ("incredibly stiff", upright in a pit with a leg stuck
