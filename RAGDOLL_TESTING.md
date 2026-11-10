@@ -1,5 +1,78 @@
 # Ragdolls: your in-game checklist
 
+## Stumbling deaths, IK phase 2: Arcade (alpha.25)
+
+Arcade is the **cinematic** one: readable, a bit theatrical, about the same
+every time. The hit **shoves the body back along the shot** and turns it
+toward whoever shot it; it takes **2 to 4 long, clean steps** (the heavier
+the blow, the fewer) while it's held up firmly; then it goes down with a
+**finisher** picked from how it was hit. About 1 to 2 seconds on its feet.
+
+The setting on the effects screen is now **Death Stumble: Grounded / Arcade
+/ Off**, and the preset buttons set it: **Preset: Arcade** picks Arcade,
+**Preset: Grounded** picks Grounded. The default is still Grounded (one of
+your open decisions). Arcade needs Bodies set to Ragdoll, like Grounded.
+
+The finishers:
+- **Face-plant** (it was going forward: shot in the back, or running): the
+  last step gives and it falls on its face, hands out late.
+- **Spin-drop** (hit from the side): it turns on, about a quarter, and
+  crumples.
+- **Sit-down** (pushed back): back steps, sits down hard with its legs out
+  in front, then tips onto its back.
+- **Last look** (pushed back, the other half of the time): it stops, faces
+  whoever shot it for a beat, and drops.
+
+Which of the last two you get comes from the body itself (its entity id),
+so everyone watching sees the same one. Run the command a few times to see
+both.
+
+Tips: `/rdmg ragdoll ...` always strikes from where you stand. For a hit
+from the side, look at a live mob (or a `/summon mannequin`) from its side
+and run the command with it under your crosshair, or shoot a zombie side-on
+with a real bow.
+
+- [ ] **1. Arrow from the front, standing:** `/rdmg ragdoll projectile torso 0.3`
+      Jerked back with a hand going to the arrow, 2 or 3 steps back away
+      from you, then a sit-down or a last look. In my test run: 3 steps
+      back, a last look, down after about 1.2 s, 2.6 blocks from where it
+      stood.
+- [ ] **2. Arrow from the side:** a mob side-on (see the tips). It turns
+      toward you (up to 60°) as it staggers back, then spin-drops. In my
+      test run: 3 steps, down after about 1 s.
+- [ ] **3. Shot in the back, and at a sprint:**
+      `/rdmg ragdoll projectile torso 0.3 sprinting away`, and
+      `walking away`. It carries on forward a few steps and face-plants.
+- [ ] **4. Light versus heavy:** `/rdmg ragdoll blow torso 0.1` (about four
+      steps, near 2 s) against `/rdmg ragdoll blow torso 0.9` (two steps,
+      about 1 s).
+- [ ] **5. Shot in the leg:** `/rdmg ragdoll projectile right_leg 0.3`.
+      It limps a couple of steps on it, then goes down over that leg.
+- [ ] **6. Headshot hang:** `/rdmg ragdoll projectile head 0.3`, a crush,
+      or a huge overkill. It **hangs where it was hit for a beat** (0.15 s,
+      three ticks), stiff, then drops the way it always has. Keep or cut?
+      (One of your open decisions.)
+- [ ] **7. The steps:** do they read as clean? Straight legs can't really
+      lift, so the swinging foot passes over the floor rather than catching
+      on it (Grounded's scuffs and drags). Tell me if they look like they
+      skate.
+- [ ] **8. Terrain in Arcade** (`sprinting away` aimed at each): stairs up
+      and down, a ledge, a wall. It should end lying down every time.
+- [ ] **9. Your own death in first person** in Arcade, standing and at a
+      sprint. The view rides your chest while you're on your feet, as in
+      Grounded.
+- [ ] **10. Preset buttons:** press Preset: Arcade and check Death Stumble
+      shows Arcade; Preset: Grounded, and it shows Grounded.
+- [ ] **11. Back to Grounded:** everything from alpha.24 should be exactly
+      as it was (my tests check it death for death).
+
+Things I know about:
+- About 1 death in 200, a walking body that's shot puts its stride foot
+  down and gets stopped dead by it: it stands a moment, or goes straight to
+  its finisher with no stagger steps.
+- A standing body can take one step more than planned (up to 5).
+- The last look drops in a heap, and that often ends on its back.
+
 ## Stumbling deaths, IK phase 1: Grounded (alpha.24)
 
 This is the one in normal play. A body killed by **a blow, an arrow or

@@ -1,14 +1,20 @@
 package dev.captience.realisticdamage.ragdoll;
 
 /**
- * How a dying body stumbles (stumbling deaths, IK phase 1): every tuning
- * number of a preset in one table.
+ * How a dying body stumbles (stumbling deaths, IK phases 1 and 2): every
+ * tuning number of a preset in one table.
  *
  * <p>{@link #grounded()} is the physical one: a hit jolts the part it struck
  * and hardly moves the body, so only a body that was already going somewhere
  * has anything to catch; the hold on its torso is weak and goes with its
  * legs; its steps shorten and slow as it weakens, and its feet slip late on.
- * (Arcade arrives in phase 2.)
+ *
+ * <p>{@link #arcade()} is the cinematic one: the hit shoves the body back
+ * along the shot and turns it toward the shooter; it takes a planned number
+ * of long, clean steps (the heavier the blow, the fewer), held up firmly
+ * until the last, and goes down with a finisher picked from how it was hit
+ * ({@link Stumble.Finisher}). A body whose strings were cut hangs a beat
+ * before it drops. Everything Arcade adds is off in Grounded.
  *
  * <p>The fields are public and mutable so the trace tool can sweep them; the
  * game only ever uses a preset as it comes.
@@ -138,6 +144,97 @@ public final class StumbleStyle {
 	public double flight = 1.2;
 	public double hipDrop = 0.04;
 	public double rakedFoot = 1.0;
+	/** {@link Stepper#liftClear}: zero scuffs (Grounded). */
+	public double liftClear = 0.0;
+	/** {@link Stepper#stanceMin}: zero steps again at once (Grounded). */
+	public double stanceMin = 0.0;
+	/** {@link Stepper#holdAlone}, above zero: a foot left behind holds on while it is the only one down. */
+	public double holdAlone = 0.0;
+	/** The neck's tone while it is on its feet, held by the stepper; zero leaves the head to its own muscles. */
+	public double headHold = 0.0;
+
+	// --- A planned stumble (Arcade; all off in Grounded) ------------------------------
+
+	/**
+	 * Steps a planned stumble takes before its finisher, for the lightest
+	 * blow and the heaviest (the heavier, the fewer). Zero leaves it all to
+	 * the muscles, as Grounded does.
+	 */
+	public double stepsMost = 0.0;
+	public double stepsLeast = 0.0;
+	/**
+	 * A planned stumble's time on its feet, at most: this, and this much more
+	 * for each step. Its finisher comes with the first foot it puts down a
+	 * step's worth before that (and no sooner than {@link #feetMin}).
+	 */
+	public double feetBase = 0.0;
+	public double feetPerStep = 0.0;
+	/** A planned stumble's strength, 1 a living body's, however its muscles were. */
+	public double plannedVigor = 1.0;
+	/** The stagger shove along the shot, blocks a second, for the lightest blow and the heaviest. */
+	public double shoveMin = 0.0;
+	public double shoveMax = 0.0;
+	/** A bleed-out's shove, the way it sways, blocks a second. */
+	public double fadeShove = 0.0;
+	/** How much of the way it was seen going it keeps under the shove. */
+	public double keep = 1.0;
+	/** How much of the shove's part across the way it faces it keeps: these legs step across badly. */
+	public double sideShove = 1.0;
+	/** The slowest and the fastest it sets off along its path, blocks a second. */
+	public double pathMin = 0.0;
+	public double pathMax = 0.0;
+	/**
+	 * Until its finisher it is kept going along its path at no less than
+	 * this share of the speed it set off at, gaining at most
+	 * {@link #driveAccel} blocks a second each second. Zero for none.
+	 */
+	public double drive = 0.0;
+	public double driveAccel = 0.0;
+	/** The furthest it turns toward where the shot came from, radians, and how long the turn takes, seconds. */
+	public double turnMost = 0.0;
+	public double turnFor = 0.5;
+	/** Steps a wounded leg carries before it can give: zero, it gives the first time it is stood on alone. */
+	public double limpSteps = 0.0;
+	/**
+	 * Within this much (a cosine) of where two finishers meet, either fits
+	 * and the body's own seed picks.
+	 */
+	public double finisherBand = 0.15;
+
+	// --- The finishers (Arcade) -----------------------------------------------------------
+
+	/** Face-plant: it pitches over forward this fast, radians a second, and its arms go out this late, seconds. */
+	public double faceTopple = 1.3;
+	public double armsLate = 0.2;
+	/** Spin-drop: it turns on as it crumples, this fast, radians a second. */
+	public double spinRate = 3.0;
+	/**
+	 * Sit-down: for this long, seconds, its legs go out in front (this far at
+	 * the hips, radians, this hard) on feet that slide (this grip), its back
+	 * held up this much; then it tips back, this fast, radians a second.
+	 */
+	public double sitFor = 0.5;
+	public double sitFold = 1.3;
+	public double sitTone = 2.5;
+	public double sitGrip = 0.05;
+	public double sitUpright = 0.6;
+	public double sitTip = 1.2;
+	/** Last look: it holds the look this long, seconds, and drops toward the shooter this fast, blocks a second. */
+	public double lookFor = 0.4;
+	public double lookNudge = 0.3;
+
+	// --- The headshot hang (Arcade) ---------------------------------------------------------
+
+	/**
+	 * A body whose strings were cut (a headshot, a crush, an overkill) hangs
+	 * this long, seconds, before it drops (the film beat): its torso held up
+	 * this hard, this share of its weight carried, its limbs this stiff. Zero
+	 * drops it at once.
+	 */
+	public double hangFor = 0.0;
+	public double hangHold = 2.0;
+	public double hangSupport = 0.8;
+	public double hangTone = 5.0;
 
 	private StumbleStyle(String name) {
 		this.name = name;
@@ -148,6 +245,75 @@ public final class StumbleStyle {
 		return new StumbleStyle("grounded");
 	}
 
+	/** Readable, cinematic, consistent. */
+	public static StumbleStyle arcade() {
+		StumbleStyle s = new StumbleStyle("arcade");
+		// Nearly every conscious death by a blow or an arrow, however hard.
+		s.minAwake = 0.2;
+		s.feetMin = 1.0;
+		s.feetMax = 2.4;
+		s.stepsMost = 4.0;
+		s.stepsLeast = 2.0;
+		s.feetBase = 0.5;
+		s.feetPerStep = 0.42;
+		s.plannedVigor = 1.0;
+		// The hit: shoved back along the shot, and turned toward it.
+		s.shoveMin = 1.5;
+		s.shoveMax = 2.5;
+		s.fadeShove = 1.1;
+		s.keep = 0.35;
+		s.sideShove = 0.3;
+		s.pathMin = 1.2;
+		s.pathMax = 2.2;
+		s.drive = 0.45;
+		s.driveAccel = 6.0;
+		s.turnMost = Math.toRadians(60.0);
+		s.turnFor = 0.35;
+		s.torsoKick = 0.35;
+		// Held up firmly, until the last step.
+		s.balanceFrom = 0.75;
+		s.balanceGone = 1.0;
+		s.balanceLeft = 0.15;
+		s.strengthFrom = 0.7;
+		s.strengthLeft = 0.85;
+		s.hunch = 0.05;
+		s.hunchLate = 0.15;
+		s.reachLeft = 0.85;
+		s.slowBy = 0.15;
+		s.gripFrom = 1.0;
+		s.gripLeft = 1.0;
+		// A wounded leg limps a couple of steps, then goes.
+		s.woundedLeg = 0.6;
+		s.woundedLegFeet = 1.0;
+		s.limpSteps = 2.0;
+		s.buckleShove = 1.0;
+		s.giveTone = 1.0;
+		s.fallStrength = 0.8;
+		s.fallStrengthLeft = 0.5;
+		// Long, clean steps that lift clear, slightly slow.
+		s.uprightHold = 1.5;
+		s.facingHold = 1.0;
+		s.support = 0.7;
+		s.brakeTone = 2.0;
+		s.toeOff = 0.45;
+		s.armRaise = 0.7;
+		s.flailAt = 4.0;
+		s.swingMin = 0.18;
+		s.swingMax = 0.48;
+		s.quickAt = 3.0;
+		s.flight = 0.0;
+		s.stanceMin = 0.22;
+		s.holdAlone = 1.0;
+		s.reachForward = 0.55;
+		s.reachBack = 0.45;
+		s.circle = 0.02;
+		s.overshoot = -0.2;
+		s.liftClear = 0.8;
+		s.headHold = 1.6;
+		s.hangFor = 0.15;
+		return s;
+	}
+
 	/** A preset by its name, or null for none ("off", or one this version does not have). */
 	public static StumbleStyle byName(String name) {
 		if (name == null) {
@@ -155,6 +321,7 @@ public final class StumbleStyle {
 		}
 		return switch (name.toLowerCase(java.util.Locale.ROOT)) {
 			case "grounded" -> grounded();
+			case "arcade" -> arcade();
 			default -> null;
 		};
 	}
@@ -187,6 +354,12 @@ public final class StumbleStyle {
 		s.flight = flight;
 		s.hipDrop = hipDrop;
 		s.rakedFoot = rakedFoot;
-		s.holdHead = false;
+		s.liftClear = liftClear;
+		s.stanceMin = stanceMin;
+		s.holdAlone = holdAlone > 0.0;
+		s.holdHead = headHold > 0.0;
+		if (headHold > 0.0) {
+			s.neckTone = headHold;
+		}
 	}
 }

@@ -181,22 +181,30 @@ final class RagdollCorpse extends SimulatedCorpse {
 		}
 		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
 		Behaviour.Input input = behaviourInput(entity, payload, snapshot, muscles);
-		// A death on its feet (stumbling deaths), for the deaths that get one;
-		// every other body falls as it always has.
-		Stumble stumble = live ? null : stumble(ragdoll, entity, payload, input, seen, level);
-		if (stumble == null) {
+		// How it falls when it simply falls: as it always has.
+		Runnable fall = () -> {
 			ragdoll.setMuscles(muscles);
 			Behaviour behaviour = Behaviour.choose(input);
 			ragdoll.setBehaviour(live ? behaviour.withoutTwitch() : behaviour);
 			launch(ragdoll, entity, payload, feet, seen, muscles);
+		};
+		// A death on its feet (stumbling deaths), for the deaths that get one
+		// (or, in Arcade, a beat before a body whose strings were cut drops);
+		// every other body falls at once.
+		Stumble stumble = live ? null : stumble(ragdoll, entity, payload, input, seen, level, fall);
+		if (stumble == null) {
+			fall.run();
 		}
 		if (System.getenv("RD_RAGDOLL_TRACE") != null) {
 			System.out.printf(java.util.Locale.ROOT,
 					"[rd] ragdoll launch %s: kind %s violence %.2f sent (%.2f %.2f %.2f) seen (%.2f %.2f %.2f) part %d kick %.2f yaw %.1f stride %.2f %s%n",
 					entity.getName().getString(), payload.kind(), payload.violence(), payload.vx() * 20, payload.vy() * 20,
 					payload.vz() * 20, seen.x, seen.y, seen.z, payload.hitPart(), payload.kick() * 20, yaw, stride,
-					stumble == null ? "falls" : String.format(java.util.Locale.ROOT, "stumbles for %.2f s (vigor %.2f, weak leg %d)",
-							stumble.onFeet, stumble.vigor, stumble.weakLeg));
+					stumble == null ? "falls" : stumble.hang()
+							? String.format(java.util.Locale.ROOT, "hangs %.2f s, then falls", stumble.onFeet)
+							: String.format(java.util.Locale.ROOT, "stumbles (%s) for %.2f s (vigor %.2f, weak leg %d, steps %d, %s)",
+									stumble.style.name, stumble.onFeet, stumble.vigor, stumble.weakLeg, stumble.plannedSteps(),
+									stumble.planned() == null ? "no finisher" : stumble.planned().label));
 		}
 		return new RagdollCorpse(entity, ragdoll, modelScale, level);
 	}
@@ -207,7 +215,7 @@ final class RagdollCorpse extends SimulatedCorpse {
 	 * ({@link Stumble#plan}), or the body was not standing on anything.
 	 */
 	private static @Nullable Stumble stumble(HumanoidRagdoll ragdoll, LivingEntity entity, CorpsePayload payload,
-			Behaviour.Input input, Vector3d seen, ClientLevel level) {
+			Behaviour.Input input, Vector3d seen, ClientLevel level, Runnable fall) {
 		StumbleStyle style = StumbleStyle.byName(ClientEffectsConfig.get().deathStumble().name());
 		if (style == null || !onItsFeet(ragdoll, entity, level)) {
 			return null;
@@ -215,7 +223,7 @@ final class RagdollCorpse extends SimulatedCorpse {
 		Vector3d sent = new Vector3d(payload.vx(), payload.vy(), payload.vz()).mul(20.0);
 		Vector3d hitDir = new Vector3d(payload.hx(), payload.hy(), payload.hz());
 		return Stumble.begin(style, ragdoll, input, sent, seen, hitDir.lengthSquared() > 1.0e-6 ? hitDir : null,
-				payload.kick() * 20.0);
+				payload.kick() * 20.0, fall);
 	}
 
 	/** Whether a body died standing on the ground, on legs the stepper can walk. */

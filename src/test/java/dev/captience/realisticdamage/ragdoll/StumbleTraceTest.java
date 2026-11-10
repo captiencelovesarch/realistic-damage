@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Not an assertion: a death on its feet, tick by tick, for tuning a
  * {@link StumbleStyle}. Runs only with {@code RD_STUMBLE} set.
- * {@code RD_STYLE} (grounded, off), {@code RD_SPEED} (how fast it was going,
+ * {@code RD_STYLE} (grounded, arcade, off), {@code RD_SPEED} (how fast it was going,
  * the way it faces: 0, 4.3 walking, 5.6 sprinting), {@code RD_PHASE} (where in
  * its stride), {@code RD_KIND} (PROJECTILE, BLOW, FADE), {@code RD_VIOLENCE},
  * {@code RD_HIT} (the part struck: 0 head, 1 torso, 2 and 3 the arms, 4 and 5
@@ -25,7 +25,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p>With {@code RD_SWEEP} set it prints one line a death instead, over
  * {@code RD_SPEEDS}, {@code RD_KINDS}, {@code RD_HITS}, {@code RD_FROMS},
- * {@code RD_PHASES} and {@code RD_SCENES} (comma lists).
+ * {@code RD_PHASES}, {@code RD_SCENES}, {@code RD_SEEDS} and
+ * {@code RD_VIOLENCES} (comma lists).
  */
 class StumbleTraceTest {
 	@Test
@@ -42,9 +43,10 @@ class StumbleTraceTest {
 		death.from = System.getenv().getOrDefault("RD_FROM", "front");
 		HumanoidRagdoll r = death.start();
 		Stumble stumble = r.controller() instanceof Stumble s ? s : null;
-		System.out.printf(Locale.ROOT, "# %s%n", stumble == null ? "no stumble"
-				: String.format(Locale.ROOT, "on its feet %.2f s, vigor %.2f, weak leg %d", stumble.onFeet, stumble.vigor,
-						stumble.weakLeg));
+		System.out.printf(Locale.ROOT, "# %s%n", stumble == null ? "no stumble" : stumble.hang() ? "hangs " + stumble.onFeet
+				: String.format(Locale.ROOT, "on its feet %.2f s, vigor %.2f, weak leg %d, steps %d, %s, turn %.0f", stumble.onFeet,
+						stumble.vigor, stumble.weakLeg, stumble.plannedSteps(),
+						stumble.planned() == null ? "no finisher" : stumble.planned().label, Math.toDegrees(stumble.turnTo())));
 		PrintWriter frames = System.getenv("RD_FRAMES") == null ? null
 				: new PrintWriter(Files.newBufferedWriter(Path.of(System.getenv("RD_FRAMES"))));
 		int ticks = Integer.parseInt(System.getenv().getOrDefault("RD_TICKS", "100"));
@@ -57,10 +59,10 @@ class StumbleTraceTest {
 			Stepper st = stumble == null ? null : stumble.stepper;
 			System.out.printf(Locale.ROOT,
 					"t%03d com (%5.2f %5.2f %5.2f) v %4.2f R (%5.2f %5.2f %5.2f) L (%5.2f %5.2f %5.2f) lean %5.1f pitch %5.1f"
-							+ " arms %3.0f %3.0f head %3.0f hip %4.2f headY %4.2f",
+							+ " arms %3.0f %3.0f head %3.0f hip %4.2f headY %4.2f yaw %4.0f",
 					t, com.x, com.y, com.z, Math.hypot(v.x, v.z), rf.x, rf.y, rf.z, lf.x, lf.y, lf.z, r.lean(), pitch(r),
 					limb(r, HumanoidRagdoll.RIGHT_ARM), limb(r, HumanoidRagdoll.LEFT_ARM), limb(r, HumanoidRagdoll.HEAD),
-					r.joint(HumanoidRagdoll.RIGHT_LEG, new Vector3d()).y, r.body(HumanoidRagdoll.HEAD).x.y);
+					r.joint(HumanoidRagdoll.RIGHT_LEG, new Vector3d()).y, r.body(HumanoidRagdoll.HEAD).x.y, yaw(r));
 			if (st != null) {
 				System.out.printf(Locale.ROOT, " steps %d %s%s%s%s str %.2f bal %.2f slip %.2f%n", st.steps(),
 						st.stepping() ? "SWING" + st.swingLeg() : st.standing() ? "stand" : "-----",
@@ -93,10 +95,15 @@ class StumbleTraceTest {
 		String[] hits = System.getenv().getOrDefault("RD_HITS", "1").split(",");
 		String[] froms = System.getenv().getOrDefault("RD_FROMS", "front").split(",");
 		String[] phases = System.getenv().getOrDefault("RD_PHASES", "0,1.2,2.4,3.6").split(",");
+		String[] seeds = System.getenv().getOrDefault("RD_SEEDS", System.getenv().getOrDefault("RD_SEED", "7")).split(",");
+		String[] violences = System.getenv().getOrDefault("RD_VIOLENCES",
+				System.getenv().getOrDefault("RD_VIOLENCE", "0.4")).split(",");
 		int ticks = Integer.parseInt(System.getenv().getOrDefault("RD_TICKS", "160"));
-		System.out.printf("S %-11s %-10s %3s %-6s %3s %4s | %4s %5s %5s %-17s | %5s %5s %5s %5s | %5s %5s %5s %5s %5s | %7s%n",
-				"scene", "kind", "hit", "from", "v", "ph", "feet", "steps", "down", "why", "went", "side", "leanX", "slip",
-				"lean", "face", "endV", "pen", "sep", "strides");
+		System.out.printf("S %-11s %-10s %3s %-6s %3s %4s %3s %4s | %4s %3s %-10s %5s %5s %-17s | %5s %5s %5s %5s | %5s %5s %4s %5s %5s %5s | %7s%n",
+				"scene", "kind", "hit", "from", "v", "ph", "vio", "seed", "feet", "pl", "finisher", "steps", "down", "why",
+				"went", "side", "leanX", "slip", "lean", "face", "yaw", "endV", "pen", "sep", "strides");
+		for (String seedText : seeds) {
+		for (String vio : violences) {
 		for (String scene : scenes) {
 			for (String kind : kinds) {
 				for (String hit : hits) {
@@ -105,6 +112,8 @@ class StumbleTraceTest {
 							for (String ph : phases) {
 								HumanoidRagdollTest.FakeWorld world = StepperTest.scene(scene);
 								StumbleTest.Death death = death();
+								death.seed = Integer.parseInt(seedText.trim());
+								death.violence = Double.parseDouble(vio.trim());
 								death.kind = DeathKind.valueOf(kind);
 								death.hit = Integer.parseInt(hit);
 								death.from = from;
@@ -126,11 +135,13 @@ class StumbleTraceTest {
 								}
 								Vector3d went = Balance.centreOfMass(r, new Vector3d()).sub(start);
 								System.out.printf(Locale.ROOT,
-										"S %-11s %-10s %3s %-6s %3.1f %4.1f | %4.2f %5d %5.2f %-17s | %5.2f %5.2f %5.1f %5.2f | %5.1f %5.2f %5.2f %5.3f %5.3f | %7d%n",
-										scene, kind, hit, from, death.speed, death.phase, stumble == null ? 0.0 : stumble.onFeet,
+										"S %-11s %-10s %3s %-6s %3.1f %4.1f %3.1f %4d | %4.2f %3d %-10s %5d %5.2f %-17s | %5.2f %5.2f %5.1f %5.2f | %5.1f %5.2f %4.0f %5.2f %5.3f %5.3f | %7d%n",
+										scene, kind, hit, from, death.speed, death.phase, death.violence, death.seed,
+										stumble == null ? 0.0 : stumble.onFeet, stumble == null ? 0 : stumble.plannedSteps(),
+										stumble == null || stumble.planned() == null ? "-" : stumble.planned().label,
 										stumble == null ? 0 : stumble.stepper.steps(), stumble == null ? 0.0 : stumble.letGoAt(),
 										stumble == null ? "no stumble" : String.valueOf(stumble.why()), went.z, went.x, leanMax,
-										stumble == null ? 0.0 : stumble.stepper.slipped(), r.lean(), r.facing().y,
+										stumble == null ? 0.0 : stumble.stepper.slipped(), r.lean(), r.facing().y, yaw(r),
 										r.sim.maxMotion(), pen, sep, stumble == null ? 0 : stumble.stepper.strides());
 							}
 						}
@@ -138,6 +149,14 @@ class StumbleTraceTest {
 				}
 			}
 		}
+		}
+		}
+	}
+
+	/** Which way the torso faces along the ground, degrees from +Z (the way every test body starts facing). */
+	private static double yaw(HumanoidRagdoll r) {
+		Vector3d f = r.facing();
+		return Math.toDegrees(Math.atan2(f.x, f.z));
 	}
 
 	/**

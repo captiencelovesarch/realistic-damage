@@ -2,6 +2,7 @@ package dev.captience.realisticdamage.client.gametest;
 
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.client.AccessibilityScreen;
 import dev.captience.realisticdamage.client.ClientEffectsConfig;
 import dev.captience.realisticdamage.client.ClientState;
 import dev.captience.realisticdamage.client.DeathCamera;
@@ -11,13 +12,21 @@ import dev.captience.realisticdamage.damage.Corpses;
 import dev.captience.realisticdamage.damage.DeathKind;
 import dev.captience.realisticdamage.ragdoll.Behaviour;
 import dev.captience.realisticdamage.ragdoll.Stumble;
+import dev.captience.realisticdamage.ragdoll.StumbleStyle;
 import dev.captience.realisticdamage.systems.MobAnatomy;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.events.ContainerEventHandler;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -34,11 +43,12 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 
 /**
- * Stumbling deaths, IK phase 1 (Grounded), in a real client, as real deaths
- * reach it: an arrow that flies and lands in a chest, a body shot in the back
- * as it sprints, a leg shot, a headshot, a husk killed by a blow from the
- * player, a bleed-out, a blast, a blow with the setting off, and your own
- * death in first person at a sprint.
+ * Stumbling deaths, IK phases 1 (Grounded) and 2 (Arcade), in a real client,
+ * as real deaths reach it: an arrow that flies and lands in a chest, a body
+ * shot in the back as it sprints, a leg shot, a headshot, a husk killed by a
+ * blow from the player, a bleed-out, a blast, a blow with the setting off,
+ * and your own death in first person at a sprint; then in Arcade an arrow
+ * from the front and one from the side, a headshot, and the preset buttons.
  *
  * <p>What has to hold: blows, arrows and bleed-outs die on their feet, for
  * between 0.3 and 2 seconds, and end lying down; a headshot and a blast drop
@@ -49,6 +59,13 @@ import org.joml.Vector3d;
  * chest, so it turns a few degrees a tick and does not whip with the head.
  * The screenshots, from the side every other tick through the stumble, are
  * for a person to judge the look.
+ *
+ * <p>Arcade: an arrow sends the body back along the shot on its planned two
+ * to four steps, turned toward the shooter when shot from the side, and it
+ * goes down with the finisher the hit calls for (from the front a sit-down
+ * or a last look, from the side a spin-drop); a headshot hangs its beat (a
+ * few ticks) and drops; the Arcade and Grounded preset buttons set the
+ * setting.
  */
 public class StumbleClientGameTest implements FabricClientGameTest {
 	/** Blocks between one scene and the next, along +X. */
@@ -85,6 +102,7 @@ public class StumbleClientGameTest implements FabricClientGameTest {
 			drops(context, singleplayer, px + 6 * APART, py, pz, "explosion torso 1.0", "7_blast", "a blast");
 			off(context, singleplayer, px + 8 * APART, py, pz);
 			ownDeath(context, singleplayer, px + 7 * APART, py, pz);
+			arcade(context, singleplayer, px + 11 * APART, py, pz);
 		} finally {
 			context.getInput().releaseKey(options -> options.keyUp);
 			context.getInput().releaseKey(options -> options.keySprint);
@@ -491,6 +509,196 @@ public class StumbleClientGameTest implements FabricClientGameTest {
 		if (context.computeOnClient(client -> RagdollView.active())) {
 			throw new AssertionError("the ragdoll view leaked into the next life");
 		}
+	}
+
+	// --- Arcade (IK phase 2) ------------------------------------------------------------
+
+	private static void arcade(ClientGameTestContext context, TestSingleplayerContext singleplayer,
+			double x, double y, double z) {
+		context.runOnClient(client -> ClientEffectsConfig.get().deathStumble = ClientEffectsConfig.DeathStumble.ARCADE);
+		try {
+			arcadeArrow(context, singleplayer, x, y, z, false);
+			arcadeArrow(context, singleplayer, x + APART, y, z, true);
+			arcadeHeadshot(context, singleplayer, x + 2 * APART, y, z);
+		} finally {
+			context.runOnClient(client -> ClientEffectsConfig.get().deathStumble = ClientEffectsConfig.DeathStumble.GROUNDED);
+		}
+		presets(context);
+	}
+
+	/**
+	 * A real arrow into the chest of a body standing still, in Arcade: from in
+	 * front of it, or ({@code side}) from its right.
+	 */
+	private static void arcadeArrow(ClientGameTestContext context, TestSingleplayerContext singleplayer,
+			double x, double y, double z, boolean side) {
+		String what = side ? "Arcade, an arrow from the side" : "Arcade, an arrow from the front";
+		String name = side ? "rd_arcade_2_side" : "rd_arcade_1_front";
+		stage(context, singleplayer, x, y, z);
+		int id = singleplayer.getServer().computeOnServer(server -> {
+			ServerLevel level = server.getPlayerList().getPlayers().getFirst().level();
+			Mannequin mannequin = EntityTypes.MANNEQUIN.create(level, EntitySpawnReason.COMMAND);
+			// Facing the shooter (-Z), or facing +Z with the shooter off to its right (-X).
+			float yaw = side ? 0.0F : 180.0F;
+			mannequin.snapTo(x, y, z + 3.0, yaw, 0.0F);
+			mannequin.setYHeadRot(yaw);
+			mannequin.setYBodyRot(yaw);
+			level.addFreshEntity(mannequin);
+			mannequin.setHealth(1.0F);
+			return mannequin.getId();
+		});
+		watch(context, x, y, z + 3.0);
+		context.waitTicks(20);
+		context.takeScreenshot(name + "_00_before");
+		singleplayer.getServer().runOnServer(server -> {
+			ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+			ServerLevel level = player.level();
+			Arrow arrow = new Arrow(level, player, new ItemStack(Items.ARROW), null);
+			if (side) {
+				arrow.setPos(x - 1.5, y + 1.25, z + 3.0);
+				arrow.shoot(1.0, 0.0, 0.0, 3.0F, 0.0F);
+			} else {
+				arrow.setPos(x, y + 1.25, z - 1.0);
+				arrow.shoot(0.0, 0.0, 1.0, 3.0F, 0.0F);
+			}
+			level.addFreshEntity(arrow);
+		});
+		Stumble stumble = awaitStumble(context, id, 40);
+		if (stumble == null) {
+			throw new AssertionError(what + ": did not stumble (ragdoll lean "
+					+ context.computeOnClient(client -> RemoteCorpses.leanOf(id)) + ")");
+		}
+		if (stumble.hang() || stumble.plannedSteps() < 2 || stumble.plannedSteps() > 4) {
+			throw new AssertionError(what + ": planned " + stumble.plannedSteps() + " steps" + (stumble.hang() ? ", hanging" : ""));
+		}
+		Stumble.Finisher planned = stumble.planned();
+		boolean fits = side ? planned == Stumble.Finisher.SPIN_DROP
+				: planned == Stumble.Finisher.SIT_DOWN || planned == Stumble.Finisher.LAST_LOOK;
+		if (!fits) {
+			throw new AssertionError(what + ": planned a " + planned);
+		}
+		if (side && !(stumble.turnTo() < -0.5)) {
+			throw new AssertionError(what + ": turns " + Math.toDegrees(stumble.turnTo()) + " degrees, not toward the shooter");
+		}
+		Vector3d from = context.computeOnClient(client -> RemoteCorpses.torsoOf(id));
+		int letGo = film(context, stumble, name, 22);
+		Vector3d to = down(context, id, what);
+		context.takeScreenshot(name + "_99_down");
+		double along = side ? to.x - from.x : to.z - from.z;
+		report(what, stumble, letGo, along, context.computeOnClient(client -> RemoteCorpses.faceOf(id)));
+		System.out.printf(Locale.ROOT, "RD stumble test: %s: planned %d steps and a %s, staggered %d, went down with %s%s%n",
+				what, stumble.plannedSteps(), planned.label, stumble.staggered(), stumble.finisher() == null ? "none"
+						: stumble.finisher().label, stumble.early() ? " (early)" : "");
+		if (letGo < 0) {
+			throw new AssertionError(what + ": held on its feet and never let go");
+		}
+		if (stumble.finisher() != planned) {
+			throw new AssertionError(what + ": went down with " + stumble.finisher() + " (" + stumble.why() + "), not its " + planned);
+		}
+		double at = stumble.letGoAt();
+		// A last look holds a beat on top of its time on its feet.
+		double look = planned == Stumble.Finisher.LAST_LOOK ? StumbleStyle.arcade().lookFor : 0.0;
+		if (at < (stumble.early() ? 0.5 : 1.0) - 1.0e-6 || at > 2.25 + look + 1.0e-6) {
+			throw new AssertionError(what + ": on its feet " + at + " s");
+		}
+		if (along < 0.5) {
+			throw new AssertionError(what + ": went " + along + " blocks along the shot");
+		}
+	}
+
+	/** Arcade's headshot: the film beat, a few ticks hanging where it was hit, and then it drops. */
+	private static void arcadeHeadshot(ClientGameTestContext context, TestSingleplayerContext singleplayer,
+			double x, double y, double z) {
+		stage(context, singleplayer, x, y, z);
+		int id = place(context, singleplayer, x, y, z, "projectile head 0.3");
+		watch(context, x, y, z + 3.0);
+		Stumble stumble = awaitStumble(context, id, 40);
+		if (stumble == null || !stumble.hang()) {
+			throw new AssertionError("Arcade, a headshot: " + (stumble == null ? "dropped without its beat" : "stumbled"));
+		}
+		int letGo = film(context, stumble, "rd_arcade_3_headshot", 4);
+		down(context, id, "Arcade, a headshot");
+		context.takeScreenshot("rd_arcade_3_headshot_99_down");
+		System.out.printf(Locale.ROOT, "RD stumble test: Arcade, a headshot: hung %.2f s, let go %d ticks after it was seen (%s)%n",
+				stumble.letGoAt(), letGo, stumble.why());
+		if (letGo < 0 || letGo > 5) {
+			throw new AssertionError("Arcade, a headshot: let go " + letGo + " ticks on");
+		}
+	}
+
+	/**
+	 * The preset buttons on the effects screen set Death Stumble. The screen
+	 * saves the settings as it closes, so the file is put back as it was.
+	 */
+	private static void presets(ClientGameTestContext context) {
+		Path file = FabricLoader.getInstance().getConfigDir().resolve("realisticdamage-client.json");
+		byte[] before;
+		try {
+			before = Files.exists(file) ? Files.readAllBytes(file) : null;
+		} catch (java.io.IOException e) {
+			throw new AssertionError("could not read " + file, e);
+		}
+		try {
+			context.setScreen(() -> new AccessibilityScreen(null));
+			context.waitTicks(2);
+			press(context, "Preset: Grounded");
+			context.waitTick();
+			var grounded = context.computeOnClient(client -> ClientEffectsConfig.get().deathStumble());
+			press(context, "Preset: Arcade");
+			context.waitTick();
+			var arcade = context.computeOnClient(client -> ClientEffectsConfig.get().deathStumble());
+			context.takeScreenshot("rd_arcade_4_presets");
+			context.setScreen(() -> null);
+			System.out.println("RD stumble test: Preset: Grounded set Death Stumble to " + grounded + ", Preset: Arcade to " + arcade);
+			if (grounded != ClientEffectsConfig.DeathStumble.GROUNDED || arcade != ClientEffectsConfig.DeathStumble.ARCADE) {
+				throw new AssertionError("the presets set Death Stumble to " + grounded + " and " + arcade);
+			}
+		} finally {
+			try {
+				if (before == null) {
+					Files.deleteIfExists(file);
+				} else {
+					Files.write(file, before);
+				}
+			} catch (java.io.IOException e) {
+				throw new AssertionError("could not put back " + file, e);
+			}
+			context.runOnClient(client -> ClientEffectsConfig.load());
+		}
+	}
+
+	/**
+	 * Presses the button showing this text, wherever it is on the screen. The
+	 * test framework's own looks only at the screen's top level, and the
+	 * preset buttons are in its list.
+	 */
+	private static void press(ClientGameTestContext context, String text) {
+		boolean pressed = context.computeOnClient(client -> {
+			Button button = find(client.gui.screen(), text);
+			if (button == null) {
+				return false;
+			}
+			button.onPress(new MouseButtonInfo(-1, 0));
+			return true;
+		});
+		if (!pressed) {
+			throw new AssertionError("no button '" + text + "' on the screen");
+		}
+	}
+
+	private static Button find(GuiEventListener at, String text) {
+		if (at instanceof Button button && button.getMessage().getString().equals(text)) {
+			return button;
+		}
+		if (at instanceof ContainerEventHandler container) {
+			for (GuiEventListener child : container.children()) {
+				Button button = find(child, text);
+				if (button != null) {
+					return button;
+				}
+			}
+		}
+		return null;
 	}
 
 	// --- Helpers ----------------------------------------------------------------------

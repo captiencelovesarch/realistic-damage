@@ -224,6 +224,30 @@ public final class Stepper {
 	 * forgiven: 0 none, 1 all of it (the middle of the sole is what counts).
 	 */
 	public double rakedFoot = 0.0;
+	/**
+	 * A swinging foot that lifts clear (Arcade): it ignores the floor for this
+	 * share of its swing, skimming along the top of it rather than through it,
+	 * and comes down only after. These legs are straight, so a foot passing
+	 * under its hip is at the floor whatever it does; a scuffing one (zero,
+	 * Grounded) brushes and drags there, one that lifts clear passes over.
+	 */
+	public double liftClear = 0.0;
+	/**
+	 * Seconds a landed foot is stood on before the next step may begin, for a
+	 * body that is only going over (not one with a foot in the air): the beat
+	 * on each foot of a deliberate stagger. It shortens the faster the body
+	 * goes, and is gone at {@link #quickAt}. Zero steps again at once.
+	 */
+	public double stanceMin = 0.0;
+	/**
+	 * Whether a foot left behind still holds on while it is the only one down
+	 * (the other in the air). Without it, a slow step lets the body down onto
+	 * its hips with nothing under it; with it, the body is held up by the leg
+	 * behind it until the other foot lands. Off: it lifts, as {@link #toeOff} says.
+	 */
+	public boolean holdAlone;
+	/** How far a foot that lifts clear may pass into the floor while it ignores it, blocks. */
+	private static final double LIFT_SINK = 0.07;
 	private static final double HIP_BACK_FOR = 0.35;
 
 	/** How stiffly a foot that holds fast is pinned, blocks per unit of force. */
@@ -250,6 +274,9 @@ public final class Stepper {
 	/** Each leg's pose relative to the torso when it last stood: held while standing. */
 	private final Quaterniond[] standPose = {new Quaterniond(), new Quaterniond()};
 	private final Vector3d facing = new Vector3d();
+	/** The way it is to face instead of the way it died facing, once {@link #face} has been told. */
+	private final Vector3d faceAs = new Vector3d();
+	private boolean faceSet;
 	private int steps;
 	/** Let go of with a foot swung through ahead of the other and not yet down. */
 	private boolean strideCut;
@@ -303,6 +330,9 @@ public final class Stepper {
 		}
 		if (!started) {
 			start(r, world);
+		}
+		if (faceSet) {
+			facing.set(faceAs);
 		}
 		double s = Math.max(0.0, strength);
 		Balance.centreOfMass(r, com);
@@ -386,7 +416,7 @@ public final class Stepper {
 			// The foot in front comes down first, under the body and not
 			// wherever the stride had it.
 			beginStep(r, world, t, s, leading, false, true);
-		} else if (outside > 0.0) {
+		} else if (outside > 0.0 && t - lastLanding >= stanceMin * Math.max(0.0, 1.0 - speed() / quickAt)) {
 			beginStep(r, world, t, s, choose(r, a, b), false, false);
 		} else if (speed() < SETTLED && t - lastLanding > 0.3 && awkward(r, a, b)) {
 			// Caught, but standing anyhow: square up, bringing the foot that
@@ -445,7 +475,7 @@ public final class Stepper {
 			return;
 		}
 		for (int k = 0; k < 2; k++) {
-			if (pins[k].active && behind(r, k) > toeOff) {
+			if (pins[k].active && behind(r, k) > toeOff && !(holdAlone && !pins[1 - k].active)) {
 				pins[k].active = false;
 			}
 		}
@@ -693,6 +723,29 @@ public final class Stepper {
 		return false;
 	}
 
+	/**
+	 * From now on the body faces this way along the ground (a turn toward
+	 * where the shot came from), in place of the way it faced when it died:
+	 * its torso is turned to it, and its steps are taken in its frame.
+	 */
+	public void face(Vector3d dir) {
+		faceAs.set(dir.x, 0.0, dir.z);
+		faceSet = faceAs.lengthSquared() > 1.0e-9;
+		if (faceSet) {
+			faceAs.normalize();
+		}
+	}
+
+	/** The way along the ground its steps are taken in, world, unit (valid once it has {@linkplain #started}). */
+	public Vector3d facingNow() {
+		return new Vector3d(facing);
+	}
+
+	/** Whether it has had its first tick. */
+	public boolean started() {
+		return started;
+	}
+
 	/** The body's right along the ground. */
 	private Vector3d right(Vector3d out) {
 		return out.set(facing).cross(0.0, 1.0, 0.0).normalize();
@@ -853,7 +906,7 @@ public final class Stepper {
 		// lower than the leg is long would put the foot deep in the ground, and
 		// the ground would throw it out again when the leg stops passing
 		// through. Skim it instead.
-		double floor = Math.min(from.y, to.y) - 0.04;
+		double floor = Math.min(from.y, to.y) - (liftClear > 0.0 ? 0.0 : 0.04);
 		if (hip.y + dir.y * length < floor) {
 			Vector3d along = new Vector3d(spot).sub(hip);
 			along.y = 0.0;
@@ -871,8 +924,11 @@ public final class Stepper {
 		Vector3d soleNow = r.tip(leg);
 		double under = groundAt(world, soleNow.x, soleNow.z, soleNow.y + 0.1, r.body(leg).hx * 0.6);
 		double buried = Double.isNaN(under) ? 0.0 : under - lowestSole(r.body(leg));
-		double ease = Math.max(0.0, Math.min(1.0, (done - SINK_FROM) / (GHOST_UNTIL - SINK_FROM)));
-		r.body(leg).sink = SINK * (1.0 - ease);
+		// Lifting clear, it passes over the floor for longer, and deeper.
+		double ghostUntil = liftClear > 0.0 ? Math.max(GHOST_UNTIL, liftClear) : GHOST_UNTIL;
+		double sinkFrom = liftClear > 0.0 ? ghostUntil - (GHOST_UNTIL - SINK_FROM) : SINK_FROM;
+		double ease = Math.max(0.0, Math.min(1.0, (done - sinkFrom) / (ghostUntil - sinkFrom)));
+		r.body(leg).sink = (liftClear > 0.0 ? LIFT_SINK : SINK) * (1.0 - ease);
 		// A swinging foot has no grip: brushing the floor it slides on, where
 		// one that held would brace the body against the foot still planted.
 		r.body(leg).friction = 0.05;
@@ -892,7 +948,7 @@ public final class Stepper {
 		// How far into the floor it still is. Raked, its lowest corner is under
 		// the ground for as long as it is raked, with its sole on it.
 		double deep = buried - rakedFoot * Math.max(0.0, soleNow.y - lowestSole(r.body(leg)));
-		if (done >= GHOST_UNTIL && there && deep <= SINK && touching(r, leg, world)) {
+		if (done >= ghostUntil && there && deep <= SINK && touching(r, leg, world)) {
 			land(r, k, t);
 		} else if ((hole || edge || Double.isNaN(under)) && done > 1.0 + HOLE_PATIENCE) {
 			// Stepped into a hole or off an edge, or came down over one, and
@@ -1039,7 +1095,7 @@ public final class Stepper {
 		return slipped;
 	}
 
-	/** The body's right along the ground, as it faced when it died. */
+	/** The body's right along the ground, as it faced when it died (or as it was {@linkplain #face turned}). */
 	public Vector3d rightward() {
 		return right(new Vector3d());
 	}

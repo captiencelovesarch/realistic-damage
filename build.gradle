@@ -84,6 +84,9 @@ dependencies {
 
 test {
 	useJUnitPlatform()
+	// The stumbling-death tests keep every death they ran (thousands of whole
+	// ragdolls, once per style) for the tests that read them.
+	maxHeapSize = "2g"
 }
 
 // `./gradlew runClientGametest -PwithVivecraft` runs the suite with Vivecraft

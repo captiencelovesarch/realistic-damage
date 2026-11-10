@@ -13,7 +13,9 @@ import org.joml.Vector3d;
 import org.junit.jupiter.api.Test;
 
 /**
- * Deaths on their feet (stumbling deaths, IK phase 1) against a fake world.
+ * Deaths on their feet (stumbling deaths, IK phase 1) against a fake world:
+ * Grounded's rules. Arcade's are in {@link ArcadeStumbleTest}, on the same
+ * deaths.
  */
 class StumbleTest {
 	static final double DT = 0.05;
@@ -84,14 +86,17 @@ class StumbleTest {
 					: (0.10 + 0.20 * violence) * 20.0;
 			Behaviour.Input in = new Behaviour.Input(kind, violence, struck ? hit : -1, struck ? hit : HumanoidRagdoll.TORSO,
 					muscles, new Vector3d(way), seed);
-			if (Stumble.begin(style, r, in, sent, seen, struck ? way : null, kick) == null) {
-				// The fall this death has without a stumble, near enough.
+			// The fall this death has without a stumble, near enough.
+			Runnable fall = () -> {
 				r.setMuscles(muscles);
 				r.setBehaviour(Behaviour.choose(in));
 				if (sent.lengthSquared() > seen.lengthSquared()) {
 					r.push(sent.x - seen.x, sent.y - seen.y, sent.z - seen.z);
 				}
 				r.spin(new Vector3d(way.z, 0.0, -way.x).mul(0.6), new Vector3d(0.5, 0.0, 0.5));
+			};
+			if (Stumble.begin(style, r, in, sent, seen, struck ? way : null, kick, fall) == null) {
+				fall.run();
 			}
 			return r;
 		}
@@ -242,14 +247,14 @@ class StumbleTest {
 		return all;
 	}
 
-	private static void fail(List<String> failures, Death d, Outcome o, String what) {
+	static void fail(List<String> failures, Death d, Outcome o, String what) {
 		failures.add(String.format(Locale.ROOT, "%s: %s [%s, %d steps, down at %.2f (%s), went %.2f %.2f, lean %.0f, face %.2f, pen %.3f, sep %.3f, up until %.2f]",
 				what, d, o.stumble == null ? "no stumble" : String.format(Locale.ROOT, "%.2f s on its feet", o.stumble.onFeet),
 				o.steps(), o.stumble == null ? 0.0 : o.stumble.letGoAt(), o.stumble == null ? "-" : o.stumble.why(),
 				o.went.z, o.went.x, o.body.lean(), o.face(), o.pen, o.sep, o.lastUp));
 	}
 
-	private static void report(List<String> failures, int of) {
+	static void report(List<String> failures, int of) {
 		assertTrue(failures.isEmpty(), () -> failures.size() + " of " + of + " deaths:\n  "
 				+ String.join("\n  ", failures.subList(0, Math.min(40, failures.size()))));
 	}
@@ -299,7 +304,7 @@ class StumbleTest {
 	static final double SEP_EVER = 0.45;
 
 	/** What holds for any death anywhere: it is let go of in time, ends down and in one piece, and in no block. */
-	private static void sound(List<String> failures, Death d, Outcome o) {
+	static void sound(List<String> failures, Death d, Outcome o) {
 		sound(failures, d, o, false);
 	}
 
@@ -307,7 +312,7 @@ class StumbleTest {
 	 * {@code confined}: it ended somewhere it cannot lie down in (a hole one
 	 * block wide), so it is not asked to.
 	 */
-	private static void sound(List<String> failures, Death d, Outcome o, boolean confined) {
+	static void sound(List<String> failures, Death d, Outcome o, boolean confined) {
 		if (!o.finite) {
 			fail(failures, d, o, "blew up");
 			return;
@@ -398,11 +403,11 @@ class StumbleTest {
 
 	// --- How far it gets ------------------------------------------------------------------------
 
-	private static double share(List<Ran> of, java.util.function.Predicate<Ran> which) {
+	static double share(List<Ran> of, java.util.function.Predicate<Ran> which) {
 		return of.isEmpty() ? 0.0 : of.stream().filter(which).count() / (double) of.size();
 	}
 
-	private static double median(List<Ran> of, java.util.function.ToDoubleFunction<Ran> what) {
+	static double median(List<Ran> of, java.util.function.ToDoubleFunction<Ran> what) {
 		double[] v = of.stream().mapToDouble(what).sorted().toArray();
 		return v[v.length / 2];
 	}
@@ -678,7 +683,7 @@ class StumbleTest {
 	// --- Not on flat ground ------------------------------------------------------------------------
 
 	/** Deaths to try a place with: standing, walking and sprinting into it, struck from either side, and fading. */
-	private static List<Death> deathsInto() {
+	static List<Death> deathsInto() {
 		List<Death> all = new ArrayList<>();
 		for (double speed : new double[] {0.0, WALK, SPRINT}) {
 			for (double phase : new double[] {0.0, 1.2, 2.4, 3.6}) {
@@ -715,7 +720,15 @@ class StumbleTest {
 	}
 
 	private static List<Ran> into(String scene) {
+		return into(scene, null);
+	}
+
+	/** {@link #deathsInto} a place, each with a style of its own ({@code style} makes it), or the default one for null. */
+	static List<Ran> into(String scene, java.util.function.Supplier<StumbleStyle> style) {
 		return deathsInto().parallelStream().map(d -> {
+			if (style != null) {
+				d.style = style.get();
+			}
 			Outcome o = run(d, StepperTest.scene(scene), 240);
 			if (System.getenv("RD_STATS") != null) {
 				Vector3d c = Balance.centreOfMass(o.body, new Vector3d());

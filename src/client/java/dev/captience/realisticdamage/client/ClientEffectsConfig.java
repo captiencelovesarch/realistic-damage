@@ -255,14 +255,16 @@ public final class ClientEffectsConfig {
 	public boolean hitFlinches = true;
 
 	/**
-	 * Death Stumble (stumbling deaths, IK phase 1): a body killed by a blow, an
-	 * arrow or a bleed-out, with a mind and two legs left, stays on its feet for
-	 * a moment, stepping after its balance as it weakens, and then goes down.
-	 * {@code GROUNDED} is the physical one (the hit jolts what it struck and
-	 * hardly moves the body, so only a body that was going somewhere has much to
-	 * catch); {@code OFF} is the stagger from before. Full ragdolls only. Each
-	 * player picks their own: the server never decides this. (Arcade arrives
-	 * with phase 2.)
+	 * Death Stumble (stumbling deaths, IK phases 1 and 2): a body killed by a
+	 * blow, an arrow or a bleed-out, with a mind and two legs left, stays on its
+	 * feet for a moment, stepping after its balance as it weakens, and then goes
+	 * down. {@code GROUNDED} is the physical one (the hit jolts what it struck
+	 * and hardly moves the body, so only a body that was going somewhere has much
+	 * to catch); {@code ARCADE} the cinematic one (shoved back along the shot and
+	 * turned toward the shooter, a planned few clean steps, then a finisher, and
+	 * a headshot hangs a beat before it drops); {@code OFF} is the stagger from
+	 * before. Full ragdolls only. The Arcade and Grounded presets set it. Each
+	 * player picks their own: the server never decides this.
 	 */
 	public DeathStumble deathStumble = DeathStumble.GROUNDED;
 
@@ -273,7 +275,8 @@ public final class ClientEffectsConfig {
 
 	public enum DeathStumble {
 		OFF,
-		GROUNDED
+		GROUNDED,
+		ARCADE
 	}
 
 	public enum RagdollMode {
@@ -444,6 +447,7 @@ public final class ClientEffectsConfig {
 		concussionEffectsValue = 0.7;
 		lowHealthEffectsValue = 0.8;
 		breathingVolumeValue = 0.8;
+		deathStumble = DeathStumble.ARCADE;
 	}
 
 	/** Heavier immersion: full blackout, camera drift, everything at full strength. */

@@ -49,6 +49,12 @@ public final class Muscles {
 	public boolean stringsCut;
 	/** How much of a mind was left at death, 0..1: what reflexes (phase 3) have to work with. */
 	public double awake = 1.0;
+	/**
+	 * Whether it was conscious when it died, its strings cut or not (a body
+	 * whose strings were cut has no {@link #awake} left for its reflexes, but
+	 * one shot through the head was not out cold).
+	 */
+	public boolean conscious = true;
 
 	/** Phase 0's single curve: firm at death, gone in half a second. The default for a body nobody described. */
 	public static Muscles standard() {
@@ -79,6 +85,7 @@ public final class Muscles {
 		System.arraycopy(looseness, 0, m.looseness, 0, looseness.length);
 		m.stringsCut = stringsCut;
 		m.awake = awake;
+		m.conscious = conscious;
 		return m;
 	}
 
@@ -118,6 +125,7 @@ public final class Muscles {
 		System.arraycopy(looseness, 0, m.looseness, 0, looseness.length);
 		m.stringsCut = stringsCut;
 		m.awake = awake;
+		m.conscious = conscious;
 		return m;
 	}
 
@@ -198,6 +206,7 @@ public final class Muscles {
 		boolean headHit = in.hitPart() == HumanoidRagdoll.HEAD
 				&& (in.kind() == DeathKind.BLOW || in.kind() == DeathKind.PROJECTILE || in.kind() == DeathKind.CRUSH);
 		m.stringsCut = awake <= 0.0 || headHit || in.kind() == DeathKind.CRUSH || v >= 0.95;
+		m.conscious = awake > 0.0;
 		m.awake = m.stringsCut ? 0.0 : awake;
 
 		switch (in.kind()) {

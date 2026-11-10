@@ -6,10 +6,12 @@ Status:
   test body now weakens, stumbles and goes over by itself, and is let go the
   moment it has nothing to stand on. Your second look: "SO much better",
   no complaints.
-- **Phase 1 built** (alpha.24, Nov 9 2026): Grounded, in real deaths.
-  Awaiting your playtest ([RAGDOLL_TESTING.md](RAGDOLL_TESTING.md), top
-  section).
-- Phases 2 to 4 not started.
+- **Phase 1 built** (alpha.24, Nov 9 2026): Grounded, in real deaths. Your
+  playtest: "works well".
+- **Phase 2 built** (alpha.25, Nov 9 2026): Arcade, its finishers, the
+  headshot hang, and the setting's third choice. Awaiting your playtest
+  ([RAGDOLL_TESTING.md](RAGDOLL_TESTING.md), top section).
+- Phases 3 and 4 not started.
 
 It comes after the active-ragdoll work ([RAGDOLL_PLAN.md](RAGDOLL_PLAN.md),
 phases 0 to 5, alpha.21).
@@ -436,6 +438,91 @@ top), a commit, and alpha.N installed in both Prism instances.
 - The finishers: face-plant, spin-drop, sit-down, last look.
 - The headshot hang.
 - The preset buttons are wired to the setting.
+
+**What phase 2 taught (built Nov 9 2026, alpha.25):**
+- **Grounded didn't move.** Everything Arcade added to the stepper is off
+  unless a style turns it on. Over the 3744 deaths of the Grounded tests,
+  every number of every death is the same as alpha.24's.
+- **The shove is spent in a step or two.** A shove of 1.5 to 2.5 blocks a
+  second (heavier blow, harder) is caught by the first step, and a body
+  standing on two planted feet can't be pushed along, only tipped. So the
+  stumble is kept going at 45% of the speed it set off at until its
+  finisher, along the way it faces (back or forward).
+- **Straight legs can't step sideways.** Shoved across, the leading foot
+  steps out wide, the trailing one can't cross it, and the hips sink to the
+  floor. So only 30% of a shove's sideways part is kept, and the body turns
+  toward the shooter quickly (60° at most, over 0.35 s): hit from the side,
+  it ends up stepping backward. A face-plant doesn't turn (it looks where
+  it's going).
+- **Slow steps only when slow.** "Slightly slow" steps take 0.48 s at a
+  standstill but 0.18 s at 3 blocks a second. A slow step at walking speed
+  is aimed where the hips will be a third of a second on; the body brakes
+  meanwhile, and the foot lands in the splits a block and a half ahead. A
+  beat on each foot (0.22 s, gone at 3 blocks a second) gives the stagger
+  its rhythm and its length.
+- **A slow step needs the leg behind it.** The stepper lifts a foot the body
+  has left behind. During a slow step that was the only foot down: the hips
+  sank to the floor, and the stepper's "down" rule needs a planted foot, so
+  the body went on being held while it sat on the ground. Arcade keeps that
+  foot down until the other lands (`holdAlone`), and carries 70% of the
+  body's weight (Grounded 45%). Before both, a third of Arcade's bodies
+  spent half a second or more sunk on their hips; now 9 in 2112.
+- **Mid-air support floated them off.** Grounded's "carry the weight while
+  both feet are up" (for running deaths) lifted Arcade's slower bodies off
+  the ground. Arcade has none.
+- **Time and steps.** Steps are 4 for the lightest blow and 2 for the
+  heaviest (a sit-down at most 2, a last look at most 3). The finisher comes
+  with the first foot put down from (steps − 1) × 0.42 + 0.5 s on (1 s at
+  the earliest), and at (steps × 0.42 + 0.5) s at the latest. A body that
+  died walking first puts down the foot it had in the air: that one isn't
+  counted.
+- **The finisher is picked by the way it is sent off**, against the way it
+  faced: within 60° of forward a face-plant, within 60° of backward a
+  sit-down or a last look (the entity id picks), otherwise a spin-drop.
+  Within a cosine of 0.15 of those borders the entity id picks between the
+  two.
+- **Losing its footing early.** On open ground a planned body that sinks
+  onto its hips, goes over, or has no foot down for 0.6 s goes down with
+  its own finisher a moment early, not a generic fall. At edges, holes and
+  walls it falls as Grounded's do.
+- **The headshot hang needed a new fact.** `Muscles.awake` is zeroed
+  whenever the strings are cut, so it couldn't tell a headshot from a body
+  that was out cold: `Muscles.conscious` keeps that. The hang is 3 ticks:
+  torso held upright, limbs stiff, 80% of the weight carried, the head
+  loose (it snaps); then the drop from before, launch and all. Unconscious
+  bodies don't hang.
+- **"Lift clear" is a skim.** A straight leg can't lift its foot. The
+  swinging foot ignores the floor for 80% of its swing (it may pass 7 cm
+  into it, and is aimed to skim its top) and only then comes down: nothing
+  catches or drags. 12 cm showed as a foot in a block.
+- **The unit tests outgrew 512 MB.** Two caches of 3744 whole ragdolls (one
+  per style) left the test JVM collecting garbage for minutes and dropped
+  results; it has 2 GB now, and the suite runs in 30 s.
+- **Measured** over 3744 Arcade deaths on flat ground (every kind, part,
+  side, speed and stride phase), eight seconds each:
+  - every one ends lying down, in one piece and in no block;
+  - of 1152 conscious blows and arrows to the torso or arms, 1146 go down
+    with their finisher (32 of them early), 6 lose their footing in the
+    air;
+  - steps before the finisher: 94.5% take 2 to 4 (0 to 5 in all; the
+    0 and 1 are walkers stopped dead by their stride foot);
+  - time on its feet, finishers on time: 2 steps 1.05 to 1.35 s, 3 steps
+    1.35 to 2.25 s, 4 steps 1.8 to 2.2 s;
+  - face-plants end face down 99%, sit-downs on their backs 100%,
+    spin-drops on their backs 96%, last looks 84%;
+  - standing, shot from any side, it goes 1.6 to 2.4 blocks along the shot
+    (median);
+  - a leg hit: 89% go down over that leg, after 2 or 3 steps;
+  - every headshot, crush and overkill hangs exactly 0.15 s;
+  - stairs up and down, a ledge, a wall and a pit (840 deaths): the same
+    rules hold. One body on the stairs up rests propped on them for two
+    seconds after its face-plant, then slides back down and sits a moment
+    at the bottom.
+- **In the real client:** an arrow from the front (two runs, two entity
+  ids): 2 steps and a sit-down, down after 18 ticks, 2.2 blocks; and
+  3 steps and a last look, 24 ticks, 2.6 blocks. From the side: turned
+  toward the shooter, 3 steps and a spin-drop, 19 ticks, 1.7 blocks. A
+  headshot hung 0.15 s and dropped. Both preset buttons set the setting.
 
 ### Phase 3: reaching for the world (both presets)
 
