@@ -30,6 +30,10 @@ public final class FieldKit implements ModInitializer {
 				SwitchedRecipe.SERIALIZER);
 		Registry.register(BuiltInRegistries.LOOT_CONDITION_TYPE, RealisticDamage.id("field_kit_on"),
 				HalfOnCondition.MAP_CODEC);
+		Registry.register(BuiltInRegistries.RECIPE_SERIALIZER, RealisticDamage.id("field_kit_tipped_arrow"),
+				dev.captience.realisticdamage.fieldkit.brew.FieldKitArrowRecipe.SERIALIZER);
+		dev.captience.realisticdamage.fieldkit.brew.BrewedEffects.init();
+		dev.captience.realisticdamage.fieldkit.brew.BrewedPotions.init();
 		FieldKitTab.init();
 		LootGate.init();
 		RulesSync.init();

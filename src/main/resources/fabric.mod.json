@@ -76,7 +76,8 @@
 			"dev.captience.realisticdamage.gametest.AllMobsGameTest",
 			"dev.captience.realisticdamage.gametest.ScreamGameTest",
 			"dev.captience.realisticdamage.gametest.AfflictionsGameTest",
-			"dev.captience.realisticdamage.fieldkit.gametest.FieldKitSwitchGameTest"
+			"dev.captience.realisticdamage.fieldkit.gametest.FieldKitSwitchGameTest",
+			"dev.captience.realisticdamage.fieldkit.gametest.BrewedEffectsGameTest"
 		]
 	},
 	"mixins": [
@@ -89,7 +90,11 @@
 			"config": "realisticdamage.vivecraft.mixins.json",
 			"environment": "client"
 		},
-		"realisticdamage.fieldkit.mixins.json"
+		"realisticdamage.fieldkit.mixins.json",
+		{
+			"config": "realisticdamage.fieldkit.client.mixins.json",
+			"environment": "client"
+		}
 	],
 	"depends": {
 		"fabricloader": ">=0.19.3",

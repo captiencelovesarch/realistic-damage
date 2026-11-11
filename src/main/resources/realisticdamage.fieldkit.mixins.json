@@ -3,9 +3,14 @@
 	"package": "dev.captience.realisticdamage.fieldkit.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
+		"AdrenalineEndMixin",
 		"BrewingGateMixin",
+		"BrewingStandAccessor",
 		"CreativeTabsAccessor",
 		"EffectGateMixin",
+		"FieldKitBleedMixin",
+		"HaemorrhageArrowMixin",
+		"HaemorrhageWoundMixin",
 		"ItemUseGateMixin",
 		"OfferGateMixin",
 		"TradeGateMixin"

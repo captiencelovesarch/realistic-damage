@@ -1,6 +1,10 @@
 package dev.captience.realisticdamage.fieldkit.mixin;
 
 import dev.captience.realisticdamage.fieldkit.Half;
+import dev.captience.realisticdamage.fieldkit.brew.BrewedEffects;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
 import dev.captience.realisticdamage.fieldkit.Kit;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
@@ -22,7 +26,19 @@ abstract class EffectGateMixin {
 	@Inject(method = "canBeAffected", at = @At("HEAD"), cancellable = true)
 	private void realisticdamage$gateEffect(MobEffectInstance effect, CallbackInfoReturnable<Boolean> cir) {
 		LivingEntity self = (LivingEntity) (Object) this;
-		if (!self.level().isClientSide() && Kit.halfOf(effect.getEffect()).map(half -> !half.on()).orElse(false)) {
+		if (self.level().isClientSide()) {
+			return;
+		}
+		if (Kit.halfOf(effect.getEffect()).map(half -> !half.on()).orElse(false)) {
+			cir.setReturnValue(false);
+			return;
+		}
+		// The heart is still recovering from its last surge (2.0, phase 3).
+		if (effect.is(BrewedEffects.ADRENALINE) && BrewedEffects.refusesAdrenaline(self)) {
+			if (self instanceof Player player) {
+				player.sendOverlayMessage(Component.translatable("realisticdamage.fieldkit.adrenaline.spent")
+						.withStyle(ChatFormatting.RED));
+			}
 			cir.setReturnValue(false);
 		}
 	}

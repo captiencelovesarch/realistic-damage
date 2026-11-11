@@ -3,6 +3,46 @@
 The field kit is built on its own branch, beside the neck work, with its own
 version numbers: `2.0.0-items.N`. Newest round on top.
 
+## items.2: Haemorrhage and Adrenaline (phase 3, round 1)
+
+The jar is `realistic-damage-2.0.0-items.2.jar`, in the "Realistic Damage items"
+Prism instance (items.1 is parked in `mods/replaced-jars/`). Turn **Weapons** on
+first (K, then World rules), or none of this exists.
+
+- [ ] **1. The tab.** In creative, the **Field kit** tab (on the second page of
+  tabs) has Haemorrhage and Adrenaline in every form: drinkable, splash,
+  lingering, tipped arrow, and the long and strong brews.
+- [ ] **2. Brewing.** Awkward potion + sweet berries = Haemorrhage; + glow
+  berries = Adrenaline. Redstone lengthens both, glowstone strengthens
+  Haemorrhage, gunpowder and dragon's breath work as usual.
+- [ ] **3. Tipped arrows.** Eight arrows around one drinkable Haemorrhage potion
+  make eight Arrows of Haemorrhage, and you get the bottle back.
+- [ ] **4. Haemorrhage.** Drink it and get hit by a sword or an arrow: hits that
+  wouldn't normally make you bleed do, and bleeds open worse. Holding a wound
+  (empty hand, hold use) helps half as much. Fists and maces still never cut.
+- [ ] **5. The arrow.** Shoot a zombie with an Arrow of Haemorrhage: it bleeds
+  from where it was hit. A skeleton doesn't (no blood).
+- [ ] **6. Adrenaline.** Drink it at full health: the surge kicks in ("Adrenaline
+  floods in.", faster, pain pushed back, a racing heart) for 20 seconds, then
+  the crash (heavy legs, short winded sprints). Drink another straight after:
+  "Your heart can't take another surge yet", and nothing happens.
+- [ ] **7. Bleeding harder.** With a wound open, Adrenaline makes it drain
+  faster (you'll see the blood come quicker).
+- [ ] **8. Milk.** Milk clears both, and a bleed Haemorrhage opened stays open.
+  Milk mid-surge ends the surge and starts the crash.
+- [ ] **9. The icons.** The two new icons in your inventory's effect list and
+  top right on the HUD.
+- [ ] **10. Switching off.** Turn Weapons off on the World rules page. A potion
+  in your inventory now says "Weapons is switched off: this does nothing" and
+  won't drink; a running Haemorrhage or Adrenaline ends at once; a brewing stand
+  with sweet berries won't start; the Field kit tab is gone from creative. Turn
+  it back on and it all returns.
+- [ ] **11. On a server, if you can.** With the Field kit tab open in creative,
+  have an operator (or the console) run `/rdmg config enableWeapons false`: the
+  tab empties and you land on Building Blocks, with no crash.
+
+**Not in yet:** Sedation and Numbing (round 2).
+
 ## items.1: the switches (phase 2)
 
 The jar is `realistic-damage-2.0.0-items.1.jar`. It has everything 2.0.0-alpha.1

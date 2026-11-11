@@ -752,3 +752,21 @@ same fields as `/rdmg config`, so a setting added later appears there by itself 
 file directly; on a server an operator's changes are sent as `/rdmg config` commands,
 and everyone else reads only.
 
+### The brewed effects (phase 3)
+
+Each brewed effect is a status effect (a `FieldKitEffect`, so it ends on the tick its
+switch goes off) plus vanilla potions, so vanilla supplies every form and milk clears it.
+The effects carry almost no behaviour of their own: the body's systems ask about them,
+through mixins in `fieldkit.mixin` rather than calls in the core, so the core mod still
+does not know the field kit exists. All numbers are thresholds and factors in
+`Balance` ("The field kit's brewed effects"); none is a chance.
+
+| Effect | Where it acts |
+|---|---|
+| Haemorrhage | `TraumaPipeline.createWounds`: the hit is judged against ×0.6 thresholds (×0.45 at II), and the wound opens a step worse before armour takes its step back. `BleedingSystem.tick`: the stack may run to ×1.5 the cap (×2 at II), and hand pressure keeps half its effect. `Arrow.doPostHurtEffects`: a Moderate wound where the arrow struck, on anything that bleeds |
+| Adrenaline | `onEffectStarted` starts the body's own surge (`AdrenalineMath`) for the effect's duration and spends its refractory; removal (running out, milk, a switch) ends it into the crash; `canBeAffected` refuses a dose during the refractory. `BleedingSystem.tick`: ×1.3 bleeding while it lasts. Client: Cardio is fed at least 0.6 health distress, so the heart and the arterial spurts quicken without the low-health vignette |
+
+Tipped arrows from drinkable potions are a special recipe
+(`realisticdamage:field_kit_tipped_arrow`) that only takes field kit potions and asks the
+potion's own half, so one recipe serves both switches.
+

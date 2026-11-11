@@ -106,6 +106,19 @@ in loot, trades or the creative tab, anything already in a chest does nothing an
 why, and its effects wear off at once. Flip it back and it all returns. The items arrive
 over the 2.0 alphas; the **Field kit** creative tab shows whatever exists so far.
 
+**Brews so far** (both Weapons): start from an awkward potion. Redstone makes them last
+longer, glowstone makes Haemorrhage stronger, and gunpowder and dragon's breath make
+splash and lingering potions as usual. Eight arrows round one drinkable potion make eight
+tipped arrows, no dragon's breath needed. Milk clears them, but what they already did
+stays done.
+
+- **Haemorrhage** (sweet berries): the blood stops clotting. A lighter hit opens a bleed,
+  wounds open a step worse, they bleed past the usual cap, and a hand pressed on them holds
+  back half as much. An arrow of it opens a bleed where it lands, on anything that bleeds.
+- **Adrenaline** (glow berries): the last-two-hearts surge, now, for as long as it lasts,
+  then the usual crash. It heals nothing, your racing heart makes open wounds bleed harder,
+  and a second dose is refused until your heart has recovered from the last surge.
+
 ## Playing with it
 
 Injuries show on a small body diagram that fades in when something's wrong. States and

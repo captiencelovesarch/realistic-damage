@@ -1,12 +1,21 @@
 package dev.captience.realisticdamage.fieldkit.client;
 
+import java.util.List;
 import java.util.Optional;
 
 import dev.captience.realisticdamage.fieldkit.Half;
 import dev.captience.realisticdamage.fieldkit.Kit;
 import dev.captience.realisticdamage.fieldkit.RulesPayload;
 import dev.captience.realisticdamage.fieldkit.RulesView;
+import dev.captience.realisticdamage.fieldkit.client.mixin.CreativeScreenInvoker;
 import dev.captience.realisticdamage.fieldkit.mixin.CreativeTabsAccessor;
+import net.fabricmc.fabric.api.client.creativetab.v1.FabricCreativeModeInventoryScreen;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.ItemStack;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
@@ -32,10 +41,12 @@ public final class FieldKitClient implements ClientModInitializer {
 				refreshCreativeTabs();
 			}
 		});
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(() -> {
 			RulesView.clear();
-			refreshCreativeTabs();
-		});
+			// No creative screen outlives the world, and the next world brings its
+			// own registries: let vanilla build the tabs afresh when it next needs them.
+			CreativeTabsAccessor.realisticdamage$setCachedParameters(null);
+		}));
 		ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
 			Optional<Half> off = Kit.offHalf(stack, RulesView::on);
 			off.ifPresent(half -> lines.add(Component.translatable("realisticdamage.fieldkit.off.tooltip",
@@ -44,8 +55,33 @@ public final class FieldKitClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(Welcome::tick);
 	}
 
-	/** Forget vanilla's cached tab contents, so the Field kit tab asks the switches again. */
+	/**
+	 * Rebuilds every creative tab with the parameters already in use, so the
+	 * Field kit tab asks the switches again, then brings an open creative screen
+	 * (and the search tab's index) up to date: the tab's list is redrawn, and a
+	 * tab that just emptied hands over to the default one, as vanilla does when
+	 * a tab empties for its own reasons.
+	 */
 	public static void refreshCreativeTabs() {
-		CreativeTabsAccessor.realisticdamage$setCachedParameters(null);
+		CreativeModeTab.ItemDisplayParameters parameters = CreativeTabsAccessor.realisticdamage$cachedParameters();
+		if (parameters == null) {
+			return; // never built yet: the first build will ask the switches
+		}
+		CreativeTabsAccessor.realisticdamage$buildAllTabContents(parameters);
+		Minecraft client = Minecraft.getInstance();
+		ClientPacketListener connection = client.getConnection();
+		if (connection != null) {
+			List<ItemStack> searchable = List.copyOf(CreativeModeTabs.searchTab().getDisplayItems());
+			connection.searchTrees().updateCreativeTooltips(parameters.holders(), searchable);
+			connection.searchTrees().updateCreativeTags(searchable);
+		}
+		if (client.gui.screen() instanceof CreativeModeInventoryScreen screen) {
+			CreativeModeTab selected = ((FabricCreativeModeInventoryScreen) screen).getSelectedTab();
+			if (selected.getType() == CreativeModeTab.Type.CATEGORY && !selected.shouldDisplay()) {
+				((FabricCreativeModeInventoryScreen) screen).setSelectedTab(CreativeModeTabs.getDefaultTab());
+			} else {
+				((CreativeScreenInvoker) screen).realisticdamage$selectTab(selected);
+			}
+		}
 	}
 }

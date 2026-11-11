@@ -24,6 +24,17 @@ import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.events.ContainerEventHandler;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.fabricmc.fabric.api.client.creativetab.v1.FabricCreativeModeInventoryScreen;
+import dev.captience.realisticdamage.fieldkit.FieldKitTab;
+import dev.captience.realisticdamage.fieldkit.Kit;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -184,6 +195,7 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("rd_fieldkit_03_world_rules_changed");
 			context.setScreen(() -> null);
 			context.waitTicks(3);
+			creativeTabAndIcons(context, singleplayer);
 		}
 		context.waitTicks(5);
 		boolean cleared = context.computeOnClient(client -> !RulesView.received());
@@ -195,6 +207,83 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 			ServerConfig.get().preyOnWounded = ServerConfig.PreyOnWounded.VISIBLE;
 			ServerConfig.save();
 		});
+	}
+
+	/**
+	 * The Field kit tab follows the switch (2.0, phase 3): with Weapons on it
+	 * holds every form of every Weapons brew; switched off while the tab is
+	 * open, the tab empties, disappears and the screen falls back to the
+	 * default tab. A switched-off potion's tooltip says why it does nothing. And
+	 * the new effect icons, as the inventory draws them.
+	 */
+	private void creativeTabAndIcons(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		CreativeModeTab tab = context.computeOnClient(client ->
+				net.minecraft.core.registries.BuiltInRegistries.CREATIVE_MODE_TAB.getValue(FieldKitTab.KEY));
+		singleplayer.getServer().runCommand("rdmg config enableWeapons true");
+		context.waitFor(client -> RulesView.on(Half.WEAPONS), 60);
+		singleplayer.getServer().runCommand("gamemode creative @a");
+		singleplayer.getServer().runCommand("effect give @a realisticdamage:haemorrhage 120");
+		singleplayer.getServer().runCommand("effect give @a realisticdamage:adrenaline 20");
+		context.waitTicks(10);
+
+		context.setScreen(() -> {
+			LocalPlayer player = Minecraft.getInstance().player;
+			return new CreativeModeInventoryScreen(player, player.connection.enabledFeatures(), false);
+		});
+		context.waitTicks(5);
+		boolean selected = context.computeOnClient(client ->
+				((FabricCreativeModeInventoryScreen) client.gui.screen()).setSelectedTab(tab));
+		context.waitTicks(5);
+		int shown = context.computeOnClient(client ->
+				((CreativeModeInventoryScreen) client.gui.screen()).getMenu().items.size());
+		int expected = context.computeOnClient(client -> FieldKitTab.contents().size());
+		if (!selected || shown != expected || expected < Kit.potions().size() * 4) {
+			throw new AssertionError("Weapons on: the Field kit tab must hold every form of every brew, selected="
+					+ selected + " shown=" + shown + " expected=" + expected);
+		}
+		context.takeScreenshot("rd_fieldkit_06_creative_tab");
+
+		// Switched off with the tab open: it empties, and the screen leaves it.
+		singleplayer.getServer().runCommand("rdmg config enableWeapons false");
+		context.waitFor(client -> !RulesView.on(Half.WEAPONS), 60);
+		context.waitTicks(5);
+		boolean left = context.computeOnClient(client ->
+				((FabricCreativeModeInventoryScreen) client.gui.screen()).getSelectedTab() != tab
+						&& !tab.shouldDisplay());
+		if (!left) {
+			throw new AssertionError("Weapons off: the Field kit tab must empty and go away");
+		}
+		context.takeScreenshot("rd_fieldkit_07_creative_tab_gone");
+
+		// A potion already held says why it does nothing.
+		boolean says = context.computeOnClient(client -> PotionContents.createItemStack(Items.POTION,
+						dev.captience.realisticdamage.fieldkit.brew.BrewedPotions.HAEMORRHAGE)
+				.getTooltipLines(Item.TooltipContext.of(client.level), client.player, TooltipFlag.NORMAL).stream()
+				.anyMatch(line -> line.getString().contains("Weapons is switched off")));
+		if (!says) {
+			throw new AssertionError("a switched-off potion's tooltip must say Weapons is off");
+		}
+
+		// The icons, in the survival inventory's effect list.
+		singleplayer.getServer().runCommand("rdmg config enableWeapons true");
+		context.waitFor(client -> RulesView.on(Half.WEAPONS), 60);
+		singleplayer.getServer().runCommand("gamemode survival @a");
+		singleplayer.getServer().runCommand("effect give @a realisticdamage:haemorrhage 120");
+		singleplayer.getServer().runCommand("effect give @a realisticdamage:adrenaline 20");
+		context.waitTicks(10);
+		context.setScreen(() -> new InventoryScreen(Minecraft.getInstance().player));
+		context.waitTicks(5);
+		boolean both = context.computeOnClient(client ->
+				client.player.hasEffect(dev.captience.realisticdamage.fieldkit.brew.BrewedEffects.HAEMORRHAGE)
+						&& client.player.hasEffect(dev.captience.realisticdamage.fieldkit.brew.BrewedEffects.ADRENALINE));
+		if (!both) {
+			throw new AssertionError("both brewed effects should be on the player for the icon screenshot");
+		}
+		context.takeScreenshot("rd_fieldkit_08_effect_icons");
+		context.setScreen(() -> null);
+		singleplayer.getServer().runCommand("effect clear @a");
+		singleplayer.getServer().runCommand("rdmg config enableWeapons false");
+		context.waitTicks(3);
 	}
 
 	// --- World rules, on a server ---

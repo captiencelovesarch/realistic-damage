@@ -312,5 +312,16 @@
 	"realisticdamage.rules.fallTraumaMultiplier": "Fall Trauma",
 	"realisticdamage.rules.fallTraumaMultiplier.tooltip": "Scales trauma from falls.",
 	"realisticdamage.rules.pvpTraumaMultiplier": "PvP Trauma",
-	"realisticdamage.rules.pvpTraumaMultiplier.tooltip": "Scales trauma from other players."
+	"realisticdamage.rules.pvpTraumaMultiplier.tooltip": "Scales trauma from other players.",
+	"effect.realisticdamage.haemorrhage": "Haemorrhage",
+	"item.minecraft.potion.effect.haemorrhage": "Potion of Haemorrhage",
+	"item.minecraft.splash_potion.effect.haemorrhage": "Splash Potion of Haemorrhage",
+	"item.minecraft.lingering_potion.effect.haemorrhage": "Lingering Potion of Haemorrhage",
+	"item.minecraft.tipped_arrow.effect.haemorrhage": "Arrow of Haemorrhage",
+	"effect.realisticdamage.adrenaline": "Adrenaline",
+	"item.minecraft.potion.effect.adrenaline": "Potion of Adrenaline",
+	"item.minecraft.splash_potion.effect.adrenaline": "Splash Potion of Adrenaline",
+	"item.minecraft.lingering_potion.effect.adrenaline": "Lingering Potion of Adrenaline",
+	"item.minecraft.tipped_arrow.effect.adrenaline": "Arrow of Adrenaline",
+	"realisticdamage.fieldkit.adrenaline.spent": "Your heart can't take another surge yet"
 }
