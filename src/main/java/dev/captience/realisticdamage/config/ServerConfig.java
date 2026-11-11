@@ -241,6 +241,28 @@ public final class ServerConfig {
 		}
 	}
 
+	/**
+	 * The field kit's Weapons half (2.0): anything that hurts someone or
+	 * protects you from being hurt — the brewed poisons, the trick arrows, the
+	 * traps, the gas mask. Off by default, and asked about on first launch.
+	 *
+	 * <p>Off means off without a restart: the items stay registered, so a world
+	 * never breaks when this flips, but nothing makes them (crafting, brewing,
+	 * loot, trades), nothing shows them (the creative tab), an item already in a
+	 * chest does nothing and says why, and its effects wear off at once. With
+	 * both halves off, the core rule holds exactly: food and time are the only
+	 * cure.
+	 */
+	public boolean enableWeapons = false;
+
+	/**
+	 * The field kit's Medicine half (2.0): anything that treats, supports or
+	 * reads an injury that already happened — bandages, splints, the
+	 * stethoscope, Numbing. Off by default for the same reason, and switched
+	 * exactly the same way as {@link #enableWeapons}.
+	 */
+	public boolean enableMedicine = false;
+
 	public void applyArcadePreset() {
 		enableLimbDestruction = true;
 	}

@@ -1418,4 +1418,37 @@ public final class Balance {
 	public static final double WHIPLASH_TURN_WORST = 75.0;
 	/** How much wider a whiplashed mob's shots go, at the worst. */
 	public static final double MOB_WHIPLASH_AIM_SPREAD = 2.5;
+
+	// --- The field kit's brewed effects (2.0, phase 3) ---
+	// Everything below is behind a field kit switch; with both off none of it is read.
+
+	// Haemorrhage (Weapons): the blood stops clotting.
+	/** How hard a hit must be to open a bleed, against normal, at level I; each level beyond takes another step off. */
+	public static final double HAEMORRHAGE_THRESHOLD_FACTOR = 0.6;
+	public static final double HAEMORRHAGE_THRESHOLD_PER_LEVEL = 0.15;
+	/** The threshold factor never goes below this, however strong the brew. */
+	public static final double HAEMORRHAGE_THRESHOLD_FLOOR = 0.3;
+	/** Wounds open this many severity steps worse (before armour takes its step back). */
+	public static final int HAEMORRHAGE_SEVERITY_STEPS = 1;
+	/** The stacked bleed-rate cap ({@link #WOUND_STACK_CAP}) is raised by this factor at level I, and more per level. */
+	public static final double HAEMORRHAGE_CAP_FACTOR = 1.5;
+	public static final double HAEMORRHAGE_CAP_PER_LEVEL = 0.5;
+	/** A hand on the wound keeps this share of what it would normally hold back. */
+	public static final double HAEMORRHAGE_PRESSURE_HOLD = 0.5;
+	/** The wound a Haemorrhage arrow opens where it hits, on anything that bleeds. */
+	public static final dev.captience.realisticdamage.body.WoundSeverity HAEMORRHAGE_ARROW_WOUND =
+			dev.captience.realisticdamage.body.WoundSeverity.MODERATE;
+	/** Potion durations, ticks: base, long (redstone), strong (glowstone, level II). */
+	public static final int HAEMORRHAGE_TICKS = 900;
+	public static final int HAEMORRHAGE_LONG_TICKS = 1800;
+	public static final int HAEMORRHAGE_STRONG_TICKS = 432;
+
+	// Adrenaline (Weapons): the last-two-hearts surge, on demand.
+	/** How long a drunk surge lasts, ticks: base and long (redstone). The crash after it is the natural one. */
+	public static final int ADRENALINE_POTION_TICKS = 400;
+	public static final int ADRENALINE_POTION_LONG_TICKS = 800;
+	/** Open wounds bleed this much harder while the heart is racing on it. */
+	public static final double ADRENALINE_BLEED_FACTOR = 1.3;
+	/** The heart races at least this hard (Cardio's health distress, 0-1) while it lasts. */
+	public static final double ADRENALINE_HEART_DISTRESS = 0.6;
 }

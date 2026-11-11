@@ -478,5 +478,14 @@ direction). Arcade is next ([IK_PLAN.md](IK_PLAN.md)).
 
 A medical crafting tree, a wound-management screen, surgery, infection,
 splints, or anything else that answers an injury with an item rather than with
-food and time. The spec was right the first time: the danger should be whether
-you have enough food and enough time, not whether you packed the right supply.
+food and time, **in the core mod**. The spec was right the first time: the
+danger should be whether you have enough food and enough time, not whether you
+packed the right supply.
+
+2.0 keeps that promise and adds a way out of it on purpose: medicine (bandages,
+tourniquets, splints and the rest) lives in the field kit behind its own
+**Medicine** switch, which ships off. With it off, food and time are the only
+cure, exactly as before. See `2.0_PLAN.md`.
+
+Still parked, switch or no switch: **infection** and the **defibrillator**,
+until the user says otherwise.

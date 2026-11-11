@@ -706,7 +706,67 @@ Crash (from the vignette), Breathing (from the heartbeat).
 
 ## Deliberate non-goals
 
-Persistent blood as block/world state, medical items, and numeric HUD stats. The inventory panel may show condition figures on request;
+Persistent blood as block/world state, medical items in the core mod (they live behind the field kit's Medicine switch, below), and numeric HUD stats. The inventory panel may show condition figures on request;
 the HUD never does, and Blood/Consciousness are named by band and never numbered anywhere.
 TACZ integration is still deferred, but `DamageCategory` + `BodyHitResolver` accept
 externally supplied classification and hit points so an adapter can slot in later.
+
+## Added in 2.0: the field kit switches
+
+The field kit is about forty items in two halves, each behind a server switch:
+`enableWeapons` (anything that hurts someone, or protects you from being hurt) and
+`enableMedicine` (anything that treats, supports or reads an injury that already
+happened). Both ship **off**, and the first launch with 2.0 asks about them.
+
+**The rule.** With both off, the game is the core mod exactly: food and time are the
+only cure. Nothing in the core mod knows the field kit exists; it lives in its own
+package (`fieldkit`), with its own entrypoint and mixin config.
+
+**Off without a restart.** Everything is always registered, so a world never fails to
+load because a switch moved, and flipping it back restores everything. Instead every
+route to an item asks its half at the moment it is taken:
+
+| Route | Where it asks |
+|---|---|
+| Crafting | `realisticdamage:switched`, a wrapper around any crafting recipe; off, the grid does not match |
+| Brewing | `PotionBrewing.hasMix`/`mix`: a mix whose result is switched off is not a mix |
+| Loot | the `realisticdamage:field_kit_on` condition on our own entries, and a `MODIFY_DROPS` net that strips any switched-off stack from any table |
+| Trades | the same condition as a trade's `merchant_predicate` (26.2 rolls trades through loot contexts), a net on `VillagerTrade.getOffer`, and an already-rolled offer gives nothing |
+| Use | `ItemStack.use`/`useOn`/`interactLivingEntity`: refused, with "Medicine is switched off here" on the action bar |
+| Effects | refused by `canBeAffected`; a running one ends on its next tick (`FieldKitEffect`), and what it already did stays done |
+| Creative tab | the Field kit tab lists only halves that are on, rebuilt when a switch flips |
+
+A potion belongs to the half of the effects it carries, which covers every form vanilla
+makes of it (drinkable, splash, lingering, tipped arrow) through the one
+`potion_contents` component.
+
+**Who decides.** The server's `ServerConfig` decides everything. A client cannot read a
+server's file, so `RulesSync` sends every setting (in `/rdmg config`'s own words) on
+join and whenever any setting changes by any route, plus whether that player passes
+`/rdmg`'s permission check. The client's copy (`RulesView`) is used only to draw: the
+creative tab, a tooltip, the **World rules** page.
+
+**World rules** is the first GUI for the server settings. It is generated from the
+same fields as `/rdmg config`, so a setting added later appears there by itself (under
+"Other" if no section names it). Singleplayer and the title screen edit this install's
+file directly; on a server an operator's changes are sent as `/rdmg config` commands,
+and everyone else reads only.
+
+### The brewed effects (phase 3)
+
+Each brewed effect is a status effect (a `FieldKitEffect`, so it ends on the tick its
+switch goes off) plus vanilla potions, so vanilla supplies every form and milk clears it.
+The effects carry almost no behaviour of their own: the body's systems ask about them,
+through mixins in `fieldkit.mixin` rather than calls in the core, so the core mod still
+does not know the field kit exists. All numbers are thresholds and factors in
+`Balance` ("The field kit's brewed effects"); none is a chance.
+
+| Effect | Where it acts |
+|---|---|
+| Haemorrhage | `TraumaPipeline.createWounds`: the hit is judged against ×0.6 thresholds (×0.45 at II), and the wound opens a step worse before armour takes its step back. `BleedingSystem.tick`: the stack may run to ×1.5 the cap (×2 at II), and hand pressure keeps half its effect. `Arrow.doPostHurtEffects`: a Moderate wound where the arrow struck, on anything that bleeds |
+| Adrenaline | `onEffectStarted` starts the body's own surge (`AdrenalineMath`) for the effect's duration and spends its refractory; removal (running out, milk, a switch) ends it into the crash; `canBeAffected` refuses a dose during the refractory. `BleedingSystem.tick`: ×1.3 bleeding while it lasts. Client: Cardio is fed at least 0.6 health distress, so the heart and the arterial spurts quicken without the low-health vignette |
+
+Tipped arrows from drinkable potions are a special recipe
+(`realisticdamage:field_kit_tipped_arrow`) that only takes field kit potions and asks the
+potion's own half, so one recipe serves both switches.
+

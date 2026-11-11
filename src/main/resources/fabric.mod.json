@@ -13,10 +13,12 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"dev.captience.realisticdamage.RealisticDamage"
+			"dev.captience.realisticdamage.RealisticDamage",
+			"dev.captience.realisticdamage.fieldkit.FieldKit"
 		],
 		"client": [
-			"dev.captience.realisticdamage.client.RealisticDamageClient"
+			"dev.captience.realisticdamage.client.RealisticDamageClient",
+			"dev.captience.realisticdamage.fieldkit.client.FieldKitClient"
 		],
 		"modmenu": [
 			"dev.captience.realisticdamage.client.ModMenuIntegration"
@@ -42,7 +44,8 @@
 			"dev.captience.realisticdamage.client.gametest.MobBodiesClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.AfflictionsClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.VrLensClientGameTest",
-			"dev.captience.realisticdamage.client.gametest.VivecraftClientGameTest"
+			"dev.captience.realisticdamage.client.gametest.VivecraftClientGameTest",
+			"dev.captience.realisticdamage.fieldkit.client.gametest.FieldKitClientGameTest"
 		],
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
@@ -74,7 +77,9 @@
 			"dev.captience.realisticdamage.gametest.MobAnatomyGameTest",
 			"dev.captience.realisticdamage.gametest.AllMobsGameTest",
 			"dev.captience.realisticdamage.gametest.ScreamGameTest",
-			"dev.captience.realisticdamage.gametest.AfflictionsGameTest"
+			"dev.captience.realisticdamage.gametest.AfflictionsGameTest",
+			"dev.captience.realisticdamage.fieldkit.gametest.FieldKitSwitchGameTest",
+			"dev.captience.realisticdamage.fieldkit.gametest.BrewedEffectsGameTest"
 		]
 	},
 	"mixins": [
@@ -85,6 +90,11 @@
 		},
 		{
 			"config": "realisticdamage.vivecraft.mixins.json",
+			"environment": "client"
+		},
+		"realisticdamage.fieldkit.mixins.json",
+		{
+			"config": "realisticdamage.fieldkit.client.mixins.json",
 			"environment": "client"
 		}
 	],
