@@ -82,6 +82,30 @@ involved in any of it — pressure only buys time, food is still what fixes you.
 regeneration, sleeping, golden apples and healing potions repair everything — the danger
 is whether you have enough food and enough time before things spiral.
 
+## The field kit (2.0, optional)
+
+2.0 adds about forty survival items in two halves, each behind its own server switch.
+**Both start off**, and with both off everything above holds exactly: food and time are
+the only cure.
+
+- **Weapons:** anything that hurts someone, or protects you from being hurt. Brewed
+  poisons (Haemorrhage, Sedation, Adrenaline), trick arrows, blowgun darts, bolas, nets,
+  caltrops, the bear trap, the blackjack, flash bangs, blood bait, and the gas mask and
+  padding that answer them. They hit players exactly as hard as mobs, so they change PvP.
+- **Medicine:** anything that treats, supports or reads an injury that already happened.
+  Bandages, tourniquets, cauterizing, needle and thread, blood bags, splints, slings,
+  smelling salts, the stethoscope, Numbing, coffee, spirits, crutches and prosthetics.
+
+The first time the game starts with 2.0 it asks about both. After that they live on the
+**World rules** page (the mod's settings, from Mod Menu or **K**), which shows every
+server setting: in singleplayer you change them there directly; on a server an
+operator's changes go through `/rdmg config`, and everyone else sees them read-only.
+
+Off means off, without a restart: a switched-off half can't be crafted or brewed, isn't
+in loot, trades or the creative tab, anything already in a chest does nothing and says
+why, and its effects wear off at once. Flip it back and it all returns. The items arrive
+over the 2.0 alphas; the **Field kit** creative tab shows whatever exists so far.
+
 ## Playing with it
 
 Injuries show on a small body diagram that fades in when something's wrong. States and
@@ -151,7 +175,8 @@ side. It follows the **Death Camera** toggle.
 
 ## Server settings
 
-`config/realisticdamage-server.json`, generated on first run:
+`config/realisticdamage-server.json`, generated on first run. Every one is also on the
+**World rules** page in game:
 
 | Setting | Default | Effect |
 |---|---|---|
@@ -176,6 +201,8 @@ side. It follows the **Death Camera** toggle.
 | `unconsciousAggro` | `NEARBY` | Who notices a body on the floor. `ATTACKERS` keeps whatever was already fighting you, `NEARBY` adds anything within 6 blocks that can see you, `ALL` pulls in every hostile with line of sight, `NONE` takes you off the menu entirely |
 | `preyOnWounded` | `VISIBLE` | Which visible injuries hostiles prefer: `OFF`, `DOWNED`, `LIMPING`, or `VISIBLE` (limping and bleeding) |
 | `enableBleeding` / `enableBrokenLimbs` / `enableConsciousness` / `enableBurns` / `enableHitLocation` | true | Turn whole systems off |
+| `enableWeapons` | false | The field kit's Weapons half: poisons, trick arrows, traps and the gear that answers them. Off, none of it can be made or found and any already held does nothing |
+| `enableMedicine` | false | The field kit's Medicine half: bandages, splints, tourniquets and other treatment. Off, food and time are the only cure |
 
 Every tuning constant lives in one file (`config/Balance.java`) so rebalancing never means
 hunting magic numbers.
@@ -230,12 +257,14 @@ rule is enabled. Creative and Spectator are ignored entirely.
 
 ## What's next
 
-`ROADMAP.md` covers what comes after Consequence: anatomy for mobs. Medical items are
-explicitly not on it.
+`ROADMAP.md` covers what comes after Consequence: anatomy for mobs. `2.0_PLAN.md` covers
+2.0: heads and necks, and the switchable field kit. Medicine in the core mod is still
+explicitly not planned; it lives behind the Medicine switch.
 
 ## Design
 
 `DESIGN.md` holds the full architecture and the balance tables. Limb destruction was pulled
-forward into 1.0 during playtesting; medical items and mob anatomy remain out of scope.
+forward into 1.0 during playtesting; medical items stay out of the core mod and live behind
+the field kit's Medicine switch.
 Damage classification is tag- and component-driven so a future compatibility layer (e.g.
 firearms mods with exact impact coordinates) can feed the same pipeline.

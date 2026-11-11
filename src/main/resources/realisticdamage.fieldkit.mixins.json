@@ -1,0 +1,19 @@
+{
+	"required": true,
+	"package": "dev.captience.realisticdamage.fieldkit.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"BrewingGateMixin",
+		"CreativeTabsAccessor",
+		"EffectGateMixin",
+		"ItemUseGateMixin",
+		"OfferGateMixin",
+		"TradeGateMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

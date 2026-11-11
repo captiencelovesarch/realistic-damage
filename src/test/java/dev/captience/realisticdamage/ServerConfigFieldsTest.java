@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ServerConfigFieldsTest {
 	/** Bumped in the same commit as the README row, every time a setting is added. */
-	private static final int DOCUMENTED_SETTINGS = 25;
+	private static final int DOCUMENTED_SETTINGS = 27;
 
 	@Test
 	void everySettingIsABooleanDoubleOrEnum() {

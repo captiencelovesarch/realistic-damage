@@ -1,0 +1,317 @@
+package dev.captience.realisticdamage.fieldkit.client.gametest;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import dev.captience.realisticdamage.client.AccessibilityScreen;
+import dev.captience.realisticdamage.config.ServerConfig;
+import dev.captience.realisticdamage.fieldkit.Half;
+import dev.captience.realisticdamage.fieldkit.RulesView;
+import dev.captience.realisticdamage.fieldkit.client.LocalRules;
+import dev.captience.realisticdamage.fieldkit.client.Welcome;
+import dev.captience.realisticdamage.fieldkit.client.WelcomeScreen;
+import dev.captience.realisticdamage.fieldkit.client.WorldRulesScreen;
+import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
+import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerConnection;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.events.ContainerEventHandler;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.TitleScreen;
+import org.lwjgl.glfw.GLFW;
+
+/**
+ * The field kit's switches, as a player meets them (2.0, phase 2): the
+ * first-launch question, and the World rules page in singleplayer and on a
+ * real dedicated server, read-only and then as an operator.
+ *
+ * <p>Clicks are real clicks at the widget's place on screen, and Escape is the
+ * real key, so a button that draws but does not answer fails here. Every
+ * setting this class touches is put back and saved in {@code finally}: the
+ * config is one object for the whole session.
+ */
+public class FieldKitClientGameTest implements FabricClientGameTest {
+	@Override
+	public void runTest(ClientGameTestContext context) {
+		boolean weapons = context.computeOnClient(client -> ServerConfig.get().enableWeapons);
+		boolean medicine = context.computeOnClient(client -> ServerConfig.get().enableMedicine);
+		ServerConfig.PreyOnWounded prey = context.computeOnClient(client -> ServerConfig.get().preyOnWounded);
+		try {
+			firstLaunch(context);
+			singleplayer(context);
+			dedicatedServer(context);
+		} finally {
+			context.runOnClient(client -> {
+				ServerConfig.get().enableWeapons = weapons;
+				ServerConfig.get().enableMedicine = medicine;
+				ServerConfig.get().preyOnWounded = prey;
+				ServerConfig.save();
+			});
+		}
+	}
+
+	// --- the first-launch question ---
+
+	private void firstLaunch(ClientGameTestContext context) {
+		context.runOnClient(client -> {
+			ServerConfig.get().enableWeapons = false;
+			ServerConfig.get().enableMedicine = false;
+			Welcome.armForTest();
+		});
+		int shownBefore = context.computeOnClient(client -> Welcome.shownCount());
+
+		// A fresh install reaching the title screen is asked.
+		context.setScreen(TitleScreen::new);
+		context.waitForScreen(WelcomeScreen.class);
+		context.waitTicks(5);
+		context.takeScreenshot("rd_fieldkit_00_first_launch");
+		boolean bothOffShown = context.computeOnClient(client -> {
+			WelcomeScreen screen = (WelcomeScreen) client.gui.screen();
+			return !screen.weaponsButton().getValue() && !screen.medicineButton().getValue();
+		});
+		if (!bothOffShown) {
+			throw new AssertionError("both switches must be shown off on first launch");
+		}
+
+		// A real click on Weapons turns this install's Weapons on, and only that.
+		click(context, client -> ((WelcomeScreen) client.gui.screen()).weaponsButton());
+		context.waitTick();
+		boolean[] after = context.computeOnClient(client ->
+				new boolean[] {ServerConfig.get().enableWeapons, ServerConfig.get().enableMedicine});
+		if (!after[0] || after[1]) {
+			throw new AssertionError("clicking Weapons should turn on Weapons alone, got weapons="
+					+ after[0] + " medicine=" + after[1]);
+		}
+		context.takeScreenshot("rd_fieldkit_01_first_launch_weapons_on");
+
+		// Escape answers it, and says so on disk.
+		context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+		context.waitForScreen(TitleScreen.class);
+		Path file = FabricLoader.getInstance().getConfigDir().resolve("realisticdamage-fieldkit.json");
+		try {
+			if (!Files.readString(file).contains("\"welcomeShown\": true")) {
+				throw new AssertionError("leaving the question must remember it was asked, file says "
+						+ Files.readString(file));
+			}
+		} catch (java.io.IOException e) {
+			throw new AssertionError("the first-launch file was not written", e);
+		}
+
+		// And it is never asked again: a later title screen stays a title screen.
+		context.setScreen(TitleScreen::new);
+		context.waitTicks(10);
+		boolean stillTitle = context.computeOnClient(client -> client.gui.screen() instanceof TitleScreen);
+		int shownAfter = context.computeOnClient(client -> Welcome.shownCount());
+		if (!stillTitle || shownAfter != shownBefore + 1) {
+			throw new AssertionError("the question must show exactly once, shown " + (shownAfter - shownBefore)
+					+ " times, title screen now " + stillTitle);
+		}
+		context.runOnClient(client -> {
+			ServerConfig.get().enableWeapons = false;
+			ServerConfig.save();
+		});
+	}
+
+	// --- World rules, singleplayer ---
+
+	private void singleplayer(ClientGameTestContext context) {
+		context.runOnClient(client -> {
+			ServerConfig.get().enableWeapons = false;
+			ServerConfig.get().enableMedicine = false;
+			ServerConfig.get().preyOnWounded = ServerConfig.PreyOnWounded.VISIBLE;
+		});
+		try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
+			context.waitFor(client -> RulesView.received(), 100);
+			context.waitTicks(10);
+
+			// Reached the way a player reaches it: the mod's settings, then the button.
+			context.setScreen(() -> new AccessibilityScreen(null));
+			context.waitTicks(3);
+			click(context, client -> find(client.gui.screen(), "World rules..."));
+			context.waitForScreen(WorldRulesScreen.class);
+			context.waitTicks(5);
+			context.takeScreenshot("rd_fieldkit_02_world_rules");
+
+			boolean local = context.computeOnClient(client -> !LocalRules.remote() && LocalRules.canEdit());
+			if (!local) {
+				throw new AssertionError("singleplayer must edit the settings directly");
+			}
+			int total = context.computeOnClient(client -> ((WorldRulesScreen) client.gui.screen()).controls().size());
+			int settings = context.computeOnClient(client ->
+					dev.captience.realisticdamage.command.RealisticDamageCommands.settingFields().size());
+			if (total != settings) {
+				throw new AssertionError("the page must show every setting: " + total + " of " + settings);
+			}
+
+			// Medicine on, from the page: the server's own setting moves, and the
+			// server tells the client, which is what the creative tab follows.
+			click(context, client -> control(client, "enableMedicine"));
+			context.waitFor(client -> ServerConfig.get().enableMedicine, 20);
+			context.waitFor(client -> RulesView.on(Half.MEDICINE), 40);
+			boolean weaponsStill = context.computeOnClient(client -> ServerConfig.get().enableWeapons);
+			if (weaponsStill) {
+				throw new AssertionError("turning Medicine on moved Weapons");
+			}
+			context.waitTicks(5);
+			boolean shown = context.computeOnClient(client ->
+					((CycleButton<?>) control(client, "enableMedicine")).getValue() == Boolean.TRUE);
+			if (!shown) {
+				throw new AssertionError("the page must show the change once the server confirms it");
+			}
+
+			// An enum setting cycles to its next value. It is further down the
+			// page, so scroll to it with the wheel first, as a player would.
+			reveal(context, "preyOnWounded");
+			click(context, client -> control(client, "preyOnWounded"));
+			context.waitFor(client -> ServerConfig.get().preyOnWounded != ServerConfig.PreyOnWounded.VISIBLE, 20);
+			context.waitFor(client -> "off".equals(RulesView.values().get("preyOnWounded")), 40);
+			context.waitTicks(5);
+			// The server's answer updates the page where it stands: a page that
+			// jumped back to the top after every click would be unusable.
+			double scroll = context.computeOnClient(client -> ((WorldRulesScreen) client.gui.screen()).scrollAmount());
+			Object shownValue = context.computeOnClient(client ->
+					((CycleButton<?>) control(client, "preyOnWounded")).getValue());
+			if (scroll <= 0 || shownValue != ServerConfig.PreyOnWounded.OFF) {
+				throw new AssertionError("after a change the page must keep its place and show the new value, scroll="
+						+ scroll + " shown=" + shownValue);
+			}
+			context.takeScreenshot("rd_fieldkit_03_world_rules_changed");
+			context.setScreen(() -> null);
+			context.waitTicks(3);
+		}
+		context.waitTicks(5);
+		boolean cleared = context.computeOnClient(client -> !RulesView.received());
+		if (!cleared) {
+			throw new AssertionError("leaving the world must forget the server's settings");
+		}
+		context.runOnClient(client -> {
+			ServerConfig.get().enableMedicine = false;
+			ServerConfig.get().preyOnWounded = ServerConfig.PreyOnWounded.VISIBLE;
+			ServerConfig.save();
+		});
+	}
+
+	// --- World rules, on a server ---
+
+	private void dedicatedServer(ClientGameTestContext context) {
+		try (TestDedicatedServerContext server = context.worldBuilder().createServer();
+				TestDedicatedServerConnection connection = server.connect()) {
+			context.waitFor(client -> RulesView.received(), 100);
+			String name = context.computeOnClient(client -> client.player.getName().getString());
+			server.runCommand("deop " + name);
+			server.runCommand("rdmg config enableWeapons false");
+			context.waitFor(client -> RulesView.received() && !RulesView.canEdit() && !RulesView.on(Half.WEAPONS), 60);
+
+			// A player who is not an operator reads the server's rules and can change none.
+			context.setScreen(() -> new WorldRulesScreen(null));
+			context.waitTicks(5);
+			context.takeScreenshot("rd_fieldkit_04_server_read_only");
+			boolean readOnly = context.computeOnClient(client -> {
+				WorldRulesScreen screen = (WorldRulesScreen) client.gui.screen();
+				return LocalRules.remote() && screen.controls().stream().noneMatch(widget -> widget.active);
+			});
+			if (!readOnly) {
+				throw new AssertionError("a non-operator on a server must see every control locked");
+			}
+			click(context, client -> control(client, "enableWeapons"));
+			context.waitTicks(30);
+			boolean unchanged = server.computeOnServer(s -> !ServerConfig.get().enableWeapons);
+			if (!unchanged) {
+				throw new AssertionError("a locked page changed the server's setting");
+			}
+
+			// Made an operator, the page unlocks by itself, and a change goes
+			// through /rdmg config and comes back as the server's new value.
+			server.runCommand("op " + name);
+			context.waitFor(client -> RulesView.canEdit(), 60);
+			context.waitTicks(5);
+			boolean unlocked = context.computeOnClient(client -> control(client, "enableWeapons").active);
+			if (!unlocked) {
+				throw new AssertionError("the page must unlock when the player is made an operator");
+			}
+			context.takeScreenshot("rd_fieldkit_05_server_operator");
+			click(context, client -> control(client, "enableWeapons"));
+			server.waitFor(s -> ServerConfig.get().enableWeapons, 60);
+			context.waitFor(client -> RulesView.on(Half.WEAPONS), 60);
+			context.setScreen(() -> null);
+			server.runCommand("rdmg config enableWeapons false");
+			server.runCommand("deop " + name);
+			context.waitTicks(10);
+		}
+	}
+
+	// --- helpers ---
+
+	private static AbstractWidget control(Minecraft client, String name) {
+		AbstractWidget widget = ((WorldRulesScreen) client.gui.screen()).control(name);
+		if (widget == null) {
+			throw new AssertionError("no control for " + name);
+		}
+		return widget;
+	}
+
+	/**
+	 * Rolls the mouse wheel over the page until a setting's control is wholly in
+	 * view: down first, then back up. Not by comparing positions, because a list
+	 * only places the rows it draws, and a row that has never been on screen
+	 * still reports where it was built, at the top.
+	 */
+	private static void reveal(ClientGameTestContext context, String name) {
+		for (int turn = 0; turn < 80; turn++) {
+			int[] where = context.computeOnClient(client -> {
+				WorldRulesScreen screen = (WorldRulesScreen) client.gui.screen();
+				AbstractWidget widget = control(client, name);
+				int[] area = screen.listArea();
+				return new int[] {widget.getY(), widget.getY() + widget.getHeight(), area[0], area[1],
+						screen.width / 2, (area[0] + area[1]) / 2};
+			});
+			if (where[0] >= where[2] && where[1] <= where[3]) {
+				return;
+			}
+			double scale = context.computeOnClient(client -> client.getWindow().getGuiScale());
+			context.getInput().setCursorPos(where[4] * scale, where[5] * scale);
+			context.getInput().scroll(turn < 40 ? -1 : 1);
+			context.waitTicks(2);
+		}
+		throw new AssertionError("could not scroll " + name + " into view");
+	}
+
+	/** A real left click at the middle of a widget, in window pixels. */
+	private static void click(ClientGameTestContext context,
+			java.util.function.Function<Minecraft, AbstractWidget> widget) {
+		double[] at = context.computeOnClient(client -> {
+			AbstractWidget target = widget.apply(client);
+			if (target == null) {
+				throw new AssertionError("nothing to click");
+			}
+			double scale = client.getWindow().getGuiScale();
+			return new double[] {(target.getX() + target.getWidth() / 2.0) * scale,
+					(target.getY() + target.getHeight() / 2.0) * scale};
+		});
+		context.getInput().setCursorPos(at[0], at[1]);
+		context.waitTick();
+		context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+		context.waitTick();
+	}
+
+	private static Button find(GuiEventListener at, String text) {
+		if (at instanceof Button button && button.getMessage().getString().equals(text)) {
+			return button;
+		}
+		if (at instanceof ContainerEventHandler container) {
+			for (GuiEventListener child : container.children()) {
+				Button button = find(child, text);
+				if (button != null) {
+					return button;
+				}
+			}
+		}
+		return null;
+	}
+}

@@ -32,6 +32,13 @@ public class AccessibilityScreen extends OptionsSubScreen {
 	protected void addOptions() {
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 
+		// The server's settings (2.0): their own page, because they are not
+		// this player's to change on someone else's server.
+		this.list.addBig(Button.builder(Component.translatable("realisticdamage.rules.open"),
+						button -> this.minecraft.gui.setScreen(
+								new dev.captience.realisticdamage.fieldkit.client.WorldRulesScreen(this)))
+				.build());
+
 		this.list.addSmall(
 				Button.builder(Component.translatable("realisticdamage.config.preset")
 								.append(": ").append(Component.translatable("realisticdamage.config.preset.arcade")),
