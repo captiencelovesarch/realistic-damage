@@ -3,6 +3,10 @@
 The field kit is built on its own branch, beside the neck work, with its own
 version numbers: `2.0.0-items.N`. Newest round on top.
 
+**Combined (Nov 11 2026):** items.1 and items.2 are merged into the `2.0`
+branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
+and is in all three instances. Everything below applies to it unchanged.
+
 ## items.2: Haemorrhage and Adrenaline (phase 3, round 1)
 
 The jar is `realistic-damage-2.0.0-items.2.jar`, in the "Realistic Damage items"

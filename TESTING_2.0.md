@@ -1,10 +1,19 @@
 # Realistic Damage 2.0: what to test
 
-The jar is `realistic-damage-2.0.0-alpha.2.jar`, in both Prism instances
-("Realistic Damage" and "Realistic Damage vr"). The alpha.1 jar is parked in
-`mods/replaced-jars/`. alpha.2 has everything alpha.1 had, so its checklist
-below still applies, and so do the alpha.25 and alpha.26 checklists in
-[RAGDOLL_TESTING.md](RAGDOLL_TESTING.md).
+The jar is `realistic-damage-2.0.0-alpha.3.jar`. It's **everything in one**:
+heads and necks (alpha.1 and alpha.2, below) plus the field kit (items.1 and
+items.2, checklist in [TESTING_FIELDKIT.md](TESTING_FIELDKIT.md)) plus the
+settings-page fix. It's in all three Prism instances: "Realistic Damage",
+"Realistic Damage vr" and "Realistic Damage items". Each instance's old jar
+is parked in its `mods/replaced-jars/`.
+
+Nothing in alpha.3 is new beyond the merge: the necks, the items and the fix
+are each what their own rounds were. The one place they meet: the **World
+rules** page (K, then World rules) now lists Broken Necks and Whiplash too,
+so you can switch them off there.
+
+The alpha.25 and alpha.26 checklists in [RAGDOLL_TESTING.md](RAGDOLL_TESTING.md)
+still apply.
 
 ## alpha.2: broken necks and whiplash (phase 1, round 2)
 

@@ -45,9 +45,9 @@ public class WorldRulesScreen extends OptionsSubScreen {
 		SECTIONS.put("field_kit", List.of("enableWeapons", "enableMedicine"));
 		SECTIONS.put("injuries", List.of("enableHitLocation", "enableBleeding", "enableBrokenLimbs",
 				"enableConsciousness", "enableBurns", "enableMicrosleeps", "disabledArmsLoseGrip",
-				"enableAdrenaline", "enableLongTermInjuries"));
+				"enableAdrenaline", "enableLongTermInjuries", "enableWhiplash"));
 		SECTIONS.put("destruction", List.of("enableLimbDestruction", "enableExplosiveDismemberment",
-				"enableDecapitation", "spawnSeveredLimbs"));
+				"enableDecapitation", "enableBrokenNecks", "spawnSeveredLimbs"));
 		SECTIONS.put("falls", List.of("softenFallLethality", "enableKnockdown", "knockdownFromBlows"));
 		SECTIONS.put("mobs", List.of("enableMobAnatomy", "unconsciousAggro", "preyOnWounded"));
 		SECTIONS.put("scaling", List.of("bodyDamageMultiplier", "bleedingRateMultiplier",
