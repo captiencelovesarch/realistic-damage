@@ -82,7 +82,8 @@
 			"dev.captience.realisticdamage.fieldkit.gametest.FieldKitSwitchGameTest",
 			"dev.captience.realisticdamage.fieldkit.gametest.BrewedEffectsGameTest",
 			"dev.captience.realisticdamage.fieldkit.gametest.SedationNumbingGameTest",
-			"dev.captience.realisticdamage.fieldkit.gametest.MedicineBleedingGameTest"
+			"dev.captience.realisticdamage.fieldkit.gametest.MedicineBleedingGameTest",
+			"dev.captience.realisticdamage.fieldkit.gametest.MedicineBonesGameTest"
 		]
 	},
 	"mixins": [

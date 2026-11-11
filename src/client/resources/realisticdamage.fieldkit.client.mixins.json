@@ -5,6 +5,7 @@
 	"client": [
 		"CreativeScreenInvoker",
 		"DressedBloodMixin",
+		"GogglesGlareMixin",
 		"HeartRaceMixin",
 		"NumbHudMixin"
 	],

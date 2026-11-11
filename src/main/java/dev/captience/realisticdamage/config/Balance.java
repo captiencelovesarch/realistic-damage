@@ -1517,4 +1517,20 @@ public final class Balance {
 	public static final int BLOOD_BAG_USE_TICKS = 100;
 	/** How long a bag of blood keeps, ticks: three days. */
 	public static final long BLOOD_BAG_KEEPS_TICKS = 72000L;
+
+	// --- Field kit, phase 4 round 2: bones, head and senses (2.0) ---
+
+	/** A splint: four seconds to bind on. A broken limb under one costs this share of its penalty. */
+	public static final int SPLINT_USE_TICKS = 80;
+	public static final double SPLINT_PENALTY_FACTOR = 0.5;
+	/** A sling: three seconds to tie. A slung broken arm takes this much more from every heal. */
+	public static final int SLING_USE_TICKS = 60;
+	public static final double SLING_HEAL_FACTOR = 2.0;
+	/** Smelling salts: a second under the nose. They bring a body up to this far over waking. */
+	public static final int SALTS_USE_TICKS = 20;
+	public static final double SALTS_WAKE_MARGIN = 5.0;
+	/** The stethoscope's own volume: a heart at rest is loud enough to hear through it. */
+	public static final double STETHOSCOPE_VOLUME = 0.85;
+	/** Tinted goggles: how dark the view goes (alpha of the tint, 0 to 255). */
+	public static final int GOGGLES_TINT_ALPHA = 92;
 }

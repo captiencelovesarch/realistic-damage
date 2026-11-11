@@ -480,6 +480,149 @@ BLOOD_BAG = [
 ]
 
 
+# --- phase 4, round 2: bones, head and senses ---
+
+SPLINT_PALETTE = {
+    ".": CLEAR,
+    "K": (60, 44, 26, 255),
+    "W": (146, 104, 58, 255),
+    "h": (176, 132, 78, 255),
+    "w": (108, 74, 40, 255),
+    "S": (244, 244, 240, 255),
+    "s": (190, 190, 186, 255),
+}
+
+SLING_PALETTE = {
+    ".": CLEAR,
+    "K": (70, 66, 74, 255),
+    "W": (236, 234, 230, 255),
+    "L": (204, 200, 196, 255),
+    "D": (160, 156, 154, 255),
+    "B": (90, 112, 160, 255),
+    "b": (64, 82, 124, 255),
+}
+SLING = [
+    "................",
+    "......KKKK......",
+    ".....KBbbBK.....",
+    "....KBK..KBK....",
+    "...KbK....KbK...",
+    "...KbK....KbK...",
+    "..KBK......KBK..",
+    "..KbK......KbK..",
+    ".KKKKKKKKKKKKKK.",
+    ".KWWWWWWWWWWWLK.",
+    "..KWLWWWWWWLDK..",
+    "...KWLWWWWLDK...",
+    "....KWLWWLDK....",
+    ".....KWLLDK.....",
+    "......KWDK......",
+    ".......KK.......",
+]
+
+SALTS_PALETTE = {
+    ".": CLEAR,
+    "K": (40, 30, 24, 255),
+    "C": (150, 104, 62, 255),
+    "c": (112, 76, 44, 255),
+    "G": (142, 92, 46, 255),
+    "g": (102, 62, 30, 255),
+    "H": (214, 168, 110, 255),
+    "W": (244, 242, 236, 255),
+    "w": (208, 204, 196, 255),
+}
+SALTS = [
+    "................",
+    "................",
+    "................",
+    "......KKKK......",
+    "......KCCK......",
+    "......KcCK......",
+    ".....KKKKKK.....",
+    ".....KgGGgK.....",
+    "....KgGGGGgK....",
+    "...KgHGGGGGgK...",
+    "...KHWWWWWWgK...",
+    "...KHWwWWWwgK...",
+    "...KgWWWwWWgK...",
+    "...KgwWWWWWgK...",
+    "....KgggggggK...",
+    ".....KKKKKKK....",
+]
+
+STETHOSCOPE_PALETTE = {
+    ".": CLEAR,
+    "K": (30, 30, 34, 255),
+    "T": (64, 64, 72, 255),
+    "t": (98, 98, 108, 255),
+    "C": (226, 124, 82, 255),
+    "c": (176, 86, 54, 255),
+    "H": (250, 190, 150, 255),
+    "M": (200, 202, 210, 255),
+}
+STETHOSCOPE = [
+    "................",
+    "..KK.......KK...",
+    "..KMK.....KMK...",
+    "...KTK...KTK....",
+    "...KtK...KtK....",
+    "....KTK.KTK.....",
+    ".....KTKTK......",
+    "......KTK.......",
+    "......KtK.......",
+    "......KTK.......",
+    ".....KTK........",
+    ".....KtK..KKKK..",
+    ".....KTKKKcCCcK.",
+    "......KTTTCHCCK.",
+    "..........KcCcK.",
+    "...........KKK..",
+]
+
+GOGGLES_PALETTE = {
+    ".": CLEAR,
+    "K": (34, 22, 16, 255),
+    "L": (124, 76, 42, 255),
+    "l": (90, 54, 30, 255),
+    "T": (58, 44, 76, 255),
+    "t": (96, 74, 124, 255),
+    "H": (176, 156, 204, 255),
+}
+GOGGLES = [
+    "................",
+    "................",
+    "................",
+    "................",
+    "...KKKK..KKKK...",
+    "..KLLLLKKLLLLK..",
+    ".KLHtTTLLHtTTLK.",
+    "KlLtTTTLLtTTTLlK",
+    "KlLTTTTLLTTTTLlK",
+    ".KLTTTlKKTTTlLK.",
+    "..KlllK..KlllK..",
+    "...KKK....KKK...",
+    "................",
+    "................",
+    "................",
+    "................",
+]
+
+
+def splint_grid():
+    """A wooden board corner to corner, bound on with two white wraps."""
+    grid = blank16()
+    board = line(2, 13, 11, 4)
+    shades = "wWWh"
+    for (x, y) in board:
+        for k, c in enumerate(shades):
+            grid[y][x + k] = c
+    # The wraps: across the board and a pixel past it each side, two rows deep.
+    for t in (2, 3, 6, 7):
+        x, y = board[t]
+        for k in range(0, 4):
+            grid[y][x + k] = "s" if t in (3, 7) else "S"
+    return outline16(grid, "K")
+
 def blank16():
     return [["."] * 16 for _ in range(16)]
 
@@ -588,6 +731,22 @@ def item_sprites():
     }
 
 
+def round2_sprites():
+    def make(grid, palette):
+        rows = ["".join(r) if not isinstance(r, str) else r for r in grid]
+        assert len(rows) == 16 and all(len(r) == 16 for r in rows), [len(r) for r in rows]
+        im = Image.new("RGBA", (16, 16))
+        im.putdata(soft_outline(rows, palette))
+        return im
+    return {
+        "splint": make(splint_grid(), SPLINT_PALETTE),
+        "sling": make(SLING, SLING_PALETTE),
+        "smelling_salts": make(SALTS, SALTS_PALETTE),
+        "stethoscope": make(STETHOSCOPE, STETHOSCOPE_PALETTE),
+        "tinted_goggles": make(GOGGLES, GOGGLES_PALETTE),
+    }
+
+
 def slot(size):
     """A vanilla-looking inventory slot, size x size."""
     im = Image.new("RGBA", (size, size), (139, 139, 139, 255))
@@ -645,6 +804,16 @@ def main():
                         "fieldkit_items_bleeding.png",
                         ["paper", "string", "leather", "iron_nugget", "glass_bottle", "flint_and_steel"])
     print("preview:", out)
+    round2 = round2_sprites()
+    out = preview_items(round2, "Realistic Damage 2.0, field kit: phase 4 round 2, bones and senses (Medicine) - 8x, then in slots",
+                        "fieldkit_items_bones_senses.png",
+                        ["stick", "string", "white_wool", "bone_meal", "copper_ingot", "leather"])
+    print("preview:", out)
+    if "--install-round2" in sys.argv:
+        ITEM_TEXTURES.mkdir(parents=True, exist_ok=True)
+        for n, im in round2.items():
+            im.save(ITEM_TEXTURES / f"{n}.png")
+            print("wrote", ITEM_TEXTURES / f"{n}.png")
     if "--install-items" in sys.argv:
         ITEM_TEXTURES.mkdir(parents=True, exist_ok=True)
         for n, im in things.items():

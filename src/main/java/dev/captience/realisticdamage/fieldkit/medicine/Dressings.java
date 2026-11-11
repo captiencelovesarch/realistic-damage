@@ -3,6 +3,7 @@ package dev.captience.realisticdamage.fieldkit.medicine;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -36,7 +37,8 @@ import net.minecraft.world.entity.player.Player;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What is on a body's wounds (2.0, phase 4): bandages and tourniquets.
+ * What is on a body's wounds (2.0, phase 4): bandages and tourniquets, and
+ * (round 2) splints and slings on broken limbs.
  *
  * <p><b>A bandage</b> sits on one region's wound and lets through only part of
  * it: a quarter of a minor wound, two fifths of a moderate one. A moderate
@@ -49,6 +51,13 @@ import org.jspecify.annotations.Nullable;
  * is given back when it comes off. Left on for {@code TOURNIQUET_LIMIT_TICKS}
  * the limb dies, through the core's own destruction, stump and scar and all
  * (when limb destruction is on; under Grounded it stays Disabled).
+ *
+ * <p><b>A splint</b> on a broken limb halves what the break costs, and stays
+ * until the bone has knit. With long-term injuries on, a limb that knits in a
+ * splint gets back the ceiling the break took ({@link #owed}). <b>A sling</b>
+ * holds a broken arm still: its hand can't be used (nor the arm swung, when
+ * it's the main one), and it heals twice as fast. It comes back when the arm
+ * has knit, or when it's taken off.
  *
  * <p>Saved with the body. Under the Medicine switch: switched off, every
  * tourniquet comes off and gives its limb back, and bandages do nothing.
@@ -104,6 +113,13 @@ public final class Dressings {
 				.apply(i, BandageEntry::new));
 	}
 
+	private record OwedEntry(BodyPart part, int band) {
+		static final Codec<OwedEntry> CODEC = RecordCodecBuilder.create(i -> i.group(
+						PART_CODEC.fieldOf("part").forGetter(OwedEntry::part),
+						Codec.INT.fieldOf("band").forGetter(OwedEntry::band))
+				.apply(i, OwedEntry::new));
+	}
+
 	private record TourniquetEntry(BodyPart part, int ticks, double held, boolean warned) {
 		static final Codec<TourniquetEntry> CODEC = RecordCodecBuilder.create(i -> i.group(
 						PART_CODEC.fieldOf("part").forGetter(TourniquetEntry::part),
@@ -117,21 +133,38 @@ public final class Dressings {
 		public static final Codec<State> CODEC = RecordCodecBuilder.create(i -> i.group(
 						BandageEntry.CODEC.listOf().optionalFieldOf("bandages", List.of()).forGetter(State::bandageList),
 						TourniquetEntry.CODEC.listOf().optionalFieldOf("tourniquets", List.of())
-								.forGetter(State::tourniquetList))
+								.forGetter(State::tourniquetList),
+						PART_CODEC.listOf().optionalFieldOf("splints", List.of()).forGetter(s -> List.copyOf(s.splints)),
+						PART_CODEC.listOf().optionalFieldOf("slings", List.of()).forGetter(s -> List.copyOf(s.slings)),
+						OwedEntry.CODEC.listOf().optionalFieldOf("owed", List.of()).forGetter(State::owedList))
 				.apply(i, State::new));
 
 		public final Map<BodyPart, Bandage> bandages = new EnumMap<>(BodyPart.class);
 		public final Map<BodyPart, Tourniquet> tourniquets = new EnumMap<>(BodyPart.class);
+		public final Set<BodyPart> splints = EnumSet.noneOf(BodyPart.class);
+		public final Set<BodyPart> slings = EnumSet.noneOf(BodyPart.class);
+		/** The ceiling band each limb had before its break lowered it, while it is still broken. */
+		public final Map<BodyPart, Integer> owed = new EnumMap<>(BodyPart.class);
 
 		public State() {}
 
-		private State(List<BandageEntry> bandageList, List<TourniquetEntry> tourniquetList) {
+		private State(List<BandageEntry> bandageList, List<TourniquetEntry> tourniquetList, List<BodyPart> splintList,
+				List<BodyPart> slingList, List<OwedEntry> owedList) {
 			for (BandageEntry entry : bandageList) {
 				bandages.put(entry.part(), new Bandage(entry.ticks(), entry.soaked()));
 			}
 			for (TourniquetEntry entry : tourniquetList) {
 				tourniquets.put(entry.part(), new Tourniquet(entry.ticks(), entry.held(), entry.warned()));
 			}
+			splints.addAll(splintList);
+			slings.addAll(slingList);
+			for (OwedEntry entry : owedList) {
+				owed.put(entry.part(), entry.band());
+			}
+		}
+
+		private List<OwedEntry> owedList() {
+			return owed.entrySet().stream().map(e -> new OwedEntry(e.getKey(), e.getValue())).toList();
 		}
 
 		private List<BandageEntry> bandageList() {
@@ -147,7 +180,8 @@ public final class Dressings {
 		}
 
 		public boolean empty() {
-			return bandages.isEmpty() && tourniquets.isEmpty();
+			return bandages.isEmpty() && tourniquets.isEmpty() && splints.isEmpty() && slings.isEmpty()
+					&& owed.isEmpty();
 		}
 
 		/** A deep copy: its maps and entries are its own. */
@@ -155,6 +189,9 @@ public final class Dressings {
 			State copy = new State();
 			bandages.forEach((part, b) -> copy.bandages.put(part, new Bandage(b.ticks, b.soaked)));
 			tourniquets.forEach((part, t) -> copy.tourniquets.put(part, new Tourniquet(t.ticks, t.held, t.warned)));
+			copy.splints.addAll(splints);
+			copy.slings.addAll(slings);
+			copy.owed.putAll(owed);
 			return copy;
 		}
 	}
@@ -284,6 +321,71 @@ public final class Dressings {
 		return true;
 	}
 
+	// --- round 2: splints, slings and what a break owes ---
+
+	/** Whether a splint is easing this limb now: on, Medicine on, and the bone still broken. */
+	public static boolean splinted(LivingEntity body, BodyPart part) {
+		State state = peek(body);
+		return state != null && state.splints.contains(part) && Half.MEDICINE.on()
+				&& RDAttachments.get(body).part(part).broken();
+	}
+
+	/** Whether this arm is in a sling now (Medicine on). Read on either side: the state is synced. */
+	public static boolean slung(LivingEntity body, BodyPart part) {
+		State state = peek(body);
+		return state != null && state.slings.contains(part) && Half.MEDICINE.on(body.level());
+	}
+
+	public static void splint(LivingEntity body, BodyPart part) {
+		change(body, state -> state.splints.add(part));
+		DRESSED.add(body);
+	}
+
+	public static void sling(LivingEntity body, BodyPart part) {
+		change(body, state -> state.slings.add(part));
+		DRESSED.add(body);
+	}
+
+	/** Takes an arm out of its sling. False when it wasn't in one. */
+	public static boolean unsling(LivingEntity body, BodyPart part) {
+		State state = peek(body);
+		if (state == null || !state.slings.contains(part)) {
+			return false;
+		}
+		change(body, next -> next.slings.remove(part));
+		return true;
+	}
+
+	/** An arm in a sling, or null: the one a sneak-use with an empty hand would take out. */
+	public static @Nullable BodyPart anySling(LivingEntity body) {
+		State state = peek(body);
+		return state == null || state.slings.isEmpty() ? null : state.slings.iterator().next();
+	}
+
+	/**
+	 * A break has just lowered this limb's ceiling from {@code prior}: remembered
+	 * while the bone is broken, so a splint on it when it knits can give it back.
+	 */
+	public static void owe(LivingEntity body, BodyPart part, int prior) {
+		State state = peek(body);
+		if (state != null && state.owed.containsKey(part)) {
+			return;   // the first break's band is the one to give back
+		}
+		change(body, next -> next.owed.put(part, prior));
+		DRESSED.add(body);
+	}
+
+	/** Hands an item to a player body, or drops it where the body is. */
+	static void giveBack(LivingEntity body, net.minecraft.world.item.ItemStack stack) {
+		if (body instanceof Player player) {
+			if (!player.getInventory().add(stack)) {
+				player.drop(stack, false);
+			}
+		} else {
+			body.spawnAtLocation((net.minecraft.server.level.ServerLevel) body.level(), stack);
+		}
+	}
+
 	/** The limb whose tourniquet has been on the longest, or null. */
 	public static @Nullable BodyPart oldestTourniquet(LivingEntity body) {
 		State state = peek(body);
@@ -331,10 +433,14 @@ public final class Dressings {
 				for (BodyPart part : List.copyOf(state.tourniquets.keySet())) {
 					loosen(body, part);
 				}
-				if (!peek(body).bandages.isEmpty()) {
+				State left = peek(body);
+				if (!left.bandages.isEmpty()) {
 					change(body, next -> next.bandages.clear());
 				}
-				it.remove();
+				// Splints and slings stay on, doing nothing, and are looked at again once it is back on.
+				if (peek(body).empty()) {
+					it.remove();
+				}
 				continue;
 			}
 			tickBody(body, state);
@@ -393,10 +499,53 @@ public final class Dressings {
 				RDAttachments.pushSnapshot(body);
 			}
 		}
-		if (!bandagesOff.isEmpty() || !tourniquetsOff.isEmpty()) {
+		// Round 2: a splint or a sling comes off when its bone has knit (or the limb is gone).
+		List<BodyPart> splintsOff = new ArrayList<>();
+		List<BodyPart> slingsOff = new ArrayList<>();
+		List<BodyPart> debtsOff = new ArrayList<>();
+		for (BodyPart part : state.splints) {
+			BodyPartData limb = data.part(part);
+			if (limb.destroyed()) {
+				splintsOff.add(part);
+			} else if (!limb.broken()) {
+				splintsOff.add(part);
+				Integer prior = state.owed.get(part);
+				if (prior != null) {
+					// Knit straight in the splint: the break's long-term loss is given back.
+					limb.restoreCeiling();
+					limb.lowerCeilingTo(prior);
+					RDAttachments.pushSnapshot(body);
+					debtsOff.add(part);
+					say(body, "realisticdamage.fieldkit.splint.straight", part);
+				} else {
+					say(body, "realisticdamage.fieldkit.splint.knit", part);
+				}
+			}
+		}
+		for (BodyPart part : state.slings) {
+			BodyPartData limb = data.part(part);
+			if (limb.destroyed() || !limb.broken()) {
+				slingsOff.add(part);
+				giveBack(body, new net.minecraft.world.item.ItemStack(Medicine.SLING));
+				if (!limb.destroyed() && !state.splints.contains(part)) {
+					say(body, "realisticdamage.fieldkit.sling.knit", part);
+				}
+			}
+		}
+		for (BodyPart part : state.owed.keySet()) {
+			BodyPartData limb = data.part(part);
+			if ((limb.destroyed() || !limb.broken()) && !debtsOff.contains(part)) {
+				debtsOff.add(part);   // knit without a splint, or lost: the loss stands
+			}
+		}
+		if (!bandagesOff.isEmpty() || !tourniquetsOff.isEmpty() || !splintsOff.isEmpty() || !slingsOff.isEmpty()
+				|| !debtsOff.isEmpty()) {
 			change(body, next -> {
 				bandagesOff.forEach(next.bandages::remove);
 				tourniquetsOff.forEach(next.tourniquets::remove);
+				splintsOff.forEach(next.splints::remove);
+				slingsOff.forEach(next.slings::remove);
+				debtsOff.forEach(next.owed::remove);
 			});
 		} else if (changed) {
 			publish(body);

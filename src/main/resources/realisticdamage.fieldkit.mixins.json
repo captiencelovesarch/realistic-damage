@@ -9,6 +9,8 @@
 		"CreativeTabsAccessor",
 		"EffectGateMixin",
 		"FieldKitBleedMixin",
+		"GogglesHelmetMixin",
+		"GogglesMixin",
 		"HaemorrhageArrowMixin",
 		"HaemorrhageWoundMixin",
 		"ItemUseGateMixin",
@@ -20,6 +22,11 @@
 		"SedationDoseMixin",
 		"SedationDraughtMixin",
 		"SedationKnockdownMixin",
+		"SlingGripMixin",
+		"SlingMessageMixin",
+		"SplintCeilingMixin",
+		"SplintMendMixin",
+		"SplintPenaltyMixin",
 		"TradeGateMixin"
 	],
 	"injectors": {

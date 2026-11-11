@@ -793,3 +793,34 @@ uses of vanilla items (a glass bottle to draw blood, flint and steel or a fire
 charge to cauterize) are `UseItemCallback`/`UseEntityCallback` handlers that only
 act on a sneak with Medicine on, and only on a willing body (`Consent`).
 
+
+
+### Medicine, round 2: bones, head and senses (phase 4)
+
+Splints and slings live in the same synced `Dressings` state as bandages, with
+a third map, `owed`: the ceiling band a limb had before its break lowered it
+(`SplintCeilingMixin` wraps `CeilingLogic`'s `lowerCeilingTo`). `Dressings.tickBody`
+takes a splint or sling off once its bone has knit; a splinted limb with a debt
+gets `restoreCeiling()` then `lowerCeilingTo(prior)`. The core's own "mended"
+line is held back for a dressed limb (`SplintMendMixin`), so there's one line.
+
+The splint's halving is three `ImpairmentMath` call sites (`SplintPenaltyMixin`):
+the per-leg penalty (a private helper with no body, so the body being ticked is
+stashed at the head of `ImpairmentSystem.tick`), the main arm in `tick`, and
+both arms in `twoHandedPenalty`. The sling is the core's grip (`SlingGripMixin` on
+`gripBlocked`, which every use refusal, the per-tick stop and the grip line go
+through) plus field kit attack and dig refusals in a first phase, ahead of the
+core's strain listener. Its faster healing is the `heal` argument in
+`HealingSystem.trackBrokenHeal`.
+
+Smelling salts decide from `SaltsRule` (blood, air, Sedation stage) and wake
+through the core: consciousness to `WAKE_THRESHOLD` + 5 and the minimum ticks
+out, so the next `ConsciousnessSystem.tick` runs its private `wake()`.
+
+The stethoscope is client-side (`StethoscopeEar`): the server only starts the
+use. Your own heart is `ClientState`'s; anyone else's is a `Cardio` run from
+their synced snapshot, the way `BloodEmitter` times a stranger's artery.
+
+Treatments used on a body are routed in a `UseEntityCallback` phase after the
+default one: the core's grip and drag listeners run first, and the entity's own
+`interact` (trades, saddles) never sees the click.

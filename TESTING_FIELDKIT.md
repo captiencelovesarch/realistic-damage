@@ -7,6 +7,45 @@ version numbers: `2.0.0-items.N`. Newest round on top.
 branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
 and is in all three instances. Everything below applies to it unchanged.
 
+## items.5: bones, head and senses (phase 4, round 2)
+
+The jar is `realistic-damage-2.0.0-items.5.jar`, in "Realistic Damage items"
+(items.4 parked in `mods/replaced-jars/`). Turn **Medicine** on (K, then World
+rules). Handy: `/rdmg break @s left_leg` (or `right_arm`, ...) breaks a limb;
+`/rdmg heal @s` mends everything.
+
+- [ ] **1. Crafting.** 2 sticks + string = a splint; any wool + string = a sling;
+  glass bottle + bone meal = smelling salts; copper ingot + string = a
+  stethoscope; 2 tinted glass + leather = tinted goggles. All in the Field kit tab.
+- [ ] **2. Splint a leg.** Break a leg and walk: you limp. Hold use with a splint
+  (4 s): "You splint your left leg." The limp is about half as bad.
+- [ ] **3. Splint an arm.** Break your main arm: you swing and dig slowly, and a
+  bow draws slowly. Splint it: both get about twice as quick again.
+- [ ] **4. Knit.** Heal up (eat and wait, sleep, or `/rdmg heal`): "has knit. The
+  splint comes off." With **long-term injuries** on, a broken limb gets "never
+  be quite the same"; if it knits in a splint, you get "knit straight" and it
+  heals all the way.
+- [ ] **5. Sling.** Break your main arm and put it in a sling: you can't use what's
+  in that hand, can't hit or dig ("Your right arm is in a sling."), and a bow in
+  the other hand won't draw. Sneak and use with an empty hand in the air: the
+  arm comes out and you get the sling back.
+- [ ] **6. Sling heals.** With one arm slung and the other not (both broken), the
+  slung one should mend about twice as fast. When it knits, the sling comes back.
+- [ ] **7. Smelling salts.** Knock someone (or a mob) out with blows, then hold
+  use on them with salts (1 s): they come round. Someone out from blood loss,
+  underwater, or out cold on Sedation: "won't bring them round".
+- [ ] **8. Stethoscope.** Hold use in the air: your own heart, slow and steady.
+  Get hurt and bleed, and listen again: faster, weaker, skipping. Hold it on
+  a friend or a mob for theirs. Nobody else hears it.
+- [ ] **9. Tinted goggles.** Wear them (right-click, or the helmet slot): the
+  world goes darker and a little violet, first person only. With a concussion,
+  bright light (sun, glowstone) no longer brings the headache and the glare
+  on. They don't protect your head.
+- [ ] **10. Villagers.** Bandage or splint a villager: it gets treated, no trade
+  screen.
+- [ ] **11. Medicine off.** Every one of these refuses or does nothing; a splint or
+  sling already on stays on but does nothing until Medicine is back.
+
 ## items.4: the bleeding kit (phase 4, round 1)
 
 The jar is `realistic-damage-2.0.0-items.4.jar`, in "Realistic Damage items"

@@ -148,6 +148,25 @@ someone with it and hold to treat them; each lands on the worst wound it can hel
   mob or someone who's out cold; use the bag (5 s) to give the blood back. It keeps three
   days.
 
+**Bones, head and senses** (Medicine, phase 4). The same hold-to-use.
+
+- **Splint** (2 sticks + string; 4 s): goes on the worst broken arm or leg and halves what
+  the break costs you (the limp, the slow swing, the stalled bow). It stays on until the
+  bone has knit. With long-term injuries on, a limb that knits in a splint keeps its full
+  strength.
+- **Sling** (any wool + string; 3 s): holds a broken arm still. Its hand can't use
+  anything, and if it's your main arm you can't swing or dig either. In exchange it heals
+  twice as fast. It comes back to you when the arm has knit; sneak and use with an empty
+  hand to take it out sooner.
+- **Smelling Salts** (glass bottle + bone meal; 1 s): bring round someone who was knocked
+  out or fainted. Not someone out from blood loss, from lack of air, or from Sedation.
+- **Stethoscope** (copper ingot + string): hold use on someone, or in the air for
+  yourself, and hear their heart: fast, weak or skipping. Only you hear it, and it's only
+  sound.
+- **Tinted Goggles** (2 tinted glass + leather): worn on the head instead of a helmet
+  (they're no protection). Bright light stops making a concussion worse, and the world
+  looks darker through them.
+
 ## Playing with it
 
 Injuries show on a small body diagram that fades in when something's wrong. States and

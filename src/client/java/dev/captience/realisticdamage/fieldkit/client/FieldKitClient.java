@@ -55,6 +55,8 @@ public final class FieldKitClient implements ClientModInitializer {
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(Welcome::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(FieldKitClient::loosenTick);
+		// The stethoscope (phase 4, round 2): after the core's heart has ticked.
+		ClientTickEvents.END_CLIENT_TICK.register(StethoscopeEar::tick);
 		// A blood bag says how long it keeps, from the world's clock (phase 4).
 		ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
 			if (!stack.is(dev.captience.realisticdamage.fieldkit.medicine.Medicine.BLOOD_BAG)) {
@@ -79,6 +81,9 @@ public final class FieldKitClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.attachElementAfter(
 				net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.MISC_OVERLAYS,
 				dev.captience.realisticdamage.RealisticDamage.id("sedation_eyelids"), HeavyEyelids::render);
+		net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.attachElementAfter(
+				net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.MISC_OVERLAYS,
+				dev.captience.realisticdamage.RealisticDamage.id("tinted_goggles"), GogglesView::render);
 	}
 
 	private static boolean useWasDown;

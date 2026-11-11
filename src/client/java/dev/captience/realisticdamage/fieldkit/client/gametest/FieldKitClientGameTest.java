@@ -204,6 +204,7 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 			creativeTabAndIcons(context, singleplayer);
 			sedationAndNumbing(context, singleplayer);
 			bleedingKit(context, singleplayer);
+			bonesAndSenses(context, singleplayer);
 		}
 		context.waitTicks(5);
 		boolean cleared = context.computeOnClient(client -> !RulesView.received());
@@ -413,6 +414,51 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 		singleplayer.getServer().runOnServer(server -> dev.captience.realisticdamage.fieldkit.medicine.Medicine.loosen(
 				server.getPlayerList().getPlayers().getFirst(), server.getPlayerList().getPlayers().getFirst()));
 		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with air");
+		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
+		context.waitTicks(5);
+	}
+
+	/**
+	 * Bones, head and senses from the player's chair (2.0, phase 4 round 2):
+	 * hold the real use key with a stethoscope and hear your own heart; wear
+	 * tinted goggles and see the world darken; see a sling the server put on a
+	 * broken arm reach this client.
+	 */
+	private void bonesAndSenses(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runCommand("rdmg config enableMedicine true");
+		context.waitFor(client -> RulesView.on(Half.MEDICINE), 60);
+		String name = context.computeOnClient(client -> client.player.getName().getString());
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with realisticdamage:stethoscope");
+		context.setScreen(() -> null);
+		context.waitTicks(10);
+
+		int before = context.computeOnClient(client -> dev.captience.realisticdamage.fieldkit.client.StethoscopeEar.beatsHeard);
+		context.getInput().holdKey(options -> options.keyUse);
+		context.waitTicks(100);
+		context.getInput().releaseKey(options -> options.keyUse);
+		int heard = context.computeOnClient(client -> dev.captience.realisticdamage.fieldkit.client.StethoscopeEar.beatsHeard)
+				- before;
+		if (heard < 2) {
+			throw new AssertionError("five seconds on your own chest should hear a calm heart a few times, heard " + heard);
+		}
+
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with air");
+		singleplayer.getServer().runCommand("item replace entity " + name + " armor.head with realisticdamage:tinted_goggles");
+		context.waitFor(client -> dev.captience.realisticdamage.fieldkit.medicine.Goggles.worn(client.player), 60);
+		context.waitTicks(5);
+		context.takeScreenshot("rd_fieldkit_15_goggles");
+		singleplayer.getServer().runCommand("item replace entity " + name + " armor.head with air");
+
+		singleplayer.getServer().runCommand("rdmg break " + name + " right_arm");
+		singleplayer.getServer().runOnServer(server -> dev.captience.realisticdamage.fieldkit.medicine.Dressings.sling(
+				server.getPlayerList().getPlayers().getFirst(), dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM));
+		context.waitFor(client -> dev.captience.realisticdamage.fieldkit.medicine.Dressings.slung(client.player,
+				dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM), 60);
+
+		singleplayer.getServer().runOnServer(server -> dev.captience.realisticdamage.fieldkit.medicine.Dressings.unsling(
+				server.getPlayerList().getPlayers().getFirst(), dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM));
+		singleplayer.getServer().runCommand("rdmg heal " + name);
 		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
 		context.waitTicks(5);
 	}
