@@ -53,6 +53,7 @@ public final class TickDispatcher {
 		}
 		data.tickUnconscious();
 		data.tickKnockdown(Balance.KNOCKDOWN_RECOVERY_TICKS);
+		data.tickWhiplash();
 		// Ahead of bleeding, so a pressure hold claimed this tick counts this tick.
 		RescueSystem.tick(player, data);
 		BleedingSystem.tick(player, data);

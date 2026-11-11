@@ -64,7 +64,7 @@ public final class CameraDrift {
 		// so this composes with mouse look instead of fighting it.
 		// In VR the view is the headset: nothing may turn it but the player's own head (1.7 alpha.10).
 		if (!Vr.active()) {
-			player.turn(yaw / TURN_SCALE, pitch / TURN_SCALE);
+			StiffNeck.turnInvoluntarily(player, yaw / TURN_SCALE, pitch / TURN_SCALE);
 		}
 	}
 }

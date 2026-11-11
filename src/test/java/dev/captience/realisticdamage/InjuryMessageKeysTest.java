@@ -57,7 +57,8 @@ class InjuryMessageKeysTest {
 	 */
 	// 74 (active ragdolls phase 4): knocked_down.blast and .blow report the body, like knocked_down;
 	// Injury Text may swallow them.
-	private static final int SHIPPED_MESSAGE_KEYS = 74;
+	// 76 (2.0): whiplash and whiplash_worse report the neck; Injury Text may swallow them.
+	private static final int SHIPPED_MESSAGE_KEYS = 76;
 
 	@Test
 	void everyShippedMessageKeyIsClassifiedDeliberately() throws IOException {

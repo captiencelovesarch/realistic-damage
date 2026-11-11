@@ -143,7 +143,11 @@ public class AccessibilityScreen extends OptionsSubScreen {
 								Component.translatable("realisticdamage.config.decapitation_view.tooltip")))
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.decapitation_view"),
 								(button, value) -> config.decapitationView = value),
-				null);
+				CycleButton.onOffBuilder(config.stiffNeck)
+						.withTooltip(value -> net.minecraft.client.gui.components.Tooltip.create(
+								Component.translatable("realisticdamage.config.stiff_neck.tooltip")))
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.stiff_neck"),
+								(button, value) -> config.stiffNeck = value));
 		this.list.addSmall(
 				CycleButton.onOffBuilder(config.hitFlinches)
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.hit_flinches"),

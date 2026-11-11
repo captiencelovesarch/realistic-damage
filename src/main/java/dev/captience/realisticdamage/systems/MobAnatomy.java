@@ -287,6 +287,7 @@ public final class MobAnatomy {
 		}
 		data.tickUnconscious();
 		data.tickKnockdown(Balance.KNOCKDOWN_RECOVERY_TICKS);
+		data.tickWhiplash();
 		BleedingSystem.tick(mob, data);
 		// The mindless and the bosses have no consciousness to run (1.7 slice 3).
 		if (feelsConsciousness(mob)) {
@@ -368,7 +369,7 @@ public final class MobAnatomy {
 	 * has to keep being asserted.
 	 */
 	public static boolean settled(RealisticDamageData data) {
-		if (data.bleeding() || data.unconscious() || data.concussion() || data.knockedDown()
+		if (data.bleeding() || data.unconscious() || data.concussion() || data.knockedDown() || data.whiplashed()
 				|| data.blood() < Balance.BLOOD_MAX - Balance.CONDITION_EPSILON
 				|| data.consciousness() < data.consciousnessCap() - Balance.CONDITION_EPSILON) {
 			return false;
@@ -467,7 +468,21 @@ public final class MobAnatomy {
 		if (plan(mob).hasHands() && data.part(ImpairmentSystem.armFor(mob, true)).broken()) {
 			spread *= Balance.MOB_BROKEN_ARM_AIM_SPREAD;
 		}
+		// A stiff neck cannot follow the target (2.0).
+		spread *= NeckMath.mobAimSpread(data.whiplash());
 		return spread;
+	}
+
+	/**
+	 * What a mob's head-turn speed is multiplied by (2.0): a whiplashed neck
+	 * turns slowly. 1 for anything without a body or a sound neck.
+	 */
+	public static double turnFactor(Mob mob) {
+		if (mob.level().isClientSide()) {
+			return 1.0;
+		}
+		RealisticDamageData data = mob.getAttached(RDAttachments.DATA);
+		return data == null || !data.whiplashed() ? 1.0 : NeckMath.mobTurnFactor(data.whiplash());
 	}
 
 	/** Server stop or world unload: forget everything. */

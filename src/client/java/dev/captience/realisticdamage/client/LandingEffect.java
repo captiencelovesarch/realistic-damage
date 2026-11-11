@@ -80,7 +80,7 @@ public final class LandingEffect {
 			slamRemaining -= spend;
 			// In VR the view is the headset: nothing may turn it but the player's own head (1.7 alpha.10).
 			if (!Vr.active()) {
-				player.turn(0.0, spend / 0.15);
+				StiffNeck.turnInvoluntarily(player, 0.0, spend / 0.15);
 			}
 		}
 		if (shakeRemaining > 0.0) {
@@ -91,7 +91,7 @@ public final class LandingEffect {
 			double yaw = Math.sin(shakePhase * 1.9) * 0.55 * decay;
 			double pitch = Math.cos(shakePhase * 2.7) * 0.40 * decay;
 			if (!Vr.active()) {
-				player.turn(yaw / 0.15 * deltaTicks, pitch / 0.15 * deltaTicks);
+				StiffNeck.turnInvoluntarily(player, yaw / 0.15 * deltaTicks, pitch / 0.15 * deltaTicks);
 			}
 			if (shakeRemaining <= 0.0) {
 				shakeStrength = 0.0;

@@ -63,7 +63,7 @@ public enum DeathKind {
 			return FADE;
 		}
 		if (source.is(RDDamageTypes.SKULL_CRUSHED) || source.is(RDDamageTypes.CHEST_CRUSHED)
-				|| source.is(RDDamageTypes.DECAPITATED)) {
+				|| source.is(RDDamageTypes.DECAPITATED) || source.is(RDDamageTypes.NECK_BROKEN)) {
 			return BLOW;
 		}
 		if (source.is(DamageTypes.FELL_OUT_OF_WORLD) || source.is(DamageTypes.OUTSIDE_BORDER)) {

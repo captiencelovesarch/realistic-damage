@@ -6,7 +6,8 @@
 	"client": [
 		"VrArmRendererMixin",
 		"VrPlayerModelArmsMixin",
-		"VrPlayerModelLegsMixin"
+		"VrPlayerModelLegsMixin",
+		"VrTurnMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

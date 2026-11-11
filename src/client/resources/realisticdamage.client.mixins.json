@@ -38,7 +38,8 @@
 		"SoundEngineMuffleMixin",
 		"VillagerModelMixin",
 		"WitchModelMixin",
-		"WorldDistortionMixin"
+		"WorldDistortionMixin",
+		"EntityTurnMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

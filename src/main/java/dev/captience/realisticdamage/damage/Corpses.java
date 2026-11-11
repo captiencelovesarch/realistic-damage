@@ -129,6 +129,11 @@ public final class Corpses {
 			launch = body.getDeltaMovement();
 			double stashed = data.peekDeathViolence(body.tickCount);
 			violence = stashed >= 0.0 ? stashed : 0.4;
+			// A snapped neck cuts every string at once (2.0): the body drops where
+			// it stands, mob or player, with no stumble.
+			if (source.is(RDDamageTypes.NECK_BROKEN)) {
+				violence = 1.0;
+			}
 			ClassifiedDamage classified = DamageClassifier.classify(body, source);
 			if (classified != null && classified.routing() == ClassifiedDamage.Routing.LOCATIONAL
 					&& ServerConfig.get().enableHitLocation) {
@@ -158,6 +163,9 @@ public final class Corpses {
 				}
 			}
 		}
+		// The neck that went with the death (2.0), on the snapshot before the
+		// corpse packet, so the ragdoll's head hangs from the start.
+		BrokenNeck.died(body, data);
 		if (launch.length() > MAX_LAUNCH) {
 			launch = launch.normalize().scale(MAX_LAUNCH);
 		}

@@ -36,9 +36,11 @@ public class ConsciousnessGameTest {
 		RealisticDamageData data = RDAttachments.get(player);
 		data.reset();
 		// Spec §19: many hearts remaining, huge golem/mace hit to the head -> out cold.
-		// 14 applied * 1.4 (heavy blunt) = 19.6 head trauma -> consciousness hit
-		// 19.6 * 1.2 * 4.0 = 94; concussion triggers (>= 6 head trauma).
-		TraumaPipeline.handle(player, data, headMace(helper), 14, 14, 14, false);
+		// 11 applied * 1.4 (heavy blunt) = 15.4 head trauma -> consciousness hit
+		// 15.4 * 1.2 * 4.0 = 74; concussion triggers (>= 6 head trauma). Since 2.0
+		// the step above this (16) snaps the neck and the one above that (20)
+		// crushes the skull, so "out cold" is the band under both.
+		TraumaPipeline.handle(player, data, headMace(helper), 11, 11, 11, false);
 		helper.assertTrue(data.concussion(), "massive head hit must concuss");
 		helper.assertTrue(data.consciousness() < Balance.WAKE_THRESHOLD,
 				"massive head hit must crush consciousness, got " + data.consciousness());

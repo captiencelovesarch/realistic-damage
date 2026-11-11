@@ -160,9 +160,17 @@ public final class ConsciousnessEffects {
 		ConcussionEffects.frame(deltaTracker.getGameTimeDeltaTicks());
 		LowHealthEffects.frame(deltaTracker.getGameTimeDeltaTicks());
 		MouseInertia.frame(deltaTracker.getGameTimeDeltaTicks());
+		StiffNeck.frame(deltaTracker.getGameTimeDeltaTicks());
 		ClientEffectsConfig config = ClientEffectsConfig.get();
 		int width = graphics.guiWidth();
 		int height = graphics.guiHeight();
+		// A stiff neck turned too fast (2.0): the flash of pain, first, so it
+		// blurs the world and nothing drawn over it.
+		if (StiffNeck.blurring() && blurAllowed()) {
+			Lens.blur(graphics);
+			blurRequested = true;
+		}
+		StiffNeck.render(graphics);
 
 		// Vignette (from 75 down): reuse vanilla's texture with a multiplicative blend.
 		double vignette = ClientState.ramp(Balance.SYMPTOM_VIGNETTE, Balance.SYMPTOM_SEVERE)
@@ -230,7 +238,7 @@ public final class ConsciousnessEffects {
 		//
 		// Vanilla's blur has no intensity, so it is kept on while the haze is
 		// strong and cut once the ghosting is heavy enough to cover its going.
-		if (Afterimage.haze() > BLUR_CUTOFF && config.afterimageIntensity > 0.0 && blurAllowed()) {
+		if (Afterimage.haze() > BLUR_CUTOFF && config.afterimageIntensity > 0.0 && blurAllowed() && !blurRequested) {
 			Lens.blur(graphics);
 			blurRequested = true;
 		}

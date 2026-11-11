@@ -72,7 +72,7 @@ public record BodySnapshot(Regions regions, Meters meters) {
 	 * imported alongside this record in three client files.
 	 */
 	public record Meters(int statusFlags, float blood, float consciousness,
-	                     int concussionGrade, int concussionFlare, int adrenaline) {
+	                     int concussionGrade, int concussionFlare, int adrenaline, int whiplash) {
 
 		public static final StreamCodec<RegistryFriendlyByteBuf, Meters> STREAM_CODEC = StreamCodec.composite(
 				ByteBufCodecs.VAR_INT, Meters::statusFlags,
@@ -81,6 +81,7 @@ public record BodySnapshot(Regions regions, Meters meters) {
 				ByteBufCodecs.VAR_INT, Meters::concussionGrade,
 				ByteBufCodecs.VAR_INT, Meters::concussionFlare,
 				ByteBufCodecs.VAR_INT, Meters::adrenaline,
+				ByteBufCodecs.VAR_INT, Meters::whiplash,
 				Meters::new);
 	}
 
@@ -108,6 +109,8 @@ public record BodySnapshot(Regions regions, Meters meters) {
 	public static final int FLAG_WINDED = 512;
 	/** The head came off (2.0): drawn without one, and a ragdoll without one. */
 	public static final int FLAG_HEADLESS = 1024;
+	/** The neck snapped (2.0): the ragdoll's head hangs loose. */
+	public static final int FLAG_NECK_BROKEN = 2048;
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, BodySnapshot> STREAM_CODEC = StreamCodec.composite(
 			Regions.STREAM_CODEC, BodySnapshot::regions,
@@ -159,7 +162,8 @@ public record BodySnapshot(Regions regions, Meters meters) {
 				| (data.vertigo() && data.vertigoLeft() ? FLAG_VERTIGO_LEFT : 0)
 				| (data.retching() ? FLAG_RETCHING : 0)
 				| (data.adrenaline().winded ? FLAG_WINDED : 0)
-				| (data.headSevered() ? FLAG_HEADLESS : 0);
+				| (data.headSevered() ? FLAG_HEADLESS : 0)
+				| (data.neckBroken() ? FLAG_NECK_BROKEN : 0);
 		return new BodySnapshot(
 				new Regions(
 						quantizeFraction(data.part(BodyPart.HEAD).fraction()),
@@ -174,7 +178,10 @@ public record BodySnapshot(Regions regions, Meters meters) {
 						// Steps of five: the flare moves every tick, and the client
 						// only needs to know roughly how bad it is.
 						data.concussion() ? (int) Math.round(data.concussionFlare() / 5.0) * 5 : 0,
-						data.adrenaline().phase.wire()));
+						data.adrenaline().phase.wire(),
+						// Percent, in steps of five: it eases every tick, and the turn cap
+						// only needs to know roughly how stiff.
+						(int) Math.round(data.whiplash() * 20.0) * 5));
 	}
 
 	private static float quantizeFraction(double fraction) {
@@ -313,6 +320,15 @@ public record BodySnapshot(Regions regions, Meters meters) {
 		return (statusFlags() & FLAG_HEADLESS) != 0;
 	}
 
+	public boolean neckBroken() {
+		return (statusFlags() & FLAG_NECK_BROKEN) != 0;
+	}
+
+	/** How stiff the neck is from whiplash, 0 (free) to 1 (2.0). */
+	public double whiplash() {
+		return meters.whiplash() / 100.0;
+	}
+
 	public boolean concussion() {
 		return (statusFlags() & FLAG_CONCUSSION) != 0;
 	}
@@ -370,6 +386,6 @@ public record BodySnapshot(Regions regions, Meters meters) {
 	 * is not below any ceiling and carries no marks.
 	 */
 	public static BodySnapshot healthy() {
-		return new BodySnapshot(new Regions(1f, 1f, 1f, 1f, 1f, 1f, 0, 0, 0, 0, 0), new Meters(0, 100f, 100f, 0, 0, 0));
+		return new BodySnapshot(new Regions(1f, 1f, 1f, 1f, 1f, 1f, 0, 0, 0, 0, 0), new Meters(0, 100f, 100f, 0, 0, 0, 0));
 	}
 }

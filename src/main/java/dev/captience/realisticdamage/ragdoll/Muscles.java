@@ -114,6 +114,25 @@ public final class Muscles {
 		return m;
 	}
 
+	/** What is left of a snapped neck's hold: next to nothing (2.0). */
+	public static final double BROKEN_NECK_FLOOR = 0.05;
+	/** How much further than a neck can a snapped one bends, every way (2.0). */
+	public static final double BROKEN_NECK_LOOSENESS = 1.9;
+
+	/**
+	 * These muscles with the neck snapped (2.0): nothing holds the head, not even
+	 * a dead joint's stiffness, and it bends where a neck cannot, so it hangs
+	 * at a wrong angle wherever the body comes to rest.
+	 */
+	public Muscles withBrokenNeck() {
+		Muscles m = copy();
+		m.start[NECK] = 0.0;
+		m.limb[HumanoidRagdoll.HEAD] = 0.0;
+		m.limbFloor[HumanoidRagdoll.HEAD] = BROKEN_NECK_FLOOR;
+		m.looseness[HumanoidRagdoll.HEAD] = BROKEN_NECK_LOOSENESS;
+		return m;
+	}
+
 	private Muscles copy() {
 		Muscles m = new Muscles();
 		System.arraycopy(start, 0, m.start, 0, GROUPS);

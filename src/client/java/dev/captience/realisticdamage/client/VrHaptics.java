@@ -85,4 +85,14 @@ public final class VrHaptics {
 		Vr.pulse(Vr.Hand.BOTH, (float) (0.15 + 0.35 * loudness), 35.0F,
 				(float) (Math.min(1.0, loudness) * strength));
 	}
+
+	/** A stiff neck turned too fast (2.0), 0 to 1: a short, sharp twinge in both hands. */
+	public static void pain(double strength) {
+		double scale = strength();
+		if (scale <= 0.0 || strength <= 0.0) {
+			return;
+		}
+		Vr.pulse(Vr.Hand.BOTH, (float) (0.06 + 0.10 * strength), 150.0F,
+				(float) (Math.min(1.0, 0.3 + 0.7 * strength) * scale));
+	}
 }

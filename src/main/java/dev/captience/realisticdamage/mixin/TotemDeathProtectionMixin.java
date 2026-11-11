@@ -21,6 +21,8 @@ public abstract class TotemDeathProtectionMixin {
 		if (cir.getReturnValue() && (Object) this instanceof ServerPlayer player
 				&& !player.isCreative() && !player.isSpectator()) {
 			RDAttachments.get(player).totemStabilize();
+			// The blow it saved you from may not then snap your neck (2.0).
+			RDAttachments.get(player).markTotemSaved(player.tickCount);
 			RDAttachments.pushSnapshot(player);
 			Notifier.message(player, "realisticdamage.msg.totem_stabilized");
 		}

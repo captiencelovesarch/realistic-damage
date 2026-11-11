@@ -249,6 +249,14 @@ public final class ClientEffectsConfig {
 	public boolean decapitationView = true;
 
 	/**
+	 * Whiplash (2.0): true, a stiff neck slows how fast your view can turn; false,
+	 * quick turns still hurt but nothing slows the view (for anyone the cap
+	 * makes queasy, or who just hates it). In VR it is your smooth and snap
+	 * turning that slows; your real head never is.
+	 */
+	public boolean stiffNeck = true;
+
+	/**
 	 * Knocked down without dying (active ragdolls phase 4): the body falls as a
 	 * ragdoll and gets back up, instead of dropping into the prone pose. Your
 	 * own body only with Death View on Ragdoll, and never in VR.

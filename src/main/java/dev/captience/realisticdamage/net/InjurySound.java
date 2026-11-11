@@ -18,7 +18,9 @@ public enum InjurySound {
 	 */
 	SCREAM_SHARP("scream_sharp", false),
 	/** The long scream of losing a limb (1.7). */
-	SCREAM_SEVERE("scream_severe", false);
+	SCREAM_SEVERE("scream_severe", false),
+	/** A neck snaps (2.0): one dry crack, and nothing after it. */
+	NECK_CRACK("neck_crack");
 
 	private final String id;
 	private final boolean styled;

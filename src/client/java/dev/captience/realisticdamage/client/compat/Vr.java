@@ -88,7 +88,16 @@ public final class Vr {
 		Api.pulse(hand, seconds, frequency, Math.min(1.0F, amplitude));
 	}
 
-	public enum Hand {
+	/**
+	 * Where the headset is facing in the room (2.0), unit; null in flat play.
+	 * The room, not the world: Vivecraft turning the world is not the player
+	 * turning their head.
+	 */
+	public static net.minecraft.world.phys.@org.jspecify.annotations.Nullable Vec3 headDirection() {
+		return active() ? Api.headDirection() : null;
+	}
+
+		public enum Hand {
 		MAIN, OFF, BOTH
 	}
 
@@ -117,6 +126,11 @@ public final class Vr {
 			// CENTER is the single undistorted view a mirror mode may add; it is
 			// not seen in the headset, so it keeps no history of its own.
 			return OTHER;
+		}
+
+		static net.minecraft.world.phys.Vec3 headDirection() {
+			var pose = VRClientAPI.instance().getLatestRoomPose();
+			return pose == null ? null : pose.getHead().getDir();
 		}
 
 		static void pulse(Hand hand, float seconds, float frequency, float amplitude) {

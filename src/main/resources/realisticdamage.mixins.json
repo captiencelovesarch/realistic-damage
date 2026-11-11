@@ -21,7 +21,9 @@
 		"SnowGolemThrowMixin",
 		"SkeletonShootMixin",
 		"TotemDeathProtectionMixin",
-		"SeveredSkullDropMixin"
+		"SeveredSkullDropMixin",
+		"ShallowWaterMixin",
+		"MobLookWhiplashMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

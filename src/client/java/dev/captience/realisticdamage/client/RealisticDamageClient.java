@@ -154,6 +154,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			AirHunger.tick();
 			Breathing.tick();
 			MouseInertia.tickFallback();
+			StiffNeck.tick();
 			VisionEffects.tick();
 			RescueInput.tick(client);
 			// Blood last, and in this order: the emitter reads the heart that
@@ -170,6 +171,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			ConsciousnessAudio.reset();
 			VisionEffects.reset();
 			MouseInertia.reset();
+			StiffNeck.reset();
 			ImpactEffect.reset();
 			LandingEffect.reset();
 			StumbleInput.reset();

@@ -53,11 +53,14 @@ public final class DamageHooks {
 		// source and amount, before the totem check, which is why this only
 		// *scores* the death rather than announcing it.
 		ServerLivingEntityEvents.ALLOW_DEATH.register((entity, source, amount) -> {
+			// A blow that kills and would have snapped the neck too (2.0): stashed
+			// for AFTER_DEATH, because a totem may still refuse this death.
+			BrokenNeck.lethal(entity, source, amount);
 			if (entity instanceof ServerPlayer player && participates(player)) {
 				if (!isInternal(source)) {
 					scoreDeathViolence(player, RDAttachments.get(player), source, amount);
 				} else if (source.is(RDDamageTypes.SKULL_CRUSHED) || source.is(RDDamageTypes.CHEST_CRUSHED)
-						|| source.is(RDDamageTypes.DECAPITATED)) {
+						|| source.is(RDDamageTypes.DECAPITATED) || source.is(RDDamageTypes.NECK_BROKEN)) {
 					// A destroyed head or torso is the mod's own damage, so the scoring
 					// above never saw it and "crushed beyond saving" by an iron golem
 					// got a bleed-out's slow fade (1.7 fix). There is no more violent

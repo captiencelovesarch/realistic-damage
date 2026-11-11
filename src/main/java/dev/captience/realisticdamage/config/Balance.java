@@ -1360,4 +1360,62 @@ public final class Balance {
 	/** How long a blast or a blow keeps the body down, ticks, at violence 0 and 1. */
 	public static final int KNOCKDOWN_HIT_TICKS_MIN = 25;
 	public static final int KNOCKDOWN_HIT_TICKS_MAX = 70;
+
+	// --- Broken necks and whiplash (2.0) ---
+	// A neck takes a "strain" from each thing that can wrench it: 1 snaps it, a
+	// fraction of that (WHIPLASH_MIN_STRAIN and up) leaves whiplash. Every bar
+	// below is the strain-1 figure for one cause.
+	/**
+	 * A body that lands head first (limp, knocked flat, or gliding): the drop,
+	 * blocks over the safe distance times what the ground gave back, that snaps
+	 * the neck. The server does not know a ragdoll's orientation, so "limp"
+	 * stands in for "head first".
+	 */
+	public static final double NECK_LIMP_HEIGHT = 9.0;
+	/**
+	 * A landing on your feet never snaps the neck, but a hard one wrenches it:
+	 * strain from the knockdown's own floor up to 0.95 at this drop.
+	 */
+	public static final double NECK_UPRIGHT_FULL_HEIGHT = 33.0;
+	/**
+	 * Flying into a wall: vanilla's own damage figure for the crash (ten times the
+	 * speed lost, less three), raw, that snaps the neck. 12 is about 1.5 blocks a
+	 * tick, 30 m/s: an elytra at cruise.
+	 */
+	public static final double NECK_WALL_DAMAGE = 12.0;
+	/**
+	 * A heavy blunt blow to the head (a mace smash, an iron golem, a ravager, an
+	 * anvil): the localized head trauma that snaps the neck. Three steps on a
+	 * sound head: from about 12 a blow like that puts you out cold (spec §19),
+	 * from 16 it snaps the neck, and from 20, which empties the head in one go,
+	 * it crushes the skull instead (the finish-off rule runs first). 16 is about
+	 * 11.5 points of heavy blunt damage landing on a bare head.
+	 */
+	public static final double NECK_BLUNT_TRAUMA = 16.0;
+	/** A plain blunt blow can wrench a neck but never snap it: its strain stops here. */
+	public static final double NECK_BLUNT_STRAIN_CAP = 0.95;
+	/** This much of a bar, and the neck is wrenched rather than left alone. */
+	public static final double WHIPLASH_MIN_STRAIN = 0.35;
+	/** A knockdown this violent wrenches the neck on the way down (never snaps it). */
+	public static final double WHIPLASH_KNOCKDOWN_VIOLENCE = 0.35;
+	/** A killing heavy blow to the head this violent takes the neck with it (the ragdoll's head hangs). */
+	public static final double NECK_KILL_VIOLENCE = 0.5;
+	/** Water this deep or shallower does not stop a fall: you hit the bottom. Blocks. */
+	public static final int SHALLOW_WATER_DEPTH = 1;
+	/** What one block of water takes off a fall before the bottom arrives. */
+	public static final double SHALLOW_WATER_CUSHION = 0.8;
+	/** How long whiplash lasts at its mildest and its worst, ticks: 30 s to 90 s. */
+	public static final int WHIPLASH_TICKS_MIN = 600;
+	public static final int WHIPLASH_TICKS_MAX = 1800;
+	/** How stiff the neck starts, at the mildest and the worst: 0 free, 1 as stiff as it gets. */
+	public static final double WHIPLASH_STIFFNESS_MIN = 0.35;
+	public static final double WHIPLASH_STIFFNESS_MAX = 1.0;
+	/**
+	 * The fastest the view turns, degrees a second, at the faintest stiffness and
+	 * at the worst. 75 is a quarter turn in 1.2 s; 540 only catches a flick.
+	 */
+	public static final double WHIPLASH_TURN_MILD = 540.0;
+	public static final double WHIPLASH_TURN_WORST = 75.0;
+	/** How much wider a whiplashed mob's shots go, at the worst. */
+	public static final double MOB_WHIPLASH_AIM_SPREAD = 2.5;
 }

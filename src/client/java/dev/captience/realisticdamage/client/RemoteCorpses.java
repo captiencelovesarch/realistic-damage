@@ -363,6 +363,15 @@ public final class RemoteCorpses {
 		return ragdoll.body.present(dev.captience.realisticdamage.ragdoll.HumanoidRagdoll.HEAD) ? 1 : 0;
 	}
 
+	/** How much further than normal the ragdoll's neck may bend, or -1 with no humanoid ragdoll; for the gametests (2.0). */
+	public static double ragdollNeckLooseness(Entity entity) {
+		SimulatedCorpse r = RAGDOLLS.get(entity.getId());
+		if (!(r instanceof RagdollCorpse ragdoll)) {
+			return -1.0;
+		}
+		return ragdoll.body.muscles().looseness[dev.captience.realisticdamage.ragdoll.HumanoidRagdoll.HEAD];
+	}
+
 	public static double ragdollHeight(Entity entity) {
 		SimulatedCorpse r = RAGDOLLS.get(entity.getId());
 		if (r == null) {

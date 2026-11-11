@@ -189,7 +189,7 @@ final class RagdollCorpse extends SimulatedCorpse {
 			ragdoll.push(stand.vx(), 0.0, stand.vz());
 			return new RagdollCorpse(entity, ragdoll, modelScale, level);
 		}
-		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
+		Muscles muscles = deathMuscles(payload, snapshot);
 		Behaviour.Input input = behaviourInput(entity, payload, snapshot, muscles);
 		// How it falls when it simply falls: as it always has.
 		Runnable fall = () -> {
@@ -503,6 +503,12 @@ final class RagdollCorpse extends SimulatedCorpse {
 		return new Behaviour.Input(payload.kind(), payload.violence(), hit, wound, muscles, push, entity.getId());
 	}
 
+	/** The muscles a body dies with, its neck included (2.0). */
+	private static Muscles deathMuscles(CorpsePayload payload, @Nullable BodySnapshot snapshot) {
+		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
+		return snapshot != null && snapshot.neckBroken() ? muscles.withBrokenNeck() : muscles;
+	}
+
 	/** What the body knew about itself as it died, from its synced snapshot, in ragdoll part order. */
 	private static Muscles.Input musclesInput(CorpsePayload payload, @Nullable BodySnapshot snapshot) {
 		int hit = payload.hitPart() >= 0 && payload.hitPart() < FROM_BODY_PART.length
@@ -539,7 +545,7 @@ final class RagdollCorpse extends SimulatedCorpse {
 	 */
 	void becomeDeath(LivingEntity entity, CorpsePayload payload) {
 		BodySnapshot snapshot = entity.getAttached(RDAttachments.SNAPSHOT);
-		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
+		Muscles muscles = deathMuscles(payload, snapshot);
 		body.setMuscles(muscles);
 		body.setBehaviour(Behaviour.choose(behaviourInput(entity, payload, snapshot, muscles)));
 		if (payload.hitPart() >= 0 && payload.hitPart() < FROM_BODY_PART.length && payload.kick() > 0.0F) {

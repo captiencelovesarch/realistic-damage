@@ -71,6 +71,8 @@ public final class Knockdowns {
 		int ticks = (int) Math.round(Balance.KNOCKDOWN_HIT_TICKS_MIN
 				+ (Balance.KNOCKDOWN_HIT_TICKS_MAX - Balance.KNOCKDOWN_HIT_TICKS_MIN) * Math.min(1.0, violence));
 		data.knockDown(ticks);
+		// Thrown down hard, the neck whips (2.0). Never snaps it: that bar is the blow's own.
+		BrokenNeck.strain(body, data, dev.captience.realisticdamage.systems.NeckMath.knockdown(violence), attacker);
 		body.stopUsingItem();
 		if (body.isSprinting()) {
 			body.setSprinting(false);

@@ -100,6 +100,21 @@ public final class ServerConfig {
 	public boolean enableDecapitation = true;
 
 	/**
+	 * Necks snap (2.0): a limp or gliding body landing head first, a dive into
+	 * water too shallow to stop it, an elytra into a wall at speed, a huge blunt
+	 * blow to the head. Instant death; no totem saves it. Bosses are immune.
+	 * Off, the same causes only ever wrench the neck.
+	 */
+	public boolean enableBrokenNecks = true;
+
+	/**
+	 * Whiplash (2.0): the same causes under the bar, and hard knockdowns, leave
+	 * the neck stiff for 30 to 90 seconds. Players turn their view slower and
+	 * quick turns hurt; mobs turn and aim worse.
+	 */
+	public boolean enableWhiplash = true;
+
+	/**
 	 * Mobs have bodies too (1.7): every entity type in the
 	 * {@code realisticdamage:has_anatomy} tag takes regional trauma, bleeds,
 	 * breaks, loses limbs, is concussed and collapses through the same pipeline

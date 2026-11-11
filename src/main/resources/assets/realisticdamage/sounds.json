@@ -83,5 +83,17 @@
 			"realisticdamage:scream/spy_severe_02",
 			"realisticdamage:scream/spy_severe_03"
 		]
+	},
+	"neck_crack_muted": {
+		"subtitle": "realisticdamage.subtitle.neck_crack",
+		"sounds": [
+			"realisticdamage:neck_crack_muted"
+		]
+	},
+	"neck_crack_visceral": {
+		"subtitle": "realisticdamage.subtitle.neck_crack",
+		"sounds": [
+			"realisticdamage:neck_crack_visceral"
+		]
 	}
 }

@@ -164,6 +164,8 @@ side. It follows the **Death Camera** toggle.
 | `enableLimbDestruction` | true | Arcade preset: limbs can be destroyed permanently |
 | `enableExplosiveDismemberment` | true | Extreme TNT and creeper trauma can take the nearest limb outright; nested under limb destruction |
 | `enableDecapitation` | true | An edge on an already-Disabled head takes it off (anything else still crushes it), the most violent lethal blasts throw it, and the head can be picked up and placed but never worn; nested under limb destruction |
+| `enableBrokenNecks` | true | A limp or gliding body landing head first, a dive into water one block deep, an elytra into a wall at speed or a huge blunt blow to the head snaps the neck: instant death, no totem saves it, bosses are immune. Off, those only ever give whiplash |
+| `enableWhiplash` | true | The same causes under the bar, and hard knockdowns, leave the neck stiff for 30 to 90 s: players turn their view slower and quick turns hurt, mobs turn and aim worse |
 | `enableLongTermInjuries` | false | Worst injuries permanently lower a region's healing ceiling by state band |
 | `enableMobAnatomy` | true | Mobs in the `realisticdamage:has_anatomy` tag (humanoids by default) take regional trauma, bleed, break, lose limbs and collapse like players |
 | `spawnSeveredLimbs` | true | A lost limb is thrown into the world, lands, bleeds for a minute and is gone; nested under limb destruction |

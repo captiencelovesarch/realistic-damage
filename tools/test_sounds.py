@@ -58,6 +58,8 @@ REQUESTED_PEAK = {
     "destruction_visceral": 0.92,
     "collapse_muted": 0.62,
     "collapse_visceral": 0.80,
+    "neck_crack_muted": 0.70,
+    "neck_crack_visceral": 0.85,
 }
 
 # The three the 1.6 spectral budget applies to.
@@ -72,7 +74,7 @@ REQUESTED_PEAK = {
 # so nothing can drift here unnoticed. If they are ever re-tuned, the honest
 # move is to bring them inside this budget and delete this list, not to raise
 # LOW_SHARE_MAX.
-VISCERAL = ["fracture_visceral", "destruction_visceral", "collapse_visceral"]
+VISCERAL = ["fracture_visceral", "destruction_visceral", "collapse_visceral", "neck_crack_visceral"]
 
 # sha256 of each rendered buffer, quantised to the int16 that actually ships.
 # Quantising rather than hashing the raw float64 is deliberate: a scipy upgrade
@@ -86,6 +88,8 @@ GOLDEN = {
     "destruction_visceral": "34125aa07db2c32f8f7cc3e00dce08fd6e0e6df4cd1b9ab7e2069484edf5381f",
     "collapse_muted": "cab17d86e18150e3b36d3f2e207a985282bc1eaff6bd920d6b323e828411c5e2",
     "collapse_visceral": "171c500b0ff9ae934382014fbeeef28e4aa4c6332a26147695eba37f303bba4a",
+    "neck_crack_muted": "c20ea1baf8a27d38c4877e00abac988eed93b2c028d8f06b4482096266608d09",
+    "neck_crack_visceral": "83097a84414ac189eb5cde2206767eca5e6cf9ba905c343b8a1aceef0a0bd65e",
 }
 
 NAMES = list(gen.SOUNDS)

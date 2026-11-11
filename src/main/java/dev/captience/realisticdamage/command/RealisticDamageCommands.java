@@ -115,6 +115,18 @@ public final class RealisticDamageCommands {
 						.executes(ctx -> behead(ctx, java.util.List.of(ctx.getSource().getPlayerOrException())))
 						.then(argument("targets", EntityArgument.entities())
 								.executes(ctx -> behead(ctx, EntityArgument.getEntities(ctx, "targets")))))
+				// 2.0: snaps a neck, or wrenches one, for testing.
+				.then(literal("breakneck")
+						.executes(ctx -> breakNeck(ctx, java.util.List.of(ctx.getSource().getPlayerOrException())))
+						.then(argument("targets", EntityArgument.entities())
+								.executes(ctx -> breakNeck(ctx, EntityArgument.getEntities(ctx, "targets")))))
+				.then(literal("whiplash")
+						.executes(ctx -> whiplash(ctx, java.util.List.of(ctx.getSource().getPlayerOrException()), 1.0))
+						.then(argument("targets", EntityArgument.entities())
+								.executes(ctx -> whiplash(ctx, EntityArgument.getEntities(ctx, "targets"), 1.0))
+								.then(argument("severity", DoubleArgumentType.doubleArg(0.0, 1.0))
+										.executes(ctx -> whiplash(ctx, EntityArgument.getEntities(ctx, "targets"),
+												DoubleArgumentType.getDouble(ctx, "severity"))))))
 				.then(literal("ceiling")
 						.then(argument("player", EntityArgument.player())
 								.then(argument("part", StringArgumentType.word())
@@ -271,6 +283,54 @@ public final class RealisticDamageCommands {
 			return 0;
 		}
 		ctx.getSource().sendSuccess(() -> Component.literal("Took " + count + (count == 1 ? " head" : " heads")), true);
+		return count;
+	}
+
+	/** Snaps the neck of each target that has one, as a head-first landing would. */
+	private static int breakNeck(CommandContext<CommandSourceStack> ctx,
+			java.util.Collection<? extends net.minecraft.world.entity.Entity> targets) {
+		int done = 0;
+		for (net.minecraft.world.entity.Entity target : targets) {
+			if (target instanceof net.minecraft.world.entity.LivingEntity body && body.isAlive()
+					&& dev.captience.realisticdamage.damage.BrokenNeck.can(body)) {
+				net.minecraft.world.entity.Entity by = ctx.getSource().getEntity();
+				dev.captience.realisticdamage.damage.BrokenNeck.snap(body, RDAttachments.get(body), by == body ? null : by);
+				done++;
+			}
+		}
+		final int count = done;
+		if (count == 0) {
+			ctx.getSource().sendFailure(Component.literal("No neck to break: the target needs a body and a head, "
+					+ "and can't be a boss or in creative"));
+			return 0;
+		}
+		ctx.getSource().sendSuccess(() -> Component.literal("Broke " + count + (count == 1 ? " neck" : " necks")), true);
+		return count;
+	}
+
+	/** Gives each target whiplash of this severity (0 mild to 1 all but broken). */
+	private static int whiplash(CommandContext<CommandSourceStack> ctx,
+			java.util.Collection<? extends net.minecraft.world.entity.Entity> targets, double severity) {
+		int done = 0;
+		for (net.minecraft.world.entity.Entity target : targets) {
+			if (target instanceof net.minecraft.world.entity.LivingEntity body && body.isAlive()
+					&& dev.captience.realisticdamage.damage.BrokenNeck.can(body)) {
+				var data = RDAttachments.get(body);
+				// Forced: the command replaces whatever is there, milder or not.
+				data.clearWhiplash();
+				dev.captience.realisticdamage.damage.BrokenNeck.wrench(body, data, severity);
+				if (data.whiplashed()) {
+					done++;
+				}
+			}
+		}
+		final int count = done;
+		if (count == 0) {
+			ctx.getSource().sendFailure(Component.literal("No neck to wrench: the target needs a body and a head, "
+					+ "and whiplash switched on"));
+			return 0;
+		}
+		ctx.getSource().sendSuccess(() -> Component.literal("Wrenched " + count + (count == 1 ? " neck" : " necks")), true);
 		return count;
 	}
 

@@ -212,6 +212,23 @@ public final class TraumaPipeline {
 				&& DestructionLogic.evaluate(player, data, result, blow, classified.category(), source.getEntity())) {
 			limbLost = true;
 		}
+		// Necks (2.0): an elytra into a wall, or a blunt blow that rocked the
+		// head. After destruction, so a skull this blow crushed is already a
+		// death and there is no neck left to break.
+		if (player.isAlive()) {
+			double neck = source.is(net.minecraft.world.damagesource.DamageTypes.FLY_INTO_WALL)
+					? dev.captience.realisticdamage.systems.NeckMath.wallImpact(baseDamageTaken)
+					: 0.0;
+			for (AppliedTrauma trauma : result) {
+				if (trauma.part() == BodyPart.HEAD && trauma.primary()) {
+					neck = Math.max(neck, dev.captience.realisticdamage.systems.NeckMath.headBlow(
+							classified.category(), trauma.attempted()));
+				}
+			}
+			if (neck > 0.0 && BrokenNeck.strain(player, data, neck, source.getEntity())) {
+				return result;
+			}
+		}
 		if (config.enableLongTermInjuries && player instanceof ServerPlayer) {
 			// Ceilings are a life's history; a mob has one life and no history.
 			CeilingLogic.evaluate(player, data, result, brokenBefore, destroyedBefore);
@@ -233,7 +250,15 @@ public final class TraumaPipeline {
 					player, data, classified, profile, result, traumaSource, limbLost);
 		}
 		if (fall && fallHeight > 0.0) {
-			landed(player, data, fallHeight, config);
+			// Head first, a landing snaps the neck; on your feet the legs take
+			// it, and only a landing hard enough to knock you flat jars it (2.0).
+			double effective = fallHeight * data.pendingFallSurface();
+			double neck = data.pendingFallHeadFirst()
+					? dev.captience.realisticdamage.systems.NeckMath.limpLanding(effective)
+					: dev.captience.realisticdamage.systems.NeckMath.uprightLanding(effective);
+			if (!BrokenNeck.strain(player, data, neck, null)) {
+				landed(player, data, fallHeight, config);
+			}
 		} else if (player instanceof ServerPlayer serverPlayer) {
 			// A landing gets its own cue below; firing the generic one as well
 			// would flash twice and kick the view sideways off a vertical impact.

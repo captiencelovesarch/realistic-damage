@@ -1,10 +1,82 @@
 # Realistic Damage 2.0: what to test
 
-The jar is `realistic-damage-2.0.0-alpha.1.jar`, in both Prism instances
-("Realistic Damage" and "Realistic Damage vr"). The 1.7 alpha.26 jar is
-parked in `mods/replaced-jars/`. Everything 1.7 had is still in it, so the
-alpha.25 and alpha.26 checklists in [RAGDOLL_TESTING.md](RAGDOLL_TESTING.md)
-still apply.
+The jar is `realistic-damage-2.0.0-alpha.2.jar`, in both Prism instances
+("Realistic Damage" and "Realistic Damage vr"). The alpha.1 jar is parked in
+`mods/replaced-jars/`. alpha.2 has everything alpha.1 had, so its checklist
+below still applies, and so do the alpha.25 and alpha.26 checklists in
+[RAGDOLL_TESTING.md](RAGDOLL_TESTING.md).
+
+## alpha.2: broken necks and whiplash (phase 1, round 2)
+
+**How a neck breaks.** Instant death, a dry crack, and a body that drops
+where it stands with its head hanging at a wrong angle. No totem saves it,
+and bosses never break theirs. The causes:
+- **Landing head first.** Anyone out cold, knocked flat, mid-microsleep or
+  gliding on an elytra lands head first. About 12 blocks onto stone does it
+  (15 onto grass); from about 6 blocks it only wrenches the neck.
+- **Water one block deep.** It no longer saves you from a big fall: you hit
+  the bottom. Feet first, your legs take it like a normal landing. Head
+  first, it's your neck. Two blocks of water or more still saves you as
+  before.
+- **An elytra into a wall at speed** (about 30 m/s, a normal cruise).
+- **A huge blunt blow to a bare head**: a mace, an iron golem or a ravager.
+  A sound head has three steps. Around 12 head trauma (about 8.5 points of
+  heavy blunt) you're out cold, as before. From 16 (about 11.5 points) your
+  neck snaps. From 20 the skull is crushed, as before. A helmet moves all of
+  these up.
+
+**Whiplash** is what you get just under each of those bars, and from being
+knocked flat hard (a big blast, a heavy hit, a big landing). It lasts 30 to
+90 s and eases off as it heals. Your view turns slower, and a quick turn hurts:
+a wince, a flash of blur and red at the edges.
+
+**Shortcuts:** `/rdmg whiplash` gives you the worst whiplash
+(`/rdmg whiplash @s 0.3` for a mild one). `/rdmg breakneck` snaps your own
+neck. Both take a target too, for example
+`@e[type=zombie,limit=1,sort=nearest]`. You need to be in survival.
+
+- [ ] **1. Stiff neck.** `/rdmg whiplash`, then look around slowly: it should
+  feel normal. Flick the mouse: the view meets resistance and stops short,
+  with no drift or catch-up afterwards, and it hurts. Does it feel like a
+  stiff neck, or like input lag? This is the one the plan says gets reworked
+  or cut if it feels like lag.
+- [ ] **2. It heals.** Wait it out: the turns get freer over about 90 s, then
+  it's gone. `/rdmg whiplash @s 0.3` is milder and shorter.
+- [ ] **3. Stiff Neck: Off.** Settings → Accessibility → "Stiff Neck: OFF".
+  Flicks no longer slow the view, but they still hurt.
+- [ ] **4. Controller.** If you play with Controlify, the stick is capped the
+  same way as the mouse.
+- [ ] **5. Head first.** Glide on an elytra and dive steeply into the
+  ground from 15 blocks or more: your neck snaps, because gliding counts as
+  head first. A dive from about 7 blocks only wrenches it. (Also: a
+  zombie knocked flat on a ledge 12 blocks up, shoved off onto stone.)
+- [ ] **6. Shallow water.** Dig a pool one block deep and jump into it from
+  25 blocks up: your legs get hurt, and you don't walk away clean any more.
+  Do it into a pool two blocks deep: as before, nothing.
+- [ ] **7. Elytra.** Fly into a wall at cruise speed: dead, neck broken. Clip
+  one gently: whiplash.
+- [ ] **8. Mace.** A mace hit to a zombie's head (no fall) wrenches its
+  neck. A hard smash snaps it, or crushes the skull if it's very hard.
+- [ ] **9. Whiplashed mobs.** `/rdmg whiplash` on a skeleton: it's slow to
+  turn its head toward you, and its arrows go wide.
+- [ ] **10. The ragdoll.** A body whose neck snapped drops at once, with no
+  stumble, and its head flops loose wherever it lands.
+- [ ] **11. Totems.** A totem doesn't save a broken neck. But if a totem saves
+  you from the crash itself (an elytra into a wall, say), the neck is only
+  wrenched.
+- [ ] **12. VR.** In the VR instance with whiplash: smooth turning is slowed,
+  snap turns come no faster than a stiff neck could make them, and turning
+  your real head fast gives a buzz in both hands and red at the edges. Your
+  real head is never slowed.
+- [ ] **13. The crack.** Both Injury Sound styles (Visceral, Muted) have their
+  own crack. Do they sound like a neck?
+
+**Known, not done yet:**
+- Only humanoid ragdolls (players, zombies, skeletons, illagers and so on)
+  get a loose neck. Animals still die with a normal neck.
+- An elytra landing on the ground (rather than a wall) may count as feet
+  first in multiplayer: the client often stops gliding before the server
+  sees the landing.
 
 ## alpha.1: heads come off (phase 1, round 1)
 
@@ -57,4 +129,3 @@ You need to be in survival for your own head.
   headless body; it still drops when the mob dies, like normal gear.
 - Animal heads (cows, pigs and so on) don't come off yet: only humanoids,
   villagers and the witch.
-- Broken necks and whiplash are the next round.

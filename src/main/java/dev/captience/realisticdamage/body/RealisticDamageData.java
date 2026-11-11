@@ -109,6 +109,36 @@ public final class RealisticDamageData {
 	private transient boolean headSevered;
 	/** Ticks a headless zombie has left to walk (2.0). */
 	private transient int headlessTicks;
+	/**
+	 * The neck snapped (2.0): its ragdoll's head hangs with nothing holding it.
+	 * Not persisted: it kills.
+	 */
+	private transient boolean neckBroken;
+	/**
+	 * Whiplash (2.0): ticks left, the ticks it started with, and how stiff it
+	 * started (see {@code NeckMath}). Not persisted: a restart is a long rest.
+	 */
+	private transient int whiplashTicks;
+	private transient int whiplashTotal;
+	private transient double whiplashStart;
+	/** The landing being scored came head first: a limp body's or a glider's (2.0). */
+	private transient boolean pendingFallHeadFirst;
+	/**
+	 * A dive into water too shallow to stop it is being scored as a landing on
+	 * the bottom (2.0), and whether it went in head first. Only for the length
+	 * of that one call.
+	 */
+	private transient boolean diving;
+	private transient boolean divingHeadFirst;
+	/**
+	 * A lethal blow that would also have snapped the neck, seen at ALLOW_DEATH
+	 * (2.0), stamped with its tick like the death violence: a totem can still
+	 * refuse the death, and a neck that was never broken must not hang loose on
+	 * a body that got up again.
+	 */
+	private transient int neckStashTick = Integer.MIN_VALUE;
+	/** The tick a totem last pulled this body back (2.0): that blow has spent its death. */
+	private transient int totemSavedTick = Integer.MIN_VALUE;
 	/** Counts down while you are on the ground after a hard landing. */
 	private transient int knockdownTicks;
 	/** ...and then while you are back up but not yet steady. */
@@ -350,6 +380,7 @@ public final class RealisticDamageData {
 	public void clearPendingFall() {
 		pendingFallHeight = 0.0;
 		pendingFallSurface = 1.0;
+		pendingFallHeadFirst = false;
 	}
 
 	// --- Blasts (1.6) ---
@@ -427,6 +458,104 @@ public final class RealisticDamageData {
 
 	public void setHeadlessTicks(int ticks) {
 		this.headlessTicks = Math.max(0, ticks);
+	}
+
+	public boolean neckBroken() {
+		return neckBroken;
+	}
+
+	public void setNeckBroken(boolean broken) {
+		this.neckBroken = broken;
+	}
+
+	/** Whether the neck is stiff from whiplash right now. */
+	public boolean whiplashed() {
+		return whiplashTicks > 0;
+	}
+
+	/** How stiff the neck is now, 0 (free) to 1. */
+	public double whiplash() {
+		return dev.captience.realisticdamage.systems.NeckMath.stiffness(whiplashStart, whiplashTicks, whiplashTotal);
+	}
+
+	public int whiplashTicks() {
+		return whiplashTicks;
+	}
+
+	/**
+	 * Wrenches the neck. The worse of the old and the new wins: a mild jolt on
+	 * top of a bad whiplash changes nothing, a bad one on a mild one starts
+	 * over from the bad one.
+	 *
+	 * @return whether it made the neck any stiffer
+	 */
+	public boolean wrench(double severity) {
+		double start = dev.captience.realisticdamage.systems.NeckMath.startingStiffness(severity);
+		if (start <= whiplash() + 1.0e-6) {
+			return false;
+		}
+		whiplashStart = start;
+		whiplashTotal = dev.captience.realisticdamage.systems.NeckMath.whiplashTicks(severity);
+		whiplashTicks = whiplashTotal;
+		return true;
+	}
+
+	public void tickWhiplash() {
+		if (whiplashTicks > 0) {
+			whiplashTicks--;
+		}
+	}
+
+	public void clearWhiplash() {
+		whiplashTicks = 0;
+		whiplashTotal = 0;
+		whiplashStart = 0.0;
+	}
+
+	public boolean pendingFallHeadFirst() {
+		return pendingFallHeadFirst;
+	}
+
+	public void setPendingFallHeadFirst(boolean headFirst) {
+		this.pendingFallHeadFirst = headFirst;
+	}
+
+	public void markTotemSaved(int tick) {
+		totemSavedTick = tick;
+	}
+
+	public boolean totemSaved(int tick) {
+		return totemSavedTick == tick;
+	}
+
+	public void stashNeck(int tick) {
+		neckStashTick = tick;
+	}
+
+	/** Whether a broken neck was stashed this same tick. Clears either way. */
+	public boolean consumeNeck(int tick) {
+		boolean stashed = neckStashTick == tick;
+		neckStashTick = Integer.MIN_VALUE;
+		return stashed;
+	}
+
+	public boolean diving() {
+		return diving;
+	}
+
+	public boolean divingHeadFirst() {
+		return divingHeadFirst;
+	}
+
+	/** See {@link #diving}. Always paired with {@link #endDive}, in a finally. */
+	public void beginDive(boolean headFirst) {
+		diving = true;
+		divingHeadFirst = headFirst;
+	}
+
+	public void endDive() {
+		diving = false;
+		divingHeadFirst = false;
 	}
 
 	public boolean knockedDown() {
@@ -809,6 +938,8 @@ public final class RealisticDamageData {
 		clearMicrosleep();
 		clearPendingFall();
 		clearPendingExplosion();
+		clearWhiplash();
+		neckBroken = false;
 	}
 
 	/**

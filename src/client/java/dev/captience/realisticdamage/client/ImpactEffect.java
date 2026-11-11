@@ -136,7 +136,7 @@ public final class ImpactEffect {
 		kickRemaining -= spend;
 		// In VR the view is the headset: nothing may turn it but the player's own head (1.7 alpha.10).
 		if (!Vr.active()) {
-			player.turn(kickYaw * spend / 0.15, kickPitch * spend / 0.15);
+			StiffNeck.turnInvoluntarily(player, kickYaw * spend / 0.15, kickPitch * spend / 0.15);
 		}
 		spendRing(deltaTicks);
 	}
@@ -163,7 +163,7 @@ public final class ImpactEffect {
 		double swing = Math.sin(ringPhase * 0.9) * ring * 1.4 * deltaTicks
 				* ClientEffectsConfig.get().impactIntensity;
 		if (!Vr.active()) {
-			player.turn(swing * 0.6, -swing);
+			StiffNeck.turnInvoluntarily(player, swing * 0.6, -swing);
 		}
 	}
 

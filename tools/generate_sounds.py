@@ -294,6 +294,44 @@ def collapse_visceral() -> np.ndarray:
     return norm(out, 0.80)
 
 
+# --------------------------------------------------------------------------
+# Neck crack (2.0): the neck snapping. Quicker and higher than a limb
+# fracture: a small joint letting go under a twist, not a long bone across.
+# The death that follows makes no sound of its own, so this is the whole cue.
+# --------------------------------------------------------------------------
+
+def neck_crack_muted() -> np.ndarray:
+    out = np.zeros(int(0.26 * SR))
+    # A knuckle-crack, scaled up: one dry pop with a smaller one on its heels
+    # (two facets going), and almost no low end.
+    place(out, crack(0.12, 900, 6200, 0.011, 40), 0.0, 1.0)
+    place(out, crack(0.08, 1200, 5200, 0.007, 41), 0.019, 0.45)
+    place(out, body(0.09, 230, 0.020), 0.0, 0.22)
+    return norm(out, 0.70)
+
+
+def neck_crack_visceral() -> np.ndarray:
+    out = np.zeros(int(0.38 * SR))
+    # The twist first: a gritty grind as the joint is forced past its end,
+    # rough because it is amplitude-chopped noise rather than a smooth swell.
+    n = int(0.045 * SR)
+    grit = band(rng(50).normal(0, 1, n), 700, 3400)
+    chop = (np.abs(np.sin(np.arange(n) / SR * 2 * np.pi * 95.0)) ** 3) * np.linspace(0.2, 1.0, n)
+    place(out, grit * chop, 0.0, 0.38)
+    # Then it goes: one bright pop and two splinters, each its own voice (see
+    # fracture_visceral for why five copies of one crack sound like one).
+    for i, (at, gain, top, decay) in enumerate([(0.045, 1.0, 7600, 0.016),
+                                                (0.058, 0.55, 5200, 0.010),
+                                                (0.077, 0.32, 6400, 0.009)]):
+        place(out, crack(0.12, 520, top, decay, 51 + i), at, gain)
+    # The wet give underneath, short: it is a neck, not a thigh.
+    m = int(0.22 * SR)
+    wet = lowpass(rng(55).normal(0, 1, m), 900) * env(m, 0.003, 0.05, curve=4.0)
+    place(out, wet, 0.05, 0.42)
+    place(out, body(0.12, 210, 0.026), 0.045, 0.32)
+    return norm(out, 0.85)
+
+
 SOUNDS = {
     "fracture_muted": fracture_muted,
     "fracture_visceral": fracture_visceral,
@@ -301,6 +339,8 @@ SOUNDS = {
     "destruction_visceral": destruction_visceral,
     "collapse_muted": collapse_muted,
     "collapse_visceral": collapse_visceral,
+    "neck_crack_muted": neck_crack_muted,
+    "neck_crack_visceral": neck_crack_visceral,
 }
 
 
@@ -376,7 +416,12 @@ BREATHS = {
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
+    # Names on the command line render only those (2.0): re-encoding every ogg
+    # changes the container bytes of sounds nobody touched.
+    wanted = set(sys.argv[1:])
     for name, make in {**SOUNDS, **BREATHS}.items():
+        if wanted and name not in wanted:
+            continue
         audio = make()
         if np.max(np.abs(audio)) > 1.0:
             raise SystemExit(f"{name} clips")

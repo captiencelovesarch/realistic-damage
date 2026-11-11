@@ -228,5 +228,12 @@
 	"realisticdamage.detail.scarred.broken": "Scarred where it once broke",
 	"realisticdamage.detail.scarred.destroyed": "Scarred where it was once lost",
 	"realisticdamage.detail.scarred.destroyed.head": "Scarred where the skull was once crushed",
-	"realisticdamage.detail.scarred.destroyed.torso": "Scarred where the chest once caved in"
+	"realisticdamage.detail.scarred.destroyed.torso": "Scarred where the chest once caved in",
+	"death.attack.realisticdamage.neckBroken": "%1$s broke their neck",
+	"death.attack.realisticdamage.neckBroken.player": "%1$s's neck was broken by %2$s",
+	"realisticdamage.msg.whiplash": "Your neck is wrenched. Turning your head hurts.",
+	"realisticdamage.msg.whiplash_worse": "Your neck wrenches again.",
+	"realisticdamage.subtitle.neck_crack": "Neck snaps",
+	"realisticdamage.config.stiff_neck": "Stiff Neck",
+	"realisticdamage.config.stiff_neck.tooltip": "With whiplash, your view turns slower and quick turns hurt. Off: quick turns still hurt, but nothing slows your view. In VR, your smooth and snap turns slow down instead, and fast head turns hurt."
 }

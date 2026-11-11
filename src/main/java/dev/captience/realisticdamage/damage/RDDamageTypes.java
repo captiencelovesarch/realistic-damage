@@ -27,6 +27,10 @@ public final class RDDamageTypes {
 	public static final ResourceKey<DamageType> DECAPITATED = ResourceKey.create(
 			Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("realisticdamage", "decapitated"));
 
+	/** The neck snapped (2.0): a head-first landing, a crash, a huge blow to the head. */
+	public static final ResourceKey<DamageType> NECK_BROKEN = ResourceKey.create(
+			Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("realisticdamage", "neck_broken"));
+
 	/** Fatal loss of the torso (Arcade preset limb destruction). */
 	public static final ResourceKey<DamageType> CHEST_CRUSHED = ResourceKey.create(
 			Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("realisticdamage", "chest_crushed"));
@@ -60,6 +64,12 @@ public final class RDDamageTypes {
 	public static DamageSource decapitated(ServerLevel level, net.minecraft.world.entity.@org.jspecify.annotations.Nullable Entity by) {
 		return by == null ? level.damageSources().source(DECAPITATED)
 				: level.damageSources().source(DECAPITATED, by);
+	}
+
+	/** The neck snapped; credited to whoever did it, when someone did. */
+	public static DamageSource neckBroken(ServerLevel level, net.minecraft.world.entity.@org.jspecify.annotations.Nullable Entity by) {
+		return by == null ? level.damageSources().source(NECK_BROKEN)
+				: level.damageSources().source(NECK_BROKEN, by);
 	}
 
 	/** The fatal source for destroying a core region — they die differently. */

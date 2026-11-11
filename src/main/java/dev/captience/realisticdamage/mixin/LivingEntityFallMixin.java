@@ -46,6 +46,11 @@ public abstract class LivingEntityFallMixin {
 		RealisticDamageData data = RDAttachments.get(self);
 		double surface = LandingSurface.factor(self.getBlockStateOn());
 		data.setPendingFall(overSafe, surface, leadingLegIsLeft(self));
+		// Head first or feet first (2.0): a dive into shallow water says which
+		// itself, having looked before the water stopped the glide.
+		data.setPendingFallHeadFirst(data.diving()
+				? data.divingHeadFirst()
+				: dev.captience.realisticdamage.damage.BrokenNeck.headFirst(self, data));
 	}
 
 	/**

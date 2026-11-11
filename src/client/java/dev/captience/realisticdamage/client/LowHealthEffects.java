@@ -65,7 +65,7 @@ public final class LowHealthEffects {
 			if (Math.abs(dy) > 1.0e-5 || Math.abs(dp) > 1.0e-5) {
 				// In VR the view is the headset: nothing may turn it but the player's own head (1.7 alpha.10).
 				if (!Vr.active()) {
-					player.turn(dy / 0.15, dp / 0.15);
+					StiffNeck.turnInvoluntarily(player, dy / 0.15, dp / 0.15);
 				}
 			}
 		}
