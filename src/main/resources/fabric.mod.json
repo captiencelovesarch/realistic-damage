@@ -25,6 +25,7 @@
 		],
 		"fabric-client-gametest": [
 			"dev.captience.realisticdamage.client.gametest.BodyHudClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.SettingsScreenClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.MultiplayerClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.RagdollClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.OwnRagdollClientGameTest",

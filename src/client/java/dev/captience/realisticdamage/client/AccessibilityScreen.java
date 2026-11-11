@@ -7,6 +7,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.options.OptionsSubScreen;
 import net.minecraft.network.chat.CommonComponents;
@@ -297,11 +299,33 @@ public class AccessibilityScreen extends OptionsSubScreen {
 				.build());
 	}
 
+	/**
+	 * Vanilla's options screens never rebuild, so their layout keeps whatever
+	 * was added to it. The presets and the panic button rebuild this one, and
+	 * each rebuild stacked another list on the last: the new one drew on top
+	 * while the wheel and the clicks went to the stale one underneath, so after
+	 * a preset the page would not scroll and its buttons seemed not to change.
+	 * Start from empty.
+	 */
+	@Override
+	protected void init() {
+		this.layout.removeChildren();
+		super.init();
+	}
+
+	/**
+	 * The title and, under it, what these settings are for. A header of its own
+	 * height and a column rather than two title headers: those share one frame
+	 * and were drawn on top of each other.
+	 */
 	@Override
 	protected void addTitle() {
-		super.addTitle();
-		this.layout.addTitleHeader(Component.translatable("realisticdamage.config.note").withStyle(
-				style -> style.withColor(0xA0A0A0)), this.font);
+		this.layout.setHeaderHeight(44);
+		LinearLayout header = this.layout.addToHeader(LinearLayout.vertical().spacing(5));
+		header.defaultCellSetting().alignHorizontallyCenter();
+		header.addChild(new StringWidget(this.title, this.font));
+		header.addChild(new StringWidget(Component.translatable("realisticdamage.config.note").withStyle(
+				style -> style.withColor(0xA0A0A0)), this.font));
 	}
 
 	@Override
