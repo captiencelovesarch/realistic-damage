@@ -378,10 +378,278 @@ def preview(sprites):
     return out
 
 
+# --- Item sprites (16x16), phase 4 round 1: bleeding ---
+
+ITEM_TEXTURES = ROOT / "src/main/resources/assets/realisticdamage/textures/item"
+
+BANDAGE_PALETTE = {
+    ".": CLEAR,
+    "K": (74, 64, 56, 255),
+    "W": (242, 238, 228, 255),
+    "L": (210, 203, 189, 255),
+    "D": (168, 158, 143, 255),
+    "S": (122, 112, 100, 255),
+}
+BANDAGE = [
+    "................",
+    "....KKKKKK......",
+    "...KWWWWWWK.....",
+    "..KWWLLLLWWK....",
+    ".KWWLDDDDLWWK...",
+    ".KWLDKKKKDLWK...",
+    ".KWLDKSSKDLWK...",
+    ".KWLDKSSKDLWK...",
+    ".KWLDKKKKDLWK...",
+    ".KWWLDDDDLWWKK..",
+    "..KWWLLLLWWWWWK.",
+    "...KWWWWWWLLLLWK",
+    "....KKKKKKKDDLWK",
+    "...........KDLWK",
+    "............KDWK",
+    ".............KK.",
+]
+
+TOURNIQUET_PALETTE = {
+    ".": CLEAR,
+    "K": (42, 26, 16, 255),
+    "B": (124, 76, 42, 255),
+    "b": (164, 108, 62, 255),
+    "d": (90, 54, 30, 255),
+    "W": (150, 112, 62, 255),
+    "w": (196, 156, 96, 255),
+    "G": (176, 176, 182, 255),
+    "g": (104, 104, 112, 255),
+}
+TOURNIQUET_STRAP = [
+    "................",
+    "................",
+    "................",
+    "....KKKKKKKK....",
+    "..KKbbbbbbbbKK..",
+    ".KbBKKKKKKKKBbK.",
+    "KGGK........KBK.",
+    "KGgK........KBK.",
+    "KGGK........KBK.",
+    ".KdBKKKKKKKKBdK.",
+    "..KKddddddddKK..",
+    "....KKKKKKKK....",
+    "................",
+    "................",
+    "................",
+    "................",
+]
+
+NEEDLE_PALETTE = {
+    ".": CLEAR,
+    "K": (36, 38, 46, 255),
+    "S": (204, 208, 218, 255),
+    "s": (132, 138, 152, 255),
+    "H": (252, 252, 255, 255),
+    "R": (196, 44, 44, 255),
+    "r": (124, 22, 26, 255),
+}
+
+BLOOD_BAG_PALETTE = {
+    ".": CLEAR,
+    "K": (44, 12, 16, 255),
+    "P": (228, 218, 222, 255),
+    "p": (186, 172, 180, 255),
+    "R": (152, 18, 26, 255),
+    "r": (200, 44, 50, 255),
+    "D": (98, 8, 14, 255),
+    "T": (206, 196, 202, 255),
+    "W": (246, 244, 240, 255),
+}
+BLOOD_BAG = [
+    "......KKKK......",
+    ".....KP..PK.....",
+    "...KKKKKKKKKK...",
+    "..KPPPPPPPPPPK..",
+    "..KPprrrrrrrpK..",
+    "..KPrRRRRRRRpK..",
+    "..KPrRWWWWRRpK..",
+    "..KPrRWWWWRRpK..",
+    "..KPrRRRRRRRpK..",
+    "..KPrRRRRRRRpK..",
+    "..KPrRRRRRRDpK..",
+    "..KPRRRRRRDDpK..",
+    "..KppDDDDDDDpK..",
+    "...KKKKKKKKKK...",
+    "......KTTK......",
+    ".......KK.......",
+]
+
+
+def blank16():
+    return [["."] * 16 for _ in range(16)]
+
+
+def outline16(grid, ink):
+    out = [row[:] for row in grid]
+    for y in range(16):
+        for x in range(16):
+            if grid[y][x] != ".":
+                continue
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < 16 and 0 <= ny < 16 and grid[ny][nx] not in (".", ink):
+                    out[y][x] = ink
+                    break
+    return out
+
+
+def tourniquet_grid():
+    """The strap with its buckle, and the windlass stick through it corner to corner."""
+    grid = [list(r) for r in TOURNIQUET_STRAP]
+    stick = line(2, 14, 13, 1)
+    for (x, y) in stick:
+        grid[y][x] = "W"
+        if x + 1 < 16:
+            grid[y][x + 1] = "w"
+    # Ink the stick where it crosses empty space, so it reads over the strap.
+    for (x, y) in stick:
+        for dx, dy in ((-1, 0), (0, 1), (2, 0), (1, -1), (0, -1), (-1, 1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < 16 and 0 <= ny < 16 and grid[ny][nx] == ".":
+                grid[ny][nx] = "K"
+    return grid
+
+
+def needle_grid():
+    """A steel needle point-down to the left, its eye up to the right, and a red thread looping off it."""
+    grid = blank16()
+    shaft = line(3, 13, 12, 4)
+    for (x, y) in shaft:
+        grid[y][x] = "S"
+    for (x, y) in shaft[len(shaft) // 2:]:
+        if y - 1 >= 0 and grid[y - 1][x] == ".":
+            grid[y - 1][x] = "H"
+    # The eye: a widened head with a hole.
+    for (x, y) in ((12, 3), (13, 3), (13, 2), (12, 2), (14, 2), (13, 1)):
+        grid[y][x] = "S"
+    grid[2][13] = "."
+    grid[3][13] = "s"
+    # The thread, from the eye around in a loop and away.
+    thread = (line(14, 3, 15, 5) + line(15, 5, 14, 7) + line(14, 7, 15, 9) + line(15, 9, 14, 11)
+              + line(14, 11, 15, 13))
+    for (x, y) in thread:
+        if grid[y][x] == ".":
+            grid[y][x] = "R"
+    for (x, y) in thread[1::3]:
+        if grid[y][x] == "R":
+            grid[y][x] = "r"
+    # Two pixels in from the right, so the thread doesn't ride the slot's edge.
+    grid = [row[2:] + [".", "."] for row in grid]
+    return outline16(grid, "K")
+
+
+def soft_outline(rows, palette, ink="K", shade=0.62):
+    """
+    Vanilla items don't outline in black: an edge is a darker shade of whatever
+    it borders (leather's edge is dark leather, paper's is grey paper). So every
+    ink pixel takes the colour of its darkest filled neighbour, darkened.
+    """
+    def fill(x, y):
+        if 0 <= x < 16 and 0 <= y < 16:
+            c = rows[y][x]
+            if c not in (".", ink):
+                return palette[c]
+        return None
+    out = []
+    for y in range(16):
+        for x in range(16):
+            c = rows[y][x]
+            if c != ink:
+                out.append(palette[c])
+                continue
+            around = [fill(x + dx, y + dy) for dx, dy in
+                      ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1))]
+            around = [a for a in around if a is not None]
+            if not around:
+                out.append(palette[ink])
+                continue
+            darkest = min(around, key=lambda a: a[0] * 0.3 + a[1] * 0.59 + a[2] * 0.11)
+            out.append((int(darkest[0] * shade), int(darkest[1] * shade), int(darkest[2] * shade), 255))
+    return out
+
+
+def item_sprites():
+    def make(grid, palette):
+        rows = ["".join(r) if not isinstance(r, str) else r for r in grid]
+        assert len(rows) == 16 and all(len(r) == 16 for r in rows), [len(r) for r in rows]
+        im = Image.new("RGBA", (16, 16))
+        im.putdata(soft_outline(rows, palette))
+        return im
+    return {
+        "bandage": make(BANDAGE, BANDAGE_PALETTE),
+        "tourniquet": make(tourniquet_grid(), TOURNIQUET_PALETTE),
+        "needle_and_thread": make(needle_grid(), NEEDLE_PALETTE),
+        "blood_bag": make(BLOOD_BAG, BLOOD_BAG_PALETTE),
+    }
+
+
+def slot(size):
+    """A vanilla-looking inventory slot, size x size."""
+    im = Image.new("RGBA", (size, size), (139, 139, 139, 255))
+    d = ImageDraw.Draw(im)
+    d.line([(0, 0), (size - 1, 0)], fill=(55, 55, 55, 255))
+    d.line([(0, 0), (0, size - 1)], fill=(55, 55, 55, 255))
+    d.line([(0, size - 1), (size - 1, size - 1)], fill=(255, 255, 255, 255))
+    d.line([(size - 1, 0), (size - 1, size - 1)], fill=(255, 255, 255, 255))
+    return im
+
+
+def preview_items(sprites, title, out_name, neighbours):
+    PREVIEW.mkdir(parents=True, exist_ok=True)
+    names = list(sprites)
+    big = 16 * 8
+    pad = 24
+    W = max(pad + len(names) * (big + pad), 760)
+    sheet = Image.new("RGBA", (W, 640), (198, 198, 198, 255))
+    d = ImageDraw.Draw(sheet)
+    label(d, (pad, 6), title)
+    for i, n in enumerate(names):
+        x = pad + i * (big + pad)
+        sheet.alpha_composite(sprites[n].resize((big, big), Image.NEAREST), (x, 28))
+        label(d, (x, 28 + big + 4), n.replace("_", " "))
+    y2 = 28 + big + 30
+    label(d, (pad, y2), "vanilla neighbours, same scale: " + ", ".join(n.split("/")[-1] for n in neighbours))
+    for i, path in enumerate(neighbours):
+        im = vanilla(f"assets/minecraft/textures/item/{path}.png")
+        if im is not None:
+            sheet.alpha_composite(im.resize((big * 2 // 3, big * 2 // 3), Image.NEAREST),
+                                  (pad + i * (big * 2 // 3 + 16), y2 + 16))
+    y3 = y2 + 16 + big * 2 // 3 + 24
+    label(d, (pad, y3), "in inventory slots at GUI scale 2 and 3, ours then the neighbours")
+    row = [sprites[n] for n in names] + [vanilla(f"assets/minecraft/textures/item/{p}.png") for p in neighbours]
+    for gi, gs in enumerate((2, 3)):
+        yy = y3 + 16 + gi * (18 * 3 + 12)
+        for i, ic in enumerate(row):
+            if ic is None:
+                continue
+            x = pad + i * (18 * gs + 2)
+            sheet.alpha_composite(slot(18 * gs), (x, yy))
+            sheet.alpha_composite(ic.resize((16 * gs, 16 * gs), Image.NEAREST), (x + gs, yy + gs))
+    sheet = sheet.crop((0, 0, W, y3 + 16 + 2 * (18 * 3 + 12) + 8))
+    out = PREVIEW / out_name
+    sheet.save(out)
+    return out
+
+
 def main():
     sprites = icons()
     out = preview(sprites)
     print("preview:", out)
+    things = item_sprites()
+    out = preview_items(things, "Realistic Damage 2.0, field kit: phase 4 round 1, bleeding (Medicine) - 8x, then in slots",
+                        "fieldkit_items_bleeding.png",
+                        ["paper", "string", "leather", "iron_nugget", "glass_bottle", "flint_and_steel"])
+    print("preview:", out)
+    if "--install-items" in sys.argv:
+        ITEM_TEXTURES.mkdir(parents=True, exist_ok=True)
+        for n, im in things.items():
+            im.save(ITEM_TEXTURES / f"{n}.png")
+            print("wrote", ITEM_TEXTURES / f"{n}.png")
     if "--install" in sys.argv:
         TEXTURES.mkdir(parents=True, exist_ok=True)
         for n, im in sprites.items():

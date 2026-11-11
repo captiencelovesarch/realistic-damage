@@ -7,6 +7,44 @@ version numbers: `2.0.0-items.N`. Newest round on top.
 branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
 and is in all three instances. Everything below applies to it unchanged.
 
+## items.4: the bleeding kit (phase 4, round 1)
+
+The jar is `realistic-damage-2.0.0-items.4.jar`, in "Realistic Damage items"
+(items.3 parked in `mods/replaced-jars/`). Turn **Medicine** on (K, then World
+rules). Handy: `/rdmg bleed @s left_arm minor` (or `moderate`, `severe`,
+`critical`) opens a wound to treat.
+
+- [ ] **1. Crafting.** 2 paper + string = 3 bandages; leather + stick + string = a
+  tourniquet; iron nugget + string = needle and thread. All in the Field kit tab.
+- [ ] **2. Bandage yourself.** With a minor or moderate wound, hold use with a
+  bandage: about 3 seconds, then "You bandage your left arm." The blood drips
+  much slower. A moderate one soaks through in under a minute ("has soaked
+  through") and needs a new one.
+- [ ] **3. Arteries.** On a severe or critical wound a bandage refuses ("It's
+  spurting...").
+- [ ] **4. Bandage someone else.** Right-click a friend or a villager with a
+  bandage and hold. It goes on their worst wound.
+- [ ] **5. Tourniquet.** On a bleeding leg: the bleed stops dead, the leg goes
+  grey on the body diagram and you limp hard. Sneak and press use with an
+  empty hand in the air: it comes off, the leg comes back and you get the
+  tourniquet back.
+- [ ] **6. Too long.** Leave one on: at about 4 minutes "has gone cold", at 5 the
+  limb is lost (stump and scar).
+- [ ] **7. Cauterize.** Sneak and use flint and steel in the air with a wound open:
+  the bleed stops, the screen reels from the pain (it can knock you out if you
+  were already fading), and you're Burned.
+- [ ] **8. Stitch.** Hold use with needle and thread for 10 seconds: the worst
+  wound is gone for good. Get hit while stitching and it's spoiled
+  ("Interrupted"). One needle does four.
+- [ ] **9. Blood bag.** Sneak and use a glass bottle in the air: you lose some
+  blood and get a Blood Bag. When you're low, hold use with it: blood back, and
+  the bottle back. Its tooltip says how many days it keeps. Try drawing from a
+  villager too.
+- [ ] **10. Consent.** You can't draw blood from, or cauterize, a friend who's
+  awake. Once they're out cold, you can.
+- [ ] **11. Medicine off.** Every one of these refuses and says so; a tourniquet
+  that was on comes off by itself and the limb comes back.
+
 ## items.3: Sedation and Numbing (phase 3, round 2)
 
 The jar is `realistic-damage-2.0.0-items.3.jar`, in "Realistic Damage items"

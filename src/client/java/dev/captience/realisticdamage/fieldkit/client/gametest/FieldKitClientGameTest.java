@@ -203,6 +203,7 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 			context.waitTicks(3);
 			creativeTabAndIcons(context, singleplayer);
 			sedationAndNumbing(context, singleplayer);
+			bleedingKit(context, singleplayer);
 		}
 		context.waitTicks(5);
 		boolean cleared = context.computeOnClient(client -> !RulesView.received());
@@ -364,6 +365,54 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 		singleplayer.getServer().runCommand("effect clear @a");
 		singleplayer.getServer().runCommand("rdmg heal " + name);
 		singleplayer.getServer().runCommand("rdmg config enableWeapons false");
+		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
+		context.waitTicks(5);
+	}
+
+	/**
+	 * The bleeding kit from the player's chair (2.0, phase 4): hold the real use
+	 * key with a bandage on a bleeding arm until it lands, and see a tourniquet
+	 * the server put on reach this client.
+	 */
+	private void bleedingKit(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runCommand("rdmg config enableMedicine true");
+		context.waitFor(client -> RulesView.on(Half.MEDICINE), 60);
+		String name = context.computeOnClient(client -> client.player.getName().getString());
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runCommand("rdmg bleed " + name + " left_arm minor");
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with realisticdamage:bandage 2");
+		context.setScreen(() -> null);
+		context.waitTicks(10);
+
+		context.getInput().holdKey(options -> options.keyUse);
+		context.waitTicks(dev.captience.realisticdamage.config.Balance.BANDAGE_USE_TICKS / 2);
+		context.takeScreenshot("rd_fieldkit_13_bandaging");
+		context.waitTicks(dev.captience.realisticdamage.config.Balance.BANDAGE_USE_TICKS / 2 + 15);
+		context.getInput().releaseKey(options -> options.keyUse);
+		context.waitFor(client -> {
+			dev.captience.realisticdamage.fieldkit.medicine.Dressings.State state =
+					client.player.getAttached(dev.captience.realisticdamage.fieldkit.medicine.Dressings.STATE);
+			return state != null && state.bandages.containsKey(dev.captience.realisticdamage.body.BodyPart.LEFT_ARM);
+		}, 60);
+		int left = context.computeOnClient(client -> client.player.getMainHandItem().getCount());
+		if (left != 1) {
+			throw new AssertionError("holding use with a bandage on a bleeding arm should use one up, " + left + " left");
+		}
+
+		singleplayer.getServer().runCommand("rdmg bleed " + name + " left_leg critical");
+		singleplayer.getServer().runOnServer(server -> dev.captience.realisticdamage.fieldkit.medicine.Dressings.tourniquet(
+				server.getPlayerList().getPlayers().getFirst(), dev.captience.realisticdamage.body.BodyPart.LEFT_LEG));
+		context.waitFor(client -> {
+			dev.captience.realisticdamage.fieldkit.medicine.Dressings.State state =
+					client.player.getAttached(dev.captience.realisticdamage.fieldkit.medicine.Dressings.STATE);
+			return state != null && state.tourniquets.containsKey(dev.captience.realisticdamage.body.BodyPart.LEFT_LEG);
+		}, 60);
+		context.takeScreenshot("rd_fieldkit_14_dressed");
+
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runOnServer(server -> dev.captience.realisticdamage.fieldkit.medicine.Medicine.loosen(
+				server.getPlayerList().getPlayers().getFirst(), server.getPlayerList().getPlayers().getFirst()));
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with air");
 		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
 		context.waitTicks(5);
 	}

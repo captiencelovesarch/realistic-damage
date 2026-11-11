@@ -1,0 +1,10 @@
+{
+	"type": "realisticdamage:switched",
+	"switch": "medicine",
+	"recipe": {
+		"type": "minecraft:crafting_shapeless",
+		"category": "misc",
+		"ingredients": ["minecraft:paper", "minecraft:paper", "minecraft:string"],
+		"result": { "id": "realisticdamage:bandage", "count": 3 }
+	}
+}

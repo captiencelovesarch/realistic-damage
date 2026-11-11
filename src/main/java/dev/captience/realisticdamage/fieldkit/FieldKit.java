@@ -39,6 +39,7 @@ public final class FieldKit implements ModInitializer {
 		dev.captience.realisticdamage.fieldkit.brew.Sedation.init();
 		dev.captience.realisticdamage.fieldkit.brew.Numbing.init();
 		dev.captience.realisticdamage.fieldkit.brew.MobDrag.init();
+		dev.captience.realisticdamage.fieldkit.medicine.Medicine.init();
 		FieldKitTab.init();
 		LootGate.init();
 		RulesSync.init();

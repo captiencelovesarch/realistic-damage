@@ -54,12 +54,50 @@ public final class FieldKitClient implements ClientModInitializer {
 					half.title()).withStyle(ChatFormatting.RED)));
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(Welcome::tick);
+		ClientTickEvents.END_CLIENT_TICK.register(FieldKitClient::loosenTick);
+		// A blood bag says how long it keeps, from the world's clock (phase 4).
+		ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
+			if (!stack.is(dev.captience.realisticdamage.fieldkit.medicine.Medicine.BLOOD_BAG)) {
+				return;
+			}
+			net.minecraft.client.multiplayer.ClientLevel level = net.minecraft.client.Minecraft.getInstance().level;
+			Long drawn = stack.get(dev.captience.realisticdamage.fieldkit.medicine.Medicine.DRAWN_AT);
+			if (level == null || drawn == null) {
+				return;
+			}
+			long age = level.getGameTime() - drawn;
+			long keeps = dev.captience.realisticdamage.config.Balance.BLOOD_BAG_KEEPS_TICKS;
+			lines.add(age > keeps
+					? Component.translatable("realisticdamage.fieldkit.blood_bag.spoiled.tooltip")
+							.withStyle(ChatFormatting.DARK_RED)
+					: Component.translatable("realisticdamage.fieldkit.blood_bag.keeps",
+							Math.max(1L, (keeps - age + 23999L) / 24000L)).withStyle(ChatFormatting.GRAY));
+		});
 		// Sedation's eyelids (2.0, phase 3): the stage arrives, the lids follow.
 		ClientPlayNetworking.registerGlobalReceiver(dev.captience.realisticdamage.fieldkit.brew.SedationPayload.TYPE,
 				(payload, context) -> HeavyEyelids.setStage(payload.stage()));
 		net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.attachElementAfter(
 				net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.MISC_OVERLAYS,
 				dev.captience.realisticdamage.RealisticDamage.id("sedation_eyelids"), HeavyEyelids::render);
+	}
+
+	private static boolean useWasDown;
+
+	/**
+	 * Sneak and press use in the air with an empty hand: take your tourniquet
+	 * off (phase 4). One request per press; the server knows whether there is
+	 * one. Pressing on a wound is a held empty hand too, and goes on as before.
+	 */
+	private static void loosenTick(Minecraft client) {
+		boolean down = client.options.keyUse.isDown();
+		if (down && !useWasDown && client.player != null && client.gui.screen() == null
+				&& client.player.isShiftKeyDown() && client.player.getMainHandItem().isEmpty()
+				&& (client.hitResult == null || client.hitResult.getType() == net.minecraft.world.phys.HitResult.Type.MISS)
+				&& RulesView.on(Half.MEDICINE)
+				&& ClientPlayNetworking.canSend(dev.captience.realisticdamage.fieldkit.medicine.LoosenPayload.TYPE)) {
+			ClientPlayNetworking.send(dev.captience.realisticdamage.fieldkit.medicine.LoosenPayload.INSTANCE);
+		}
+		useWasDown = down;
 	}
 
 	/**

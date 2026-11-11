@@ -1,0 +1,5 @@
+{
+	"type": "minecraft:function",
+	"setup": "realisticdamage:test/medicine_on",
+	"teardown": "realisticdamage:test/medicine_off"
+}

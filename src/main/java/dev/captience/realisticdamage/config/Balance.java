@@ -1488,4 +1488,33 @@ public final class Balance {
 	public static final double NUMB_SPRINT_LEG_COST = 1.0;
 	/** Condition a broken arm loses per swing while numb. */
 	public static final double NUMB_SWING_ARM_COST = 0.5;
+
+	// --- The field kit's medicine (2.0, phase 4): bleeding ---
+	/** How far a medic can reach a patient, blocks. */
+	public static final double TREATMENT_REACH = 3.5;
+	/** A bandage: about three seconds with both hands. */
+	public static final int BANDAGE_USE_TICKS = 60;
+	/** What a bandage lets through of a minor and a moderate wound. Arterial ones it cannot hold at all. */
+	public static final double BANDAGE_MINOR_FACTOR = 0.25;
+	public static final double BANDAGE_MODERATE_FACTOR = 0.4;
+	/** A moderate wound soaks a bandage through in this long, and it needs changing. */
+	public static final int BANDAGE_SOAK_TICKS = 900;
+	/** A tourniquet: two seconds to get it on. */
+	public static final int TOURNIQUET_USE_TICKS = 40;
+	/** On this long and the limb starts to go cold; this long and it is dead. */
+	public static final int TOURNIQUET_WARN_TICKS = 4800;
+	public static final int TOURNIQUET_LIMIT_TICKS = 6000;
+	/** Needle and thread: ten seconds of stitching, and a few wounds per needle. */
+	public static final int NEEDLE_USE_TICKS = 200;
+	public static final int NEEDLE_USES = 4;
+	/** Cauterizing: consciousness lost to the pain, at once. Enough to drop a body that was already fading. */
+	public static final double CAUTERIZE_SHOCK = 45.0;
+	/** A blood bag: drawn from a donor, given to a patient. */
+	public static final double BLOOD_BAG_DRAW = 25.0;
+	public static final double BLOOD_BAG_GIVE = 25.0;
+	/** A donor with less than this to give is turned away. */
+	public static final double BLOOD_BAG_MIN_DONOR = 50.0;
+	public static final int BLOOD_BAG_USE_TICKS = 100;
+	/** How long a bag of blood keeps, ticks: three days. */
+	public static final long BLOOD_BAG_KEEPS_TICKS = 72000L;
 }

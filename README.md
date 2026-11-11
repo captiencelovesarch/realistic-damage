@@ -130,6 +130,24 @@ did stays done.
   injury is still there: sprinting on a broken leg wears it down, and so does swinging a
   broken arm.
 
+**The bleeding kit** (Medicine, phase 4). Hold use to treat yourself, or right-click
+someone with it and hold to treat them; each lands on the worst wound it can help.
+
+- **Bandage** (2 paper + string makes 3; about 3 s): slows a minor or moderate wound. A
+  moderate one soaks it through in under a minute and it needs changing; a spurting
+  (arterial) wound it can't hold at all.
+- **Tourniquet** (leather + stick + string; 2 s): stops a limb's bleed dead, but the limb
+  is Disabled while it's on, and after five minutes it dies. Sneak and use with an empty
+  hand to take it off (in the air for your own, on someone for theirs).
+- **Cauterizing:** sneak and use flint and steel or a fire charge in the air (or on
+  someone). The worst bleed stops at once, the pain can knock you out, and it leaves a
+  burn.
+- **Needle and Thread** (iron nugget + string; 10 s, four wounds): closes the worst wound
+  for good. Getting hurt, either of you, spoils the stitching.
+- **Blood Bag:** sneak and use a glass bottle in the air to bank your own blood, or on a
+  mob or someone who's out cold; use the bag (5 s) to give the blood back. It keeps three
+  days.
+
 ## Playing with it
 
 Injuries show on a small body diagram that fades in when something's wrong. States and

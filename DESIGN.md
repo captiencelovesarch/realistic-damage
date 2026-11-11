@@ -772,3 +772,24 @@ Tipped arrows from drinkable potions are a special recipe
 (`realisticdamage:field_kit_tipped_arrow`) that only takes field kit potions and asks the
 potion's own half, so one recipe serves both switches.
 
+### Medicine, round 1: the bleeding kit (phase 4)
+
+A treatment is vanilla's hold-to-use (`TreatmentItem`): `use` treats yourself,
+`interactLivingEntity` someone else; `Treatments` remembers the patient while the
+key is held and loses it if they leave reach, and an interruptible treatment (the
+needle) is spoiled by an `AFTER_DAMAGE` on either of them. The server decides
+whether there is anything to treat when it starts and again when it lands.
+
+What sits on a wound lives in a saved, all-synced attachment (`Dressings`):
+bandages and tourniquets by region. `Dressings.factor(state, part, severity)` is
+the one rule both the server's bleed rate (`FieldKitBleedMixin`) and a client's
+drawing of the blood (`DressedBloodMixin` on `BloodEmitter.emitFor`) read. A
+tourniquet holds its limb at condition 0 and keeps what it took to give back.
+The attached state's maps are never changed in place: Fabric encodes a sync later,
+on the network thread, and a bandage put on under it broke the packet and dropped
+the player. Everything that comes on or off goes through `Dressings.change`, on a
+copy that is then set; only counters and flags tick in place. The
+uses of vanilla items (a glass bottle to draw blood, flint and steel or a fire
+charge to cauterize) are `UseItemCallback`/`UseEntityCallback` handlers that only
+act on a sneak with Medicine on, and only on a willing body (`Consent`).
+
