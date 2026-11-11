@@ -35,6 +35,14 @@ public final class BrewedEffects {
 	public static final Holder<MobEffect> ADRENALINE =
 			Kit.effect("adrenaline", new Adrenaline(), Half.WEAPONS);
 
+	/** A dose that builds: drowsy, stumbling, out, and past that, breathing stops. */
+	public static final Holder<MobEffect> SEDATION =
+			Kit.effect("sedation", new SedationEffect(), Half.WEAPONS);
+
+	/** You feel nothing, and everything is still there. */
+	public static final Holder<MobEffect> NUMBING =
+			Kit.effect("numbing", new NumbingEffect(), Half.MEDICINE);
+
 	public static void init() {
 		// Class loading registers the holders above.
 	}
@@ -86,6 +94,29 @@ public final class BrewedEffects {
 			state.refractory = Balance.ADRENALINE_REFRACTORY_TICKS;
 			state.rearmed = false;
 			Notifier.message(player, "realisticdamage.msg.adrenaline");
+		}
+	}
+
+	static final class SedationEffect extends FieldKitEffect {
+		SedationEffect() {
+			super(Half.WEAPONS, MobEffectCategory.HARMFUL, 0x5B4F9E);
+		}
+
+		@Override
+		protected boolean tickOn(net.minecraft.server.level.ServerLevel level, LivingEntity mob, int amplifier) {
+			return Sedation.tick(level, mob);
+		}
+	}
+
+	static final class NumbingEffect extends FieldKitEffect {
+		NumbingEffect() {
+			super(Half.MEDICINE, MobEffectCategory.BENEFICIAL, 0x9BDDF0);
+		}
+
+		@Override
+		protected boolean tickOn(net.minecraft.server.level.ServerLevel level, LivingEntity mob, int amplifier) {
+			Numbing.tick(mob);
+			return true;
 		}
 	}
 

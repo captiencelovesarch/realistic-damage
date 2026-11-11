@@ -7,6 +7,51 @@ version numbers: `2.0.0-items.N`. Newest round on top.
 branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
 and is in all three instances. Everything below applies to it unchanged.
 
+## items.3: Sedation and Numbing (phase 3, round 2)
+
+The jar is `realistic-damage-2.0.0-items.3.jar`, in "Realistic Damage items"
+(alpha.3 is parked in `mods/replaced-jars/`). It has the necks too. Turn on
+**Weapons** for Sedation and **Medicine** for Numbing (K, then World rules).
+
+- [ ] **1. Brewing.** Awkward potion + poppy = Sleeping Draught (Sedation),
+  glowstone makes it strong. Awkward potion + packed ice = Numbing, redstone
+  makes it last longer. Both in the Field kit tab; Numbing only while Medicine
+  is on.
+- [ ] **2. The draught.** Drink a Sleeping Draught at full health: over about ten
+  seconds your eyelids get heavy and blink slowly, you slow down, then the lids
+  droop and you nod off (microsleeps), then you're out. You wake up groggy about
+  25 seconds later, and the chat says "You slept it off." Hurt yourself first
+  (`/rdmg damagepart`) and check you woke up healed like after a bed.
+- [ ] **3. One arrow, one zombie.** Shoot a zombie with an Arrow of Sedation. It
+  slows, stumbles, then drops into a ragdoll after about 8 seconds, and gets
+  back up a while later. A ravager needs five arrows.
+- [ ] **4. Dragging.** With an empty hand, sneak and use a knocked-out mob (a
+  tranq'd villager is the classic): it's dragged behind you, slowly. Sneak-use
+  again to let go. It lets go by itself when the mob wakes.
+- [ ] **5. Too much.** Three doses (three arrows, or drink three): you go out and
+  stop breathing. After about 20 seconds out of breath you start taking damage,
+  and you die "stopped breathing" if nobody helps. Milk stops it.
+- [ ] **6. Knockout gas.** A Lingering Sedation cloud: stand in it for a second
+  and you're on your way down. Stay in it and it's an overdose.
+- [ ] **7. Small things knock you down.** While stumbling on it, any hit,
+  even a light one, puts you on the ground.
+- [ ] **8. Immune.** Iron golems, snow golems and bosses don't care.
+- [ ] **9. Milk.** Milk clears Sedation at once (the lids open, the drug is gone),
+  but if you were already out you come round the normal way.
+- [ ] **10. Numbing.** Break a leg (`/rdmg break @s left_leg`), then drink
+  Numbing: you walk at full speed, a hit doesn't flinch you or blur the screen,
+  and the body diagram goes pale blue with "Numb" and no marks. The leg is still
+  broken: sprint on it and it gets worse (watch it once Numbing wears off).
+  Swinging with a broken arm wears that arm down too.
+- [ ] **11. The slider.** Settings, Afflictions, "Sedation": turning it down
+  fades the eyelids; "Turn off all sensory effects" turns them off.
+- [ ] **12. The switches.** Medicine off: Numbing is refused and its potions
+  say so; Sedation still works. Weapons off: the reverse.
+
+**Known:** Sedation is strong in PvP on purpose for now (one arrow, about 8
+seconds, then out); balancing it is phase 7. The Haemorrhage, Sedation,
+Adrenaline and Numbing brews are all in, so phase 3 is complete.
+
 ## items.2: Haemorrhage and Adrenaline (phase 3, round 1)
 
 The jar is `realistic-damage-2.0.0-items.2.jar`, in the "Realistic Damage items"

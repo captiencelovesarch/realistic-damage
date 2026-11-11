@@ -431,6 +431,18 @@ public final class ClientEffectsConfig {
 	 */
 	public boolean visceralInjurySounds = false;
 
+	/**
+	 * Sedation's heavy eyelids (2.0 field kit): the slow blinks while drowsy,
+	 * the drooping lids while stumbling. Boxed and seeded from the vignette,
+	 * its nearest neighbour, so a silenced config stays silent.
+	 */
+	public Double sedationEffectsValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double sedationEffects() {
+		return sedationEffectsValue == null ? 1.0 : sedationEffectsValue;
+	}
+
 	/** Punchy and readable — effects present but never obscuring. */
 	public void applyArcadePreset() {
 		vignetteIntensity = 0.85;
@@ -527,6 +539,7 @@ public final class ClientEffectsConfig {
 		lowHealthEffectsValue = 0.0;
 		breathingVolumeValue = 0.0;
 		vrHapticsValue = 0.0;
+		sedationEffectsValue = 0.0;
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -601,6 +614,9 @@ public final class ClientEffectsConfig {
 		}
 		if (vrHapticsValue == null) {
 			vrHapticsValue = Math.min(1.0, impactIntensity);
+		}
+		if (sedationEffectsValue == null) {
+			sedationEffectsValue = Math.min(1.0, vignetteIntensity);
 		}
 		if (!cameraDriftSeeded) {
 			// One-time: a file from before 1.6.2 holds the old zero default. It

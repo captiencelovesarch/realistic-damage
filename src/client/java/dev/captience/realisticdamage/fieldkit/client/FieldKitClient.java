@@ -43,6 +43,7 @@ public final class FieldKitClient implements ClientModInitializer {
 		});
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(() -> {
 			RulesView.clear();
+			HeavyEyelids.reset();
 			// No creative screen outlives the world, and the next world brings its
 			// own registries: let vanilla build the tabs afresh when it next needs them.
 			CreativeTabsAccessor.realisticdamage$setCachedParameters(null);
@@ -53,6 +54,12 @@ public final class FieldKitClient implements ClientModInitializer {
 					half.title()).withStyle(ChatFormatting.RED)));
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(Welcome::tick);
+		// Sedation's eyelids (2.0, phase 3): the stage arrives, the lids follow.
+		ClientPlayNetworking.registerGlobalReceiver(dev.captience.realisticdamage.fieldkit.brew.SedationPayload.TYPE,
+				(payload, context) -> HeavyEyelids.setStage(payload.stage()));
+		net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.attachElementAfter(
+				net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.MISC_OVERLAYS,
+				dev.captience.realisticdamage.RealisticDamage.id("sedation_eyelids"), HeavyEyelids::render);
 	}
 
 	/**

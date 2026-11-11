@@ -34,6 +34,11 @@ public final class FieldKit implements ModInitializer {
 				dev.captience.realisticdamage.fieldkit.brew.FieldKitArrowRecipe.SERIALIZER);
 		dev.captience.realisticdamage.fieldkit.brew.BrewedEffects.init();
 		dev.captience.realisticdamage.fieldkit.brew.BrewedPotions.init();
+		PayloadTypeRegistry.clientboundPlay().register(dev.captience.realisticdamage.fieldkit.brew.SedationPayload.TYPE,
+				dev.captience.realisticdamage.fieldkit.brew.SedationPayload.CODEC);
+		dev.captience.realisticdamage.fieldkit.brew.Sedation.init();
+		dev.captience.realisticdamage.fieldkit.brew.Numbing.init();
+		dev.captience.realisticdamage.fieldkit.brew.MobDrag.init();
 		FieldKitTab.init();
 		LootGate.init();
 		RulesSync.init();

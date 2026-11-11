@@ -4,7 +4,8 @@
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 		"CreativeScreenInvoker",
-		"HeartRaceMixin"
+		"HeartRaceMixin",
+		"NumbHudMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

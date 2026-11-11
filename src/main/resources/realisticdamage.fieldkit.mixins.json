@@ -3,7 +3,7 @@
 	"package": "dev.captience.realisticdamage.fieldkit.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"AdrenalineEndMixin",
+		"BrewedEffectEndMixin",
 		"BrewingGateMixin",
 		"BrewingStandAccessor",
 		"CreativeTabsAccessor",
@@ -12,7 +12,14 @@
 		"HaemorrhageArrowMixin",
 		"HaemorrhageWoundMixin",
 		"ItemUseGateMixin",
+		"NumbingFlinchMixin",
+		"NumbingImpactMixin",
+		"NumbingPainMixin",
 		"OfferGateMixin",
+		"SedationConsciousnessMixin",
+		"SedationDoseMixin",
+		"SedationDraughtMixin",
+		"SedationKnockdownMixin",
 		"TradeGateMixin"
 	],
 	"injectors": {

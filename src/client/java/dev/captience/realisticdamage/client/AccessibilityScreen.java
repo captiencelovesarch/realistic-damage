@@ -196,7 +196,9 @@ public class AccessibilityScreen extends OptionsSubScreen {
 		this.list.addSmall(
 				slider("realisticdamage.config.low_health",
 						config::lowHealthEffects, value -> config.lowHealthEffectsValue = value),
-				null);
+				// Sedation's eyelids (2.0 field kit): something that happens to you.
+				slider("realisticdamage.config.sedation_effects",
+						config::sedationEffects, value -> config.sedationEffectsValue = value));
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.blood"));
 		// The master first and on its own row: everything under it is a share of

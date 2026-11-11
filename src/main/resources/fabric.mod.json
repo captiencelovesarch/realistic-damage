@@ -80,7 +80,8 @@
 			"dev.captience.realisticdamage.gametest.ScreamGameTest",
 			"dev.captience.realisticdamage.gametest.AfflictionsGameTest",
 			"dev.captience.realisticdamage.fieldkit.gametest.FieldKitSwitchGameTest",
-			"dev.captience.realisticdamage.fieldkit.gametest.BrewedEffectsGameTest"
+			"dev.captience.realisticdamage.fieldkit.gametest.BrewedEffectsGameTest",
+			"dev.captience.realisticdamage.fieldkit.gametest.SedationNumbingGameTest"
 		]
 	},
 	"mixins": [

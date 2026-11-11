@@ -1451,4 +1451,41 @@ public final class Balance {
 	public static final double ADRENALINE_BLEED_FACTOR = 1.3;
 	/** The heart races at least this hard (Cardio's health distress, 0-1) while it lasts. */
 	public static final double ADRENALINE_HEART_DISTRESS = 0.6;
+
+	// Sedation (Weapons): a dose builds into a level; level over body size is the stage.
+	/** The drinkable potion's length, ticks. A tipped arrow carries an eighth of it. */
+	public static final int SEDATION_TICKS = 800;
+	/** An application this long or longer is one whole dose: a tipped arrow's share of the potion. */
+	public static final int SEDATION_DOSE_TICKS = 100;
+	/** How long a dose takes to take hold, ticks (the eyelids get heavy, then you go). */
+	public static final int SEDATION_ABSORB_TICKS = 200;
+	/** How long the body takes to clear one dose once it has taken hold, ticks. */
+	public static final int SEDATION_CLEAR_TICKS = 2400;
+	/** Stage bars, in doses per unit of body size (a zombie or a player is 1, a ravager 5). */
+	public static final double SEDATION_DROWSY = 0.25;
+	public static final double SEDATION_STUMBLING = 0.5;
+	public static final double SEDATION_OUT = 0.85;
+	public static final double SEDATION_OVERDOSE = 2.5;
+	/**
+	 * The highest consciousness each stage allows. Drowsy sits among the first
+	 * symptoms; stumbling sits just above the wake bar and just under the
+	 * microsleep one, so a body can wake into it and still nod off; out is zero.
+	 */
+	public static final double SEDATION_DROWSY_CAP = 60.0;
+	public static final double SEDATION_STUMBLING_CAP = 21.0;
+	/** Movement lost while drowsy and while stumbling. */
+	public static final double SEDATION_DROWSY_SLOW = 0.15;
+	public static final double SEDATION_STUMBLING_SLOW = 0.30;
+	/** While stumbling, any blow this violent puts the body down (a sober one needs {@link #KNOCKDOWN_BLOW_VIOLENCE}). */
+	public static final double SEDATION_STUMBLING_KNOCKDOWN = 0.02;
+	/** Overdosed and out of breath for the whole hypoxia debt: this much health a second, times body size. */
+	public static final double SEDATION_OVERDOSE_DAMAGE_PER_SEC = 1.0;
+
+	// Numbing (Medicine): no pain, every injury still there.
+	public static final int NUMBING_TICKS = 1200;
+	public static final int NUMBING_LONG_TICKS = 2400;
+	/** Condition a broken leg loses per second of sprinting on it while numb. */
+	public static final double NUMB_SPRINT_LEG_COST = 1.0;
+	/** Condition a broken arm loses per swing while numb. */
+	public static final double NUMB_SWING_ARM_COST = 0.5;
 }

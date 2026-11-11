@@ -40,8 +40,27 @@ public final class BrewedPotions {
 			new Potion("adrenaline", new MobEffectInstance(BrewedEffects.ADRENALINE,
 					Balance.ADRENALINE_POTION_LONG_TICKS)));
 
+	/**
+	 * One whole dose to drink (the sleeping draught), throw or tip; the strong
+	 * brew is two. No long brew: how long it lasts is the body's business.
+	 */
+	public static final Holder<Potion> SEDATION = Kit.potion("sedation",
+			new Potion("sedation", new MobEffectInstance(BrewedEffects.SEDATION, Balance.SEDATION_TICKS)));
+	public static final Holder<Potion> STRONG_SEDATION = Kit.potion("strong_sedation",
+			new Potion("sedation", new MobEffectInstance(BrewedEffects.SEDATION, Balance.SEDATION_TICKS, 1)));
+
+	/** About a minute, or two from the long brew. No strong one: numb is numb. */
+	public static final Holder<Potion> NUMBING = Kit.potion("numbing",
+			new Potion("numbing", new MobEffectInstance(BrewedEffects.NUMBING, Balance.NUMBING_TICKS)));
+	public static final Holder<Potion> LONG_NUMBING = Kit.potion("long_numbing",
+			new Potion("numbing", new MobEffectInstance(BrewedEffects.NUMBING, Balance.NUMBING_LONG_TICKS)));
+
 	public static void init() {
 		FabricPotionBrewingBuilder.BUILD.register(builder -> {
+			builder.registerPotionRecipe(Potions.AWKWARD, Ingredient.of(Items.POPPY), SEDATION);
+			builder.registerPotionRecipe(SEDATION, Ingredient.of(Items.GLOWSTONE_DUST), STRONG_SEDATION);
+			builder.registerPotionRecipe(Potions.AWKWARD, Ingredient.of(Items.PACKED_ICE), NUMBING);
+			builder.registerPotionRecipe(NUMBING, Ingredient.of(Items.REDSTONE), LONG_NUMBING);
 			builder.registerPotionRecipe(Potions.AWKWARD, Ingredient.of(Items.SWEET_BERRIES), HAEMORRHAGE);
 			builder.registerPotionRecipe(HAEMORRHAGE, Ingredient.of(Items.REDSTONE), LONG_HAEMORRHAGE);
 			builder.registerPotionRecipe(HAEMORRHAGE, Ingredient.of(Items.GLOWSTONE_DUST), STRONG_HAEMORRHAGE);

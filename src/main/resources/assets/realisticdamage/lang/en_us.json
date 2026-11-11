@@ -334,5 +334,20 @@
 	"item.minecraft.splash_potion.effect.adrenaline": "Splash Potion of Adrenaline",
 	"item.minecraft.lingering_potion.effect.adrenaline": "Lingering Potion of Adrenaline",
 	"item.minecraft.tipped_arrow.effect.adrenaline": "Arrow of Adrenaline",
-	"realisticdamage.fieldkit.adrenaline.spent": "Your heart can't take another surge yet"
+	"realisticdamage.fieldkit.adrenaline.spent": "Your heart can't take another surge yet",
+	"effect.realisticdamage.sedation": "Sedation",
+	"item.minecraft.potion.effect.sedation": "Sleeping Draught",
+	"item.minecraft.splash_potion.effect.sedation": "Splash Potion of Sedation",
+	"item.minecraft.lingering_potion.effect.sedation": "Lingering Potion of Sedation",
+	"item.minecraft.tipped_arrow.effect.sedation": "Arrow of Sedation",
+	"effect.realisticdamage.numbing": "Numbing",
+	"item.minecraft.potion.effect.numbing": "Potion of Numbing",
+	"item.minecraft.splash_potion.effect.numbing": "Splash Potion of Numbing",
+	"item.minecraft.lingering_potion.effect.numbing": "Lingering Potion of Numbing",
+	"item.minecraft.tipped_arrow.effect.numbing": "Arrow of Numbing",
+	"death.attack.realisticdamage.sedativeOverdose": "%1$s stopped breathing",
+	"death.attack.realisticdamage.sedativeOverdose.player": "%1$s stopped breathing, dosed by %2$s",
+	"realisticdamage.fieldkit.sedation.slept": "You slept it off.",
+	"realisticdamage.config.sedation_effects": "Sedation",
+	"realisticdamage.fieldkit.numb": "Numb"
 }
