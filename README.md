@@ -163,6 +163,7 @@ side. It follows the **Death Camera** toggle.
 | `pvpTraumaMultiplier` | 1.0 | Scales trauma from other players |
 | `enableLimbDestruction` | true | Arcade preset: limbs can be destroyed permanently |
 | `enableExplosiveDismemberment` | true | Extreme TNT and creeper trauma can take the nearest limb outright; nested under limb destruction |
+| `enableDecapitation` | true | An edge on an already-Disabled head takes it off (anything else still crushes it), the most violent lethal blasts throw it, and the head can be picked up and placed but never worn; nested under limb destruction |
 | `enableLongTermInjuries` | false | Worst injuries permanently lower a region's healing ceiling by state band |
 | `enableMobAnatomy` | true | Mobs in the `realisticdamage:has_anatomy` tag (humanoids by default) take regional trauma, bleed, break, lose limbs and collapse like players |
 | `spawnSeveredLimbs` | true | A lost limb is thrown into the world, lands, bleeds for a minute and is gone; nested under limb destruction |

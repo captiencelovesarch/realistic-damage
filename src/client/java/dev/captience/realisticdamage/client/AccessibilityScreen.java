@@ -135,6 +135,16 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.knockdown_ragdolls"),
 								(button, value) -> config.knockdownRagdolls = value));
 		this.list.addSmall(
+				CycleButton.booleanBuilder(
+								Component.translatable("realisticdamage.config.decapitation_view.head"),
+								Component.translatable("realisticdamage.config.decapitation_view.black"),
+								config.decapitationView)
+						.withTooltip(value -> net.minecraft.client.gui.components.Tooltip.create(
+								Component.translatable("realisticdamage.config.decapitation_view.tooltip")))
+						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.decapitation_view"),
+								(button, value) -> config.decapitationView = value),
+				null);
+		this.list.addSmall(
 				CycleButton.onOffBuilder(config.hitFlinches)
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.hit_flinches"),
 								(button, value) -> config.hitFlinches = value),

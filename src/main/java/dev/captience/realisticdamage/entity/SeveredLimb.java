@@ -79,10 +79,10 @@ public class SeveredLimb extends Entity {
 	private static final int AGE_SYNC_INTERVAL = 20;
 
 	// Client-side presentation state: the tumble in flight and the settle on the ground.
-	private float tumble;
-	private float tumbleO;
-	private float lying;
-	private float lyingO;
+	protected float tumble;
+	protected float tumbleO;
+	protected float lying;
+	protected float lyingO;
 	/** Client tick at which AGE last arrived, so age can be interpolated between syncs. */
 	private int ageSyncTick;
 
@@ -109,11 +109,7 @@ public class SeveredLimb extends Entity {
 		SeveredLimb limb = new SeveredLimb(RDEntities.SEVERED_LIMB, level);
 		Vec3 at = BodyHitResolver.regionCenter(player, part);
 		limb.setPos(at.x, at.y, at.z);
-		limb.entityData.set(PART, (byte) part.ordinal());
-		limb.entityData.set(OWNER, player.getUUID().toString());
-		limb.entityData.set(OWNER_TYPE, player instanceof ServerPlayer ? ""
-				: net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(player.getType()).toString());
-		limb.entityData.set(BLOODLESS, !MobAnatomy.bleeds(player));
+		limb.ownedBy(player, part);
 		limb.setYRot(player.getYRot());
 		// The side the limb was on: a left leg with nowhere to be thrown falls
 		// off to the left, clear of the body, rather than dropping inside it.
@@ -124,6 +120,15 @@ public class SeveredLimb extends Entity {
 				player.getId() * 31L + part.ordinal() * 7L + player.tickCount));
 		level.addFreshEntity(limb);
 		return limb;
+	}
+
+	/** Whose part this is and which: the synced fields every lost part carries. */
+	protected void ownedBy(LivingEntity owner, BodyPart part) {
+		entityData.set(PART, (byte) part.ordinal());
+		entityData.set(OWNER, owner.getUUID().toString());
+		entityData.set(OWNER_TYPE, owner instanceof ServerPlayer ? ""
+				: net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(owner.getType()).toString());
+		entityData.set(BLOODLESS, !MobAnatomy.bleeds(owner));
 	}
 
 	/**
@@ -181,22 +186,17 @@ public class SeveredLimb extends Entity {
 		physics();
 	}
 
-	private void serverTick() {
+	protected void serverTick() {
 		if (tickCount % AGE_SYNC_INTERVAL == 0) {
 			entityData.set(AGE, tickCount);
 		}
 		// Fire and lava burn it away. isInLava is checked as well as isOnFire
 		// because Entity.baseTick only lights a lava-touching entity through a
 		// hurt call this entity refuses.
-		if (isOnFire() || isInLava()) {
-			int burn = entityData.get(BURN) + 1;
-			entityData.set(BURN, burn);
-			if (burn >= Balance.LIMB_BURN_TICKS) {
-				discard();
-				return;
-			}
+		if ((isOnFire() || isInLava()) && burnStep()) {
+			return;
 		}
-		if (tickCount >= Balance.LIMB_LIFETIME_TICKS) {
+		if (tickCount >= lifetime()) {
 			discard();
 		}
 	}
@@ -223,7 +223,27 @@ public class SeveredLimb extends Entity {
 					velocity.z);
 		}
 		setDeltaMovement(velocity);
-		// Presentation: spin while it flies, settle flat once it stops.
+		present(velocity);
+	}
+
+	/** One tick further along burning away; true, and discarded, once it has gone. */
+	protected boolean burnStep() {
+		int burn = entityData.get(BURN) + 1;
+		entityData.set(BURN, burn);
+		if (burn >= Balance.LIMB_BURN_TICKS) {
+			discard();
+			return true;
+		}
+		return false;
+	}
+
+	/** Ticks it lies there before it is gone. */
+	protected int lifetime() {
+		return Balance.LIMB_LIFETIME_TICKS;
+	}
+
+	/** Presentation: spin while it flies, settle flat once it stops. */
+	protected void present(Vec3 velocity) {
 		boolean resting = onGround() && velocity.horizontalDistanceSqr() < 1.0e-4;
 		if (resting) {
 			lying = Math.min(1.0F, lying + 0.2F);
@@ -301,7 +321,7 @@ public class SeveredLimb extends Entity {
 
 	/** How much of its minute is left, 1 fresh to 0 gone; the renderer fades on the last of it. */
 	public double remaining() {
-		return Math.clamp(1.0 - age() / (double) Balance.LIMB_LIFETIME_TICKS, 0.0, 1.0);
+		return Math.clamp(1.0 - age() / (double) lifetime(), 0.0, 1.0);
 	}
 
 	public float tumble(float partialTick) {

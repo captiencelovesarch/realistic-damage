@@ -24,14 +24,32 @@ public interface HiddenLimbs {
 	/** Restores what was hidden last time, then hides {@code destroyed} limbs, recording them. Parts may be null. */
 	static void apply(HiddenLimbs model, int destroyed, ModelPart leftArm, ModelPart rightArm,
 			ModelPart leftLeg, ModelPart rightLeg) {
+		apply(model, destroyed, null, leftArm, rightArm, leftLeg, rightLeg);
+	}
+
+	/**
+	 * As above, with the head (2.0): hidden only when it came off
+	 * ({@link LimbStateExtractor#HEADLESS}), never for a crushed skull, which
+	 * is still on the shoulders. Its hat, nose and hood are its children and go
+	 * with it.
+	 */
+	static void apply(HiddenLimbs model, int destroyed, ModelPart head, ModelPart leftArm, ModelPart rightArm,
+			ModelPart leftLeg, ModelPart rightLeg) {
 		int previous = model.realisticdamage$hidden();
 		if (previous != 0) {
+			if (head != null && LimbStateExtractor.gone(previous, BodyPart.HEAD)) {
+				head.visible = true;
+			}
 			restore(previous, BodyPart.LEFT_ARM, leftArm);
 			restore(previous, BodyPart.RIGHT_ARM, rightArm);
 			restore(previous, BodyPart.LEFT_LEG, leftLeg);
 			restore(previous, BodyPart.RIGHT_LEG, rightLeg);
 		}
 		int hidden = 0;
+		if (head != null && (destroyed & LimbStateExtractor.HEADLESS) != 0 && head.visible) {
+			head.visible = false;
+			hidden |= 1 << BodyPart.HEAD.ordinal();
+		}
 		hidden |= hide(destroyed, BodyPart.LEFT_ARM, leftArm);
 		hidden |= hide(destroyed, BodyPart.RIGHT_ARM, rightArm);
 		hidden |= hide(destroyed, BodyPart.LEFT_LEG, leftLeg);

@@ -96,6 +96,12 @@ public final class Corpses {
 			}
 			double v = DeathMath.violenceFromBlow(blast.amount(), body.getMaxHealth());
 			Vec3 centre = new Vec3(blast.x(), blast.y(), blast.z());
+			// At its most violent a blast takes the head with the limbs (2.0).
+			if (v >= Balance.DECAP_BLAST_VIOLENCE && ServerConfig.get().enableExplosiveDismemberment
+					&& Decapitation.can(body, data)) {
+				Decapitation.sever(body, data,
+						BodyHitResolver.regionCenter(body, BodyPart.HEAD).subtract(centre), true, null);
+			}
 			if (v >= GORE_BURST_VIOLENCE && ServerConfig.get().enableBleeding && MobAnatomy.bleeds(body)) {
 				// What is left of the body comes apart too: a burst from the torso,
 				// out along the blast.
@@ -135,6 +141,15 @@ public final class Corpses {
 					hitDir = direction(body.position().subtract(direct.position()).multiply(1.0, 0.0, 1.0));
 				} else if (source.getSourcePosition() != null) {
 					hitDir = direction(body.position().subtract(source.getSourcePosition()).multiply(1.0, 0.0, 1.0));
+				}
+				// The killing edge on a ruined head (2.0): the pipeline never saw this
+				// blow, so the finish-off rule never could. The head's state is still
+				// the one it was in before the blow landed.
+				var head = data.part(BodyPart.HEAD);
+				if (hitPart == BodyPart.HEAD && ServerConfig.get().enableHitLocation
+						&& Decapitation.takes(classified.category(), head.state(), head.destroyed(), true, 0.0)
+						&& Decapitation.can(body, data)) {
+					Decapitation.sever(body, data, hitDir, false, source.getEntity());
 				}
 				if (hitDir.lengthSqr() > 0.0) {
 					kick = shot

@@ -390,6 +390,10 @@ public final class DeathCamera {
 		double style = ClientEffectsConfig.get().realisticDeath
 				? Balance.DEATH_FADE_SECONDS_REALISTIC : Balance.DEATH_FADE_SECONDS;
 		double sequenceTicks = DeathMath.fadeSeconds(style, ClientState.deathViolence()) * 20.0;
+		if (ClientState.headless() && HeadView.wanted()) {
+			sequenceTicks = (ClientEffectsConfig.get().realisticDeath
+					? Balance.DECAP_FADE_SECONDS_REALISTIC : Balance.DECAP_FADE_SECONDS) * 20.0;
+		}
 		return Mth.clamp((int) Math.round(sequenceTicks * SCREEN_DELAY_SHARE), SCREEN_DELAY_MIN, SCREEN_DELAY_MAX);
 	}
 

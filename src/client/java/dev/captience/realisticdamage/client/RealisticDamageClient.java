@@ -75,6 +75,15 @@ public class RealisticDamageClient implements ClientModInitializer {
 		// The lost limb lying where it fell (1.6.2).
 		net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
 				dev.captience.realisticdamage.RDEntities.SEVERED_LIMB, SeveredLimbRenderer::new);
+		// ...and a head (2.0), which can be taken.
+		net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(
+				dev.captience.realisticdamage.RDEntities.SEVERED_HEAD, SeveredHeadRenderer::new);
+		net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
+			if (dev.captience.realisticdamage.RDComponents.severed(stack)) {
+				lines.add(net.minecraft.network.chat.Component.translatable("item.realisticdamage.severed")
+						.withStyle(net.minecraft.ChatFormatting.GRAY));
+			}
+		});
 
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.ImpactPayload.TYPE,
@@ -94,6 +103,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 				(payload, context) -> {
 					ClientState.setDeathViolence(payload.violence());
 					ClientState.setDeathKind(payload.kind());
+					ClientState.setHeadless(payload.headless());
 				});
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.CorpsePayload.TYPE,

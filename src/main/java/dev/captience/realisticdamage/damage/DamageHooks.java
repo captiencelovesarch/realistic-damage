@@ -31,6 +31,11 @@ public final class DamageHooks {
 				return;
 			}
 			RealisticDamageData data = RDAttachments.get(entity);
+			// A headless zombie walks on only until something hits it (2.0); the
+			// sun burning it is not a blow.
+			if (data.headlessTicks() > 0 && (source.getEntity() != null || source.getDirectEntity() != null)) {
+				data.setHeadlessTicks(0);
+			}
 			double applied = data.consumePreHurt(entity.getHealth());
 			if (applied < 0) {
 				applied = damageTaken; // no capture (shouldn't happen) — degrade to the pre-armor amount
@@ -51,7 +56,8 @@ public final class DamageHooks {
 			if (entity instanceof ServerPlayer player && participates(player)) {
 				if (!isInternal(source)) {
 					scoreDeathViolence(player, RDAttachments.get(player), source, amount);
-				} else if (source.is(RDDamageTypes.SKULL_CRUSHED) || source.is(RDDamageTypes.CHEST_CRUSHED)) {
+				} else if (source.is(RDDamageTypes.SKULL_CRUSHED) || source.is(RDDamageTypes.CHEST_CRUSHED)
+						|| source.is(RDDamageTypes.DECAPITATED)) {
 					// A destroyed head or torso is the mod's own damage, so the scoring
 					// above never saw it and "crushed beyond saving" by an iron golem
 					// got a bleed-out's slow fade (1.7 fix). There is no more violent
@@ -75,11 +81,13 @@ public final class DamageHooks {
 			double violence = RDAttachments.get(player).consumeDeathViolence(player.tickCount);
 			lastDeathKind = DeathKind.of(source);
 			lastDeathViolence = violence;
+			// Read after Corpses.died, which is where a killing edge takes the head.
+			boolean headless = RDAttachments.get(player).headSevered();
 			if (player.connection != null
 					&& net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
 							player, dev.captience.realisticdamage.net.DeathPayload.TYPE)) {
 				net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-						new dev.captience.realisticdamage.net.DeathPayload((float) violence, lastDeathKind));
+						new dev.captience.realisticdamage.net.DeathPayload((float) violence, lastDeathKind, headless));
 			}
 		});
 	}

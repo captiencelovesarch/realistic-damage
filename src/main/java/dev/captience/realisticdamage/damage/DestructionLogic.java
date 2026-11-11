@@ -69,6 +69,17 @@ public final class DestructionLogic {
 	 */
 	public static boolean evaluate(LivingEntity player, RealisticDamageData data,
 			List<TraumaPipeline.AppliedTrauma> traumas, Vec3 blowDirection) {
+		return evaluate(player, data, traumas, blowDirection, null, null);
+	}
+
+	/**
+	 * As above, knowing what the blow was (2.0): an edge that finishes a head
+	 * takes it off ({@link Decapitation}) instead of crushing it.
+	 */
+	public static boolean evaluate(LivingEntity player, RealisticDamageData data,
+			List<TraumaPipeline.AppliedTrauma> traumas, Vec3 blowDirection,
+			@org.jspecify.annotations.Nullable DamageCategory category,
+			net.minecraft.world.entity.@org.jspecify.annotations.Nullable Entity by) {
 		boolean destroyed = false;
 		for (TraumaPipeline.AppliedTrauma trauma : traumas) {
 			if (!trauma.primary()) {
@@ -82,6 +93,10 @@ public final class DestructionLogic {
 			// by what it was worth, not by what the part could still lose.
 			if (trauma.attempted() < threshold(trauma.part())) {
 				continue;
+			}
+			if (trauma.part() == BodyPart.HEAD && Decapitation.edged(category) && Decapitation.can(player, data)) {
+				Decapitation.decapitate(player, data, blowDirection, by);
+				return true;
 			}
 			// ...and judge the stump by the other half of the same record: what the
 			// part did lose says whether the limb was still standing when the blow

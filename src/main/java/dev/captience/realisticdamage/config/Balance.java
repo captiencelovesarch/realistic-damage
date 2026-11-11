@@ -274,6 +274,32 @@ public final class Balance {
 	/** ...and the ceiling on that, so a gout does not fog a whole pool. */
 	public static final double DROP_DISSOLVE_SIZE_MAX = 0.34;
 
+	// Decapitation (2.0).
+	/** A lethal blast at least this violent takes the head too: the limbs' top bar. */
+	public static final double DECAP_BLAST_VIOLENCE = 0.88;
+	/** How long a headless zombie of ordinary size walks on, and the most any does. */
+	public static final int HEADLESS_WALK_TICKS = 60;
+	public static final int HEADLESS_WALK_TICKS_MAX = 100;
+	/** How hard it lurches along, blocks a tick, and how far its heading wanders, degrees a tick. */
+	public static final double HEADLESS_WALK_SPEED = 0.055;
+	public static final double HEADLESS_WANDER = 9.0;
+	/** A head you can take lies as long as a dropped item; it can be picked up after this. */
+	public static final int HEAD_LIFETIME_TICKS = 6000;
+	public static final int HEAD_PICKUP_DELAY_TICKS = 20;
+	/**
+	 * A wither skeleton's skull hisses and flashes for this long before it
+	 * either burns away or drops, and it drops as often as vanilla drops one:
+	 * 2.5% of player kills, one point more for each level of Looting.
+	 */
+	public static final int WITHER_SKULL_HISS_TICKS = 30;
+	public static final double WITHER_SKULL_CHANCE = 0.025;
+	public static final double WITHER_SKULL_CHANCE_PER_LOOTING = 0.01;
+	/** The death fade when your head came off: Grounded is brief, Arcade lets you watch. */
+	public static final double DECAP_FADE_SECONDS_REALISTIC = 2.0;
+	public static final double DECAP_FADE_SECONDS = 4.0;
+	/** ...and in VR, or with the view set to cut to black: gone before the head lands. */
+	public static final double DECAP_FADE_SECONDS_CUT = 0.15;
+
 	// The severed limb (1.6.2): a thrown, bleeding, burnable object.
 	/** Ticks the limb lies there before it is gone: a minute. */
 	public static final int LIMB_LIFETIME_TICKS = 1200;

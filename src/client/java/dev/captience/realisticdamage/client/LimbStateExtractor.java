@@ -22,12 +22,19 @@ import net.minecraft.world.item.ItemStack;
 public final class LimbStateExtractor {
 	private LimbStateExtractor() {}
 
+	/**
+	 * Set beside the regions' bits in a render state's destroyed mask when the
+	 * head came off (2.0). A crushed skull is Destroyed too but stays on, so
+	 * the head's own bit cannot say which.
+	 */
+	public static final int HEADLESS = 1 << 6;
+
 	public static final int DOWN_UNCONSCIOUS = 1;
 	public static final int DOWN_KNOCKED = 2;
 
 	public static void extract(LivingEntity entity, LivingEntityRenderState state) {
 		BodySnapshot snapshot = entity.getAttached(RDAttachments.SNAPSHOT);
-		int destroyedMask = snapshot == null ? 0 : snapshot.destroyedMask();
+		int destroyedMask = snapshot == null ? 0 : snapshot.destroyedMask() | (snapshot.headless() ? HEADLESS : 0);
 		LimbStateHolder limbs = (LimbStateHolder) state;
 		limbs.realisticdamage$setDestroyedMask(destroyedMask);
 		limbs.realisticdamage$setBrokenMask(snapshot == null ? 0 : snapshot.brokenMask());
@@ -54,6 +61,15 @@ public final class LimbStateExtractor {
 		int destroyedMask = snapshot.destroyedMask();
 		hideDestroyedHand(state, destroyedMask, HumanoidArm.RIGHT);
 		hideDestroyedHand(state, destroyedMask, HumanoidArm.LEFT);
+		if (snapshot.headless()) {
+			// Nothing to wear a helmet, a pumpkin or a skull on (2.0).
+			state.headItem.clear();
+			state.wornHeadType = null;
+			state.wornHeadProfile = null;
+			if (state instanceof net.minecraft.client.renderer.entity.state.HumanoidRenderState humanoid) {
+				humanoid.headEquipment = net.minecraft.world.item.ItemStack.EMPTY;
+			}
+		}
 	}
 
 	/**

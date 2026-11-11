@@ -28,7 +28,19 @@ public final class RDEntities {
 			.clientTrackingRange(10)
 			.build(SEVERED_LIMB_KEY);
 
+	public static final ResourceKey<EntityType<?>> SEVERED_HEAD_KEY =
+			ResourceKey.create(Registries.ENTITY_TYPE, RealisticDamage.id("severed_head"));
+	/** A head off its body (2.0): head-sized, and kept as long as a dropped item when it is a trophy. */
+	public static final EntityType<dev.captience.realisticdamage.entity.SeveredHead> SEVERED_HEAD = EntityType.Builder
+			.of(dev.captience.realisticdamage.entity.SeveredHead::new, MobCategory.MISC)
+			.sized(0.45F, 0.45F)
+			.noSave()
+			.noSummon()
+			.clientTrackingRange(10)
+			.build(SEVERED_HEAD_KEY);
+
 	public static void init() {
 		Registry.register(BuiltInRegistries.ENTITY_TYPE, SEVERED_LIMB_KEY, SEVERED_LIMB);
+		Registry.register(BuiltInRegistries.ENTITY_TYPE, SEVERED_HEAD_KEY, SEVERED_HEAD);
 	}
 }

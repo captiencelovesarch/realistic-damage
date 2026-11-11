@@ -267,6 +267,21 @@ public final class MobAnatomy {
 
 	/** The per-tick systems a mob body runs, in the same order a player's does. */
 	public static void tickBody(LivingEntity mob, RealisticDamageData data) {
+		if (data.part(BodyPart.HEAD).destroyed()) {
+			// No living body keeps a lost head (2.0): a headless zombie walks its
+			// few seconds out and drops; anything else (one saved mid-stride, whose
+			// walk was never saved) dies now.
+			if (data.headlessTicks() > 0 && mob instanceof Mob walker) {
+				walkHeadless(walker, data);
+			} else {
+				net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) mob.level();
+				mob.hurtServer(level, data.headSevered()
+						? dev.captience.realisticdamage.damage.RDDamageTypes.decapitated(level, null)
+						: dev.captience.realisticdamage.damage.RDDamageTypes.coreDestroyed(level, BodyPart.HEAD),
+						Float.MAX_VALUE);
+				return;
+			}
+		}
 		for (BodyPartData part : data.allParts()) {
 			part.tickStrain();
 		}
@@ -285,6 +300,34 @@ public final class MobAnatomy {
 			ground(thinking, data);
 		}
 		RDAttachments.pushSnapshot(mob);
+	}
+
+	/**
+	 * Blind, and still going (2.0): no target, no path, arms out, lurching on
+	 * along a heading that weaves from side to side. {@link #down} keeps its
+	 * own AI from moving or striking; the push here is the only thing that does.
+	 */
+	private static void walkHeadless(Mob mob, RealisticDamageData data) {
+		mob.setTarget(null);
+		mob.getNavigation().stop();
+		mob.setAggressive(true);
+		float yaw = mob.getYRot() + (float) (Math.sin((mob.tickCount + mob.getId()) * 0.35) * Balance.HEADLESS_WANDER);
+		mob.setYRot(yaw);
+		mob.setYBodyRot(yaw);
+		mob.setYHeadRot(yaw);
+		if (mob.onGround() || mob.isInWater()) {
+			net.minecraft.world.phys.Vec3 ahead = net.minecraft.world.phys.Vec3.directionFromRotation(0.0F, yaw)
+					.scale(Balance.HEADLESS_WALK_SPEED);
+			net.minecraft.world.phys.Vec3 v = mob.getDeltaMovement();
+			mob.setDeltaMovement(ahead.x, v.y, ahead.z);
+		}
+		data.setHeadlessTicks(data.headlessTicks() - 1);
+	}
+
+	/** Whether this mob is walking on without its head; for the gametests. */
+	public static boolean headless(LivingEntity mob) {
+		RealisticDamageData data = mob.getAttached(RDAttachments.DATA);
+		return data != null && data.headlessTicks() > 0;
 	}
 
 	/**
@@ -378,7 +421,7 @@ public final class MobAnatomy {
 			return false;
 		}
 		RealisticDamageData data = entity.getAttached(RDAttachments.DATA);
-		return data != null && (data.unconscious() || data.knockedDown());
+		return data != null && (data.unconscious() || data.knockedDown() || data.headlessTicks() > 0);
 	}
 
 	/** Can this mob still swing at something? Not with both arms gone. */

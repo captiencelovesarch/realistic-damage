@@ -91,6 +91,15 @@ public final class ServerConfig {
 	public boolean enableExplosiveDismemberment = true;
 
 	/**
+	 * Heads come off (2.0). An edge that lands on an already-Disabled head
+	 * takes it off rather than crushing it, a lethal blast at its most violent
+	 * throws it, and the head lands, rolls and can be picked up. Under
+	 * {@link #enableLimbDestruction} like everything else that removes a part:
+	 * without destruction a head is never destroyed in the first place.
+	 */
+	public boolean enableDecapitation = true;
+
+	/**
 	 * Mobs have bodies too (1.7): every entity type in the
 	 * {@code realisticdamage:has_anatomy} tag takes regional trauma, bleeds,
 	 * breaks, loses limbs, is concussed and collapses through the same pipeline

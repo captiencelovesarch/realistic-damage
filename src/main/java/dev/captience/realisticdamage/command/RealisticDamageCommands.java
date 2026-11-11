@@ -110,6 +110,11 @@ public final class RealisticDamageCommands {
 				.then(literal("destroy")
 						.then(argument("player", EntityArgument.player())
 								.then(partArg().executes(RealisticDamageCommands::destroyPart))))
+				// 2.0: takes the head off a player or any mob with a body, for testing.
+				.then(literal("behead")
+						.executes(ctx -> behead(ctx, java.util.List.of(ctx.getSource().getPlayerOrException())))
+						.then(argument("targets", EntityArgument.entities())
+								.executes(ctx -> behead(ctx, EntityArgument.getEntities(ctx, "targets")))))
 				.then(literal("ceiling")
 						.then(argument("player", EntityArgument.player())
 								.then(argument("part", StringArgumentType.word())
@@ -236,6 +241,37 @@ public final class RealisticDamageCommands {
 		}
 		ctx.getSource().sendSuccess(() -> Component.literal(out.toString()), false);
 		return 1;
+	}
+
+	/** Takes the head off each target that can lose one, as an edge on a ruined head would. */
+	private static int behead(CommandContext<CommandSourceStack> ctx,
+			java.util.Collection<? extends net.minecraft.world.entity.Entity> targets) {
+		int done = 0;
+		for (net.minecraft.world.entity.Entity target : targets) {
+			if (!(target instanceof net.minecraft.world.entity.LivingEntity body) || !body.isAlive()
+					|| !dev.captience.realisticdamage.systems.MobAnatomy.participates(body)) {
+				continue;
+			}
+			var data = RDAttachments.get(body);
+			if (!dev.captience.realisticdamage.damage.Decapitation.can(body, data)) {
+				continue;
+			}
+			data.part(BodyPart.HEAD).setCondition(0.0);
+			net.minecraft.world.entity.Entity by = ctx.getSource().getEntity();
+			net.minecraft.world.phys.Vec3 blow = by == null ? net.minecraft.world.phys.Vec3.ZERO
+					: body.position().subtract(by.position()).multiply(1.0, 0.0, 1.0);
+			dev.captience.realisticdamage.damage.Decapitation.decapitate(body, data,
+					blow.lengthSqr() < 1.0e-6 ? blow : blow.normalize(), by == body ? null : by);
+			done++;
+		}
+		final int count = done;
+		if (count == 0) {
+			ctx.getSource().sendFailure(Component.literal("No head to take: the target needs a body, a head, "
+					+ "and decapitation switched on (it sits under limb destruction)"));
+			return 0;
+		}
+		ctx.getSource().sendSuccess(() -> Component.literal("Took " + count + (count == 1 ? " head" : " heads")), true);
+		return count;
 	}
 
 	private static int setPart(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {

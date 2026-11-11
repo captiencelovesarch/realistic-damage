@@ -20,7 +20,8 @@
 		"ServerExplosionMixin",
 		"SnowGolemThrowMixin",
 		"SkeletonShootMixin",
-		"TotemDeathProtectionMixin"
+		"TotemDeathProtectionMixin",
+		"SeveredSkullDropMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

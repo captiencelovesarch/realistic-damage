@@ -100,6 +100,15 @@ public final class RealisticDamageData {
 	 * {@code RDCodecs} never sees it.
 	 */
 	private transient @Nullable PendingExplosion pendingExplosion;
+	/**
+	 * The head came off (2.0), as opposed to being crushed: both leave the head
+	 * Destroyed, but only this one leaves a body with nothing on its shoulders.
+	 * Not persisted: a player is dead before anything could save it, and a
+	 * headless zombie that is saved mid-stride is let die on load (MobAnatomy).
+	 */
+	private transient boolean headSevered;
+	/** Ticks a headless zombie has left to walk (2.0). */
+	private transient int headlessTicks;
 	/** Counts down while you are on the ground after a hard landing. */
 	private transient int knockdownTicks;
 	/** ...and then while you are back up but not yet steady. */
@@ -402,6 +411,22 @@ public final class RealisticDamageData {
 		deathViolence = 0.0;
 		deathViolenceTick = Integer.MIN_VALUE;
 		return value;
+	}
+
+	public boolean headSevered() {
+		return headSevered;
+	}
+
+	public void setHeadSevered(boolean severed) {
+		this.headSevered = severed;
+	}
+
+	public int headlessTicks() {
+		return headlessTicks;
+	}
+
+	public void setHeadlessTicks(int ticks) {
+		this.headlessTicks = Math.max(0, ticks);
 	}
 
 	public boolean knockedDown() {

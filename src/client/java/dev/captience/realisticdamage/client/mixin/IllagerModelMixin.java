@@ -70,7 +70,8 @@ public abstract class IllagerModelMixin implements HiddenLimbs {
 		}
 		// Arms are re-shown by vanilla every pose; legs are not, so the mask
 		// remembers what was hidden and restores it for the next body.
-		HiddenLimbs.apply(this, destroyed, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg);
+		HiddenLimbs.apply(this, destroyed, ((net.minecraft.client.model.monster.illager.IllagerModel<?>) (Object) this).getHead(),
+				this.leftArm, this.rightArm, this.leftLeg, this.rightLeg);
 		InjuryPose.applyParts(holder, this.arms.visible ? null : this.leftArm, this.arms.visible ? null : this.rightArm,
 				this.leftLeg, this.rightLeg, state.isRiding ? 0.0F : 1.0F);
 	}

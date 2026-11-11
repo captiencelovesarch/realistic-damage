@@ -1,0 +1,25 @@
+{
+	"replace": false,
+	"values": [
+		"minecraft:mannequin",
+		"minecraft:zombie",
+		"minecraft:husk",
+		"minecraft:drowned",
+		"minecraft:zombie_villager",
+		"minecraft:zombified_piglin",
+		"minecraft:skeleton",
+		"minecraft:stray",
+		"minecraft:wither_skeleton",
+		"minecraft:bogged",
+		{"id": "minecraft:parched", "required": false},
+		"minecraft:piglin",
+		"minecraft:piglin_brute",
+		"minecraft:pillager",
+		"minecraft:vindicator",
+		"minecraft:evoker",
+		"minecraft:illusioner",
+		"minecraft:witch",
+		"minecraft:villager",
+		"minecraft:wandering_trader"
+	]
+}

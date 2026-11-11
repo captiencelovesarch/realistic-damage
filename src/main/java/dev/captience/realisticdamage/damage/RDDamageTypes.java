@@ -23,6 +23,10 @@ public final class RDDamageTypes {
 	public static final ResourceKey<DamageType> SKULL_CRUSHED = ResourceKey.create(
 			Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("realisticdamage", "skull_crushed"));
 
+	/** The head taken off by an edge (2.0). */
+	public static final ResourceKey<DamageType> DECAPITATED = ResourceKey.create(
+			Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("realisticdamage", "decapitated"));
+
 	/** Fatal loss of the torso (Arcade preset limb destruction). */
 	public static final ResourceKey<DamageType> CHEST_CRUSHED = ResourceKey.create(
 			Registries.DAMAGE_TYPE, Identifier.fromNamespaceAndPath("realisticdamage", "chest_crushed"));
@@ -50,6 +54,12 @@ public final class RDDamageTypes {
 
 	public static DamageSource bleedOut(ServerLevel level) {
 		return level.damageSources().source(BLEED_OUT);
+	}
+
+	/** The head came off; credited to whoever swung, when someone did. */
+	public static DamageSource decapitated(ServerLevel level, net.minecraft.world.entity.@org.jspecify.annotations.Nullable Entity by) {
+		return by == null ? level.damageSources().source(DECAPITATED)
+				: level.damageSources().source(DECAPITATED, by);
 	}
 
 	/** The fatal source for destroying a core region — they die differently. */

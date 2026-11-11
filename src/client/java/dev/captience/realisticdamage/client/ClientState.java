@@ -50,6 +50,8 @@ public final class ClientState {
 	 * so deaths the server says nothing about get the slow ending.
 	 */
 	private static double deathViolence;
+	/** This death took the head (2.0): the view rides it, and the fade has its own length. */
+	private static boolean headless;
 	/**
 	 * What kind of death it was (1.7), from the same payload, for the death
 	 * camera's motion. BLOW when the server said nothing — the collapse the death
@@ -81,6 +83,13 @@ public final class ClientState {
 			double seconds = dev.captience.realisticdamage.damage.DeathMath.fadeSeconds(
 					realistic ? Balance.DEATH_FADE_SECONDS_REALISTIC : Balance.DEATH_FADE_SECONDS,
 					deathViolence);
+			if (headless) {
+				// Your head, rolling: Grounded gives you the couple of seconds a
+				// severed head is thought to have, Arcade lets you watch the body go.
+				// Cut to black instead in VR, or when that is what you chose.
+				seconds = !HeadView.wanted() ? Balance.DECAP_FADE_SECONDS_CUT
+						: realistic ? Balance.DECAP_FADE_SECONDS_REALISTIC : Balance.DECAP_FADE_SECONDS;
+			}
 			deathFade = Math.min(1.0, deathFade + 1.0 / (seconds * 20.0));
 			// ...and pre-ages the heart: an overwhelming death starts the run-down
 			// at or past the silent point, so there are no beats at all —
@@ -101,6 +110,7 @@ public final class ClientState {
 			// violence.
 			deathFade = 0.0;
 			deathViolence = 0.0;
+			headless = false;
 			deathKind = dev.captience.realisticdamage.damage.DeathKind.BLOW;
 			HEART.reset();
 		}
@@ -173,6 +183,15 @@ public final class ClientState {
 
 	public static double deathViolence() {
 		return deathViolence;
+	}
+
+	public static void setHeadless(boolean value) {
+		headless = value;
+	}
+
+	/** Whether the death in progress took the head (2.0). */
+	public static boolean headless() {
+		return headless;
 	}
 
 	public static void setDeathKind(dev.captience.realisticdamage.damage.DeathKind kind) {

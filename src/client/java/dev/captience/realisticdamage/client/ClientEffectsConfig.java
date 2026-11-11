@@ -242,6 +242,13 @@ public final class ClientEffectsConfig {
 	public boolean ownRagdoll = true;
 
 	/**
+	 * Losing your head (2.0): true, the view goes with the head as it flies and
+	 * rolls, and you watch your body go down; false cuts straight to black.
+	 * Needs Death View on Ragdoll, and is never the head in VR.
+	 */
+	public boolean decapitationView = true;
+
+	/**
 	 * Knocked down without dying (active ragdolls phase 4): the body falls as a
 	 * ragdoll and gets back up, instead of dropping into the prone pose. Your
 	 * own body only with Death View on Ragdoll, and never in VR.

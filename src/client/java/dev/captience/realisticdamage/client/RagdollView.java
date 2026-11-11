@@ -133,6 +133,12 @@ public final class RagdollView {
 		float partial = Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(false);
 		double dt = deltaTicks / 20.0;
 		boolean onFeet = r.body.controller() != null && r.body.controller().holding();
+		// Your head came off (2.0): the view goes with it, not with the body.
+		dev.captience.realisticdamage.entity.SeveredHead severed = HeadView.wanted() ? HeadView.ownHead() : null;
+		if (severed != null) {
+			onFeet = false;
+			steady = 0.0;
+		}
 		if (!started) {
 			look(player.getYRot(), player.getXRot(), start);
 			view.set(start);
@@ -146,10 +152,18 @@ public final class RagdollView {
 			steady = Math.max(0.0, steady - dt / STEADY_EASE);
 		}
 		// Where the face points, as a camera orientation (forward -Z, up +Y).
-		Quaterniond head = r.body.orientation(HumanoidRagdoll.HEAD, partial, new Quaterniond());
-		Vector3d forward = head.transform(new Vector3d(0.0, 0.0, -1.0));
-		Vector3d up = head.transform(new Vector3d(0.0, -1.0, 0.0));
-		Quaterniond target = basis(forward, up, new Quaterniond());
+		Quaterniond target;
+		if (severed != null) {
+			target = HeadView.orientation(severed, partial, new Quaterniond());
+		} else {
+			// No head in the fall at all (crushed or taken, its entity not here):
+			// the chest stands in, so the view is not left where the head was.
+			int carrier = r.body.present(HumanoidRagdoll.HEAD) ? HumanoidRagdoll.HEAD : HumanoidRagdoll.TORSO;
+			Quaterniond head = r.body.orientation(carrier, partial, new Quaterniond());
+			Vector3d forward = head.transform(new Vector3d(0.0, 0.0, -1.0));
+			Vector3d up = head.transform(new Vector3d(0.0, -1.0, 0.0));
+			target = basis(forward, up, new Quaterniond());
+		}
 		if (steady > 0.0) {
 			// Where you were looking, turned as the chest has turned since.
 			Quaterniond chest = r.body.orientation(HumanoidRagdoll.TORSO, partial, new Quaterniond());
@@ -180,6 +194,12 @@ public final class RagdollView {
 		if (r == null) {
 			return null;
 		}
+		if (HeadView.wanted()) {
+			dev.captience.realisticdamage.entity.SeveredHead severed = HeadView.ownHead();
+			if (severed != null) {
+				return HeadView.eye(severed, partial);
+			}
+		}
 		Vector3d eye = headEye(r, partial, new Vector3d());
 		if (steady > 0.0) {
 			// Where the eyes were on the chest, wherever the head has lolled to since.
@@ -198,6 +218,11 @@ public final class RagdollView {
 
 	/** The eyes in the ragdoll's head, wherever it is between the last two ticks. */
 	private static Vector3d headEye(RagdollCorpse r, float partial, Vector3d out) {
+		if (!r.body.present(HumanoidRagdoll.HEAD)) {
+			// The top of the chest: the neck.
+			Quaterniond chest = r.body.orientation(HumanoidRagdoll.TORSO, partial, new Quaterniond());
+			return chest.transform(out.set(0.0, -6.0, 0.0).mul(r.body.unit)).add(centre(r, HumanoidRagdoll.TORSO, partial));
+		}
 		Quaterniond head = r.body.orientation(HumanoidRagdoll.HEAD, partial, new Quaterniond());
 		return head.transform(out.set(0.0, EYE_Y, EYE_Z).mul(r.body.unit)).add(centre(r, HumanoidRagdoll.HEAD, partial));
 	}
@@ -229,6 +254,7 @@ public final class RagdollView {
 	}
 
 	public static void reset() {
+		HeadView.reset();
 		started = false;
 		roll = 0.0;
 		steady = 0.0;

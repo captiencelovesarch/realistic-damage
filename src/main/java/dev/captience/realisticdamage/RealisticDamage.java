@@ -62,6 +62,8 @@ public class RealisticDamage implements ModInitializer {
 		RDAttachments.init();
 		RDParticles.init();
 		RDEntities.init();
+		RDComponents.init();
+		dev.captience.realisticdamage.damage.Decapitation.init();
 		dev.captience.realisticdamage.systems.TickDispatcher.init();
 		dev.captience.realisticdamage.systems.ImpairmentSystem.init();
 		dev.captience.realisticdamage.systems.ConsciousnessSystem.init();

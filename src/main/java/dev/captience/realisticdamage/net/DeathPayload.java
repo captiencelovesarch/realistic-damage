@@ -24,13 +24,19 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
  * @param violence 0 (slipped away) to 1 (obliterated); see {@code DeathMath}
  * @param kind     what the death looked like from inside; see {@link DeathKind}
  */
-public record DeathPayload(float violence, DeathKind kind) implements CustomPacketPayload {
+public record DeathPayload(float violence, DeathKind kind, boolean headless) implements CustomPacketPayload {
+	/** A death that left the head where it was. */
+	public DeathPayload(float violence, DeathKind kind) {
+		this(violence, kind, false);
+	}
+
 	public static final CustomPacketPayload.Type<DeathPayload> TYPE =
 			new CustomPacketPayload.Type<>(RealisticDamage.id("death"));
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, DeathPayload> CODEC = StreamCodec.composite(
 			ByteBufCodecs.FLOAT, DeathPayload::violence,
 			ByteBufCodecs.VAR_INT.map(DeathKind::byOrdinal, DeathKind::ordinal), DeathPayload::kind,
+			ByteBufCodecs.BOOL, DeathPayload::headless,
 			DeathPayload::new);
 
 	@Override

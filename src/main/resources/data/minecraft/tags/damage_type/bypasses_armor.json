@@ -3,6 +3,7 @@
 	"values": [
 		"realisticdamage:bleed_out",
 		"realisticdamage:skull_crushed",
-		"realisticdamage:chest_crushed"
+		"realisticdamage:chest_crushed",
+		"realisticdamage:decapitated"
 	]
 }

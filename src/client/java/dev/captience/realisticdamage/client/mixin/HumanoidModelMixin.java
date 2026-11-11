@@ -65,6 +65,6 @@ public abstract class HumanoidModelMixin implements HiddenLimbs {
 		// HiddenLimbs, because this model instance draws every mob of its type
 		// and must not carry one body's missing leg onto the next.
 		HiddenLimbs.apply(this, ((LimbStateHolder) state).realisticdamage$destroyedMask(),
-				model.leftArm, model.rightArm, model.leftLeg, model.rightLeg);
+				model.head, model.leftArm, model.rightArm, model.leftLeg, model.rightLeg);
 	}
 }

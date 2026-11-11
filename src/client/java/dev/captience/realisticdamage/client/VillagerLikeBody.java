@@ -19,7 +19,8 @@ public final class VillagerLikeBody {
 		ModelPart leftLeg = root.getChild("left_leg");
 		ModelPart rightLeg = root.getChild("right_leg");
 		LimbStateHolder holder = (LimbStateHolder) state;
-		HiddenLimbs.apply((HiddenLimbs) model, holder.realisticdamage$destroyedMask(), null, null, leftLeg, rightLeg);
+		HiddenLimbs.apply((HiddenLimbs) model, holder.realisticdamage$destroyedMask(), root.getChild("head"),
+				null, null, leftLeg, rightLeg);
 		InjuryPose.applyParts(holder, null, null, leftLeg, rightLeg, 1.0F);
 	}
 }

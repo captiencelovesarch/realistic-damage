@@ -106,6 +106,8 @@ public record BodySnapshot(Regions regions, Meters meters) {
 	public static final int FLAG_RETCHING = 256;
 	/** Out of breath in the adrenaline crash (1.7). */
 	public static final int FLAG_WINDED = 512;
+	/** The head came off (2.0): drawn without one, and a ragdoll without one. */
+	public static final int FLAG_HEADLESS = 1024;
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, BodySnapshot> STREAM_CODEC = StreamCodec.composite(
 			Regions.STREAM_CODEC, BodySnapshot::regions,
@@ -156,7 +158,8 @@ public record BodySnapshot(Regions regions, Meters meters) {
 				| (data.vertigo() ? FLAG_VERTIGO : 0)
 				| (data.vertigo() && data.vertigoLeft() ? FLAG_VERTIGO_LEFT : 0)
 				| (data.retching() ? FLAG_RETCHING : 0)
-				| (data.adrenaline().winded ? FLAG_WINDED : 0);
+				| (data.adrenaline().winded ? FLAG_WINDED : 0)
+				| (data.headSevered() ? FLAG_HEADLESS : 0);
 		return new BodySnapshot(
 				new Regions(
 						quantizeFraction(data.part(BodyPart.HEAD).fraction()),
@@ -303,6 +306,11 @@ public record BodySnapshot(Regions regions, Meters meters) {
 
 	public boolean unconscious() {
 		return (statusFlags() & FLAG_UNCONSCIOUS) != 0;
+	}
+
+	/** Nothing on its shoulders (2.0). */
+	public boolean headless() {
+		return (statusFlags() & FLAG_HEADLESS) != 0;
 	}
 
 	public boolean concussion() {

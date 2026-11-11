@@ -209,7 +209,7 @@ public final class TraumaPipeline {
 		// keep the frame too.
 		boolean limbLost = !taken.isEmpty();
 		if (config.enableLimbDestruction && MobAnatomy.canLoseParts(player)
-				&& DestructionLogic.evaluate(player, data, result, blow)) {
+				&& DestructionLogic.evaluate(player, data, result, blow, classified.category(), source.getEntity())) {
 			limbLost = true;
 		}
 		if (config.enableLongTermInjuries && player instanceof ServerPlayer) {

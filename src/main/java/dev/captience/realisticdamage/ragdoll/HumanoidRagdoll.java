@@ -737,6 +737,11 @@ public final class HumanoidRagdoll {
 		Vector3d local = new Vector3d();
 		Vector3d bestLocal = new Vector3d();
 		for (int i = 0; i < PARTS; i++) {
+			if (!present[i]) {
+				// A part that is gone is not in the fall; what it carried goes on
+				// what is left (a severed head's wound comes out of the neck).
+				continue;
+			}
 			Body b = bodies[i];
 			startQ[i].conjugate(new Quaterniond()).transform(new Vector3d(upright).sub(startX[i]), local);
 			double ox = Math.max(0.0, Math.abs(local.x) - b.hx);
@@ -749,6 +754,11 @@ public final class HumanoidRagdoll {
 				bestLocal.set(local);
 			}
 		}
-		return bodies[best].q.transform(bestLocal, new Vector3d()).add(bodies[best].x);
+		// Onto the part, so a point that belonged to a missing one lands on the
+		// nearest face of what is left rather than in the air where it was.
+		Body b = bodies[best];
+		bestLocal.set(Math.clamp(bestLocal.x, -b.hx, b.hx), Math.clamp(bestLocal.y, -b.hy, b.hy),
+				Math.clamp(bestLocal.z, -b.hz, b.hz));
+		return b.q.transform(bestLocal, new Vector3d()).add(b.x);
 	}
 }

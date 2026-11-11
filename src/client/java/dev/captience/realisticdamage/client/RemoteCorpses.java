@@ -354,6 +354,15 @@ public final class RemoteCorpses {
 	}
 
 	/** For the client gametest: how tall this entity's ragdoll is, its lowest corner to its highest, blocks; -1 for none. */
+	/** Whether this body's ragdoll still has its head in the fall: 1 yes, 0 no, -1 no humanoid ragdoll. For the client gametest. */
+	public static int ragdollHead(Entity entity) {
+		SimulatedCorpse r = RAGDOLLS.get(entity.getId());
+		if (!(r instanceof RagdollCorpse ragdoll)) {
+			return -1;
+		}
+		return ragdoll.body.present(dev.captience.realisticdamage.ragdoll.HumanoidRagdoll.HEAD) ? 1 : 0;
+	}
+
 	public static double ragdollHeight(Entity entity) {
 		SimulatedCorpse r = RAGDOLLS.get(entity.getId());
 		if (r == null) {
