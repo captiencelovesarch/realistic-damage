@@ -266,6 +266,39 @@ public class SedationNumbingGameTest {
 	}
 
 	/**
+	 * One sneak-click with both hands empty takes hold, and keeps it (items.8).
+	 * The game sends that click once per hand when the main hand's does nothing
+	 * on the clicking side, and the second copy used to let go again at once:
+	 * "You let go." the moment you took hold.
+	 */
+	@GameTest(environment = "realisticdamage:fieldkit_held_on", maxTicks = 20)
+	public void aClickOnBothHandsTakesHoldOnce(GameTestHelper helper) {
+		Husk husk = helper.spawn(EntityTypes.HUSK, new BlockPos(2, 2, 2));
+		husk.setNoAi(true);
+		RealisticDamageData data = RDAttachments.get(husk);
+		data.setConsciousness(0.0);
+		data.setUnconscious(true);
+		TestPlayer dragger = player(helper, new Vec3(2.5, 2.0, 4.5), "fk-two-hands");
+		dragger.setShiftKeyDown(true);
+		var use = net.fabricmc.fabric.api.event.player.UseEntityCallback.EVENT.invoker();
+		var first = use.interact(dragger, helper.getLevel(), net.minecraft.world.InteractionHand.MAIN_HAND, husk, null);
+		var second = use.interact(dragger, helper.getLevel(), net.minecraft.world.InteractionHand.OFF_HAND, husk, null);
+		boolean holding = MobDrag.dragging(dragger, husk);
+		helper.runAfterDelay(1, () -> {
+			// The next click, a tick later, is a new one: it lets go.
+			use.interact(dragger, helper.getLevel(), net.minecraft.world.InteractionHand.MAIN_HAND, husk, null);
+			boolean released = !MobDrag.dragging(dragger, husk);
+			gone(dragger);
+			husk.discard();
+			helper.assertTrue(first.consumesAction() && second.consumesAction(),
+					"both hands' copies of the click are consumed: " + first + ", " + second);
+			helper.assertTrue(holding, "one click with both hands empty let go again at once");
+			helper.assertTrue(released, "the next click lets go");
+			helper.succeed();
+		});
+	}
+
+	/**
 	 * Distance along the ground: nothing ticks a test player, so it hangs where
 	 * it spawned while the husk drops to the floor under it.
 	 */

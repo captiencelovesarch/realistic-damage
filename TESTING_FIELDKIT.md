@@ -7,6 +7,23 @@ version numbers: `2.0.0-items.N`. Newest round on top.
 branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
 and is in all three instances. Everything below applies to it unchanged.
 
+## items.8: the ragdoll is the body, and dragging (Nov 12 2026)
+
+The jar is `realistic-damage-2.0.0-items.8.jar`, in "Realistic Damage items"
+(items.7 parked in `mods/replaced-jars/`). Weapons on for dragging.
+
+- [ ] **1. Smooth flight.** Blast a zombie (or knock it flat with an iron
+  golem): it flies and tumbles smoothly again, no jerking.
+- [ ] **2. The hitbox goes with the body.** F3+B while it flies and once it
+  lands: the (low) box travels with the ragdoll and ends up where it lies,
+  even in a hole next to where it was hit.
+- [ ] **3. Dragging.** Sedate a zombie or villager, sneak and right-click the
+  body with empty hands: "You take hold of them." and it comes with you (no
+  "You let go." straight after). Sneak-click again to let go. Same for a
+  downed friend.
+- [ ] **4. Taking a tourniquet or sling off someone** with a sneak-click takes
+  off one thing per click, not two.
+
 ## items.7: the gear you can see (Nov 12 2026)
 
 The jar is `realistic-damage-2.0.0-items.7.jar`, in "Realistic Damage items"

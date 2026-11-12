@@ -96,6 +96,44 @@ public class MobDownGameTest {
 		helper.succeed();
 	}
 
+	/**
+	 * The ragdoll is the body (items.8): where the nearest watcher's ragdoll
+	 * comes to rest, the server puts the downed mob. Not a mob on its feet,
+	 * not one moved farther than a ragdoll could have thrown it, and not
+	 * into a wall.
+	 */
+	@GameTest(environment = "realisticdamage:isolated")
+	public void aDownedMobIsPutWhereItsRagdollLies(GameTestHelper helper) {
+		Zombie zombie = helper.spawn(EntityTypes.ZOMBIE, new BlockPos(2, 1, 2));
+		TestPlayer watcher = TestPlayer.spawn(helper.getLevel(), helper.absoluteVec(new net.minecraft.world.phys.Vec3(2.5, 1.0, 6.5)),
+				0.0F, "rd-ragdoll-watcher");
+		try {
+			zombie.setNoAi(true);
+			net.minecraft.world.phys.Vec3 at = zombie.position();
+			net.minecraft.world.phys.Vec3 lying = at.add(1.5, 0.2, 0.5);
+			boolean standing = dev.captience.realisticdamage.systems.RagdollRest.place(helper.getLevel(), zombie, watcher, lying);
+			helper.assertTrue(!standing, "a mob on its feet was moved to a ragdoll");
+			out(zombie);
+			zombie.tick();
+			boolean far = dev.captience.realisticdamage.systems.RagdollRest.place(helper.getLevel(), zombie, watcher,
+					at.add(12.0, 0.2, 0.0));
+			helper.assertTrue(!far, "a report twelve blocks off was believed");
+			helper.setBlock(new BlockPos(5, 1, 2), net.minecraft.world.level.block.Blocks.STONE);
+			helper.setBlock(new BlockPos(5, 2, 2), net.minecraft.world.level.block.Blocks.STONE);
+			helper.setBlock(new BlockPos(5, 3, 2), net.minecraft.world.level.block.Blocks.STONE);
+			boolean wall = dev.captience.realisticdamage.systems.RagdollRest.place(helper.getLevel(), zombie, watcher,
+					helper.absoluteVec(new net.minecraft.world.phys.Vec3(5.5, 1.2, 2.5)));
+			helper.assertTrue(!wall, "a body was put inside stone");
+			boolean moved = dev.captience.realisticdamage.systems.RagdollRest.place(helper.getLevel(), zombie, watcher, lying);
+			helper.assertTrue(moved && zombie.position().distanceTo(lying.subtract(0.0, 0.2, 0.0)) < 0.05,
+					"the downed zombie was not put where its ragdoll lies: " + zombie.position() + " for " + lying);
+		} finally {
+			zombie.discard();
+			watcher.connection.disconnect(net.minecraft.network.chat.Component.literal("done"));
+		}
+		helper.succeed();
+	}
+
 	@GameTest(environment = "realisticdamage:isolated")
 	public void aKnockedDownZombieStrikesAtNothing(GameTestHelper helper) {
 		Zombie zombie = helper.spawn(EntityTypes.ZOMBIE, AT);

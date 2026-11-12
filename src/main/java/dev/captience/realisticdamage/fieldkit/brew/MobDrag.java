@@ -47,7 +47,15 @@ public final class MobDrag {
 					|| !dragger.isShiftKeyDown() || !player.getItemInHand(hand).isEmpty()) {
 				return InteractionResult.PASS;
 			}
-			return toggle(dragger, mob) ? InteractionResult.SUCCESS_SERVER : InteractionResult.PASS;
+			if (dev.captience.realisticdamage.util.OneClick.handled(dragger)) {
+				// The other hand's copy of a click already acted on.
+				return InteractionResult.SUCCESS_SERVER;
+			}
+			if (!toggle(dragger, mob)) {
+				return InteractionResult.PASS;
+			}
+			dev.captience.realisticdamage.util.OneClick.mark(dragger);
+			return InteractionResult.SUCCESS_SERVER;
 		});
 		ServerTickEvents.END_SERVER_TICK.register(MobDrag::tick);
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> release(handler.player, false));

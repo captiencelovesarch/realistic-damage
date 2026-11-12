@@ -93,7 +93,17 @@ public final class Medicine {
 					|| (Dressings.oldestTourniquet(patient) == null && Dressings.anySling(patient) == null)) {
 				return InteractionResult.PASS;
 			}
-			return loosen(player, patient) ? InteractionResult.SUCCESS_SERVER : InteractionResult.PASS;
+			if (player instanceof net.minecraft.server.level.ServerPlayer medic
+					&& dev.captience.realisticdamage.util.OneClick.handled(medic)) {
+				return InteractionResult.SUCCESS_SERVER;   // the other hand's copy of this click
+			}
+			if (!loosen(player, patient)) {
+				return InteractionResult.PASS;
+			}
+			if (player instanceof net.minecraft.server.level.ServerPlayer medic) {
+				dev.captience.realisticdamage.util.OneClick.mark(medic);
+			}
+			return InteractionResult.SUCCESS_SERVER;
 		});
 		// A treatment on someone goes to the treatment, after the core has had
 		// its say (a hand that can't grip, dragging a body with a sneak) and

@@ -6,6 +6,7 @@ import dev.captience.realisticdamage.damage.DeathKind;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import dev.captience.realisticdamage.net.CorpsePayload;
 import dev.captience.realisticdamage.net.KnockdownPayload;
+import dev.captience.realisticdamage.net.RagdollRestPayload;
 import dev.captience.realisticdamage.ragdoll.HumanoidRagdoll;
 import dev.captience.realisticdamage.ragdoll.physics.Body;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -32,11 +33,12 @@ import org.jspecify.annotations.Nullable;
  * <p>Two stages. <b>Thrown:</b> the ragdoll leads. Your own client carries your
  * real position along with it (movement is yours to report; the knockdown has
  * already taken your steering); everyone else's ragdoll for you, and every
- * mob's, leads its entity by no more than {@link #THROWN_LEAD}. <b>Down:</b>
- * once it has come to rest the entity leads, and the ragdoll is pulled along
- * by its torso wherever the entity goes, never more than {@link #HELD} from
- * it, so a rescuer dragging an unconscious body drags the ragdoll across the
- * ground, and the hitbox is always on the body. Then, the knockdown over, the body awake and
+ * mob's, flies free, kept only loosely near where the entity is. Where it
+ * comes to rest is reported to the server, which puts the mob there
+ * ({@code RagdollRest}): the ragdoll is the body. <b>Down:</b> from then the
+ * entity leads, and the ragdoll is pulled along by its torso wherever the
+ * entity goes, so a rescuer dragging an unconscious body drags the ragdoll
+ * across the ground. Then, the knockdown over, the body awake and
  * still: it gets up, the ragdoll's pose blending into vanilla's standing one
  * over a second. A body with no legs left stays down, as it always has.
  */
@@ -54,18 +56,11 @@ public final class LiveRagdolls {
 	/** Farther than this from the entity, a ragdoll is moved bodily (a teleport, a correction). */
 	private static final double SNAP = 4.0;
 	/**
-	 * Once down, the torso is never farther than this from the entity: the
-	 * whole body is carried the rest of the way, pose and all. The entity's
-	 * hitbox is where everything that touches a body looks (a blow, an arrow,
-	 * a hand reaching to drag it), so the body drawn must stay on it; a softer
-	 * pull left a ragdoll lying blocks from its hitbox, in a pit the entity
-	 * never fell into (items.5 playtest).
+	 * A ragdoll lying still this far from its entity, blocks, reports where it
+	 * lies again (it slid on after it first came to rest); at most once a second.
 	 */
-	static final double HELD = 0.6;
-	/** ...and while thrown, the most the ragdoll may lead its entity by. */
-	static final double THROWN_LEAD = 1.75;
-	/** A torso this far below its entity's feet has fallen somewhere the entity did not: lifted back. */
-	private static final double SUNK = 0.7;
+	private static final double REPORT_DRIFT = 1.0;
+	private static final int REPORT_EVERY = 20;
 
 	static final class Live {
 		final RagdollCorpse ragdoll;
@@ -75,6 +70,8 @@ public final class LiveRagdolls {
 		boolean thrown = true;
 		/** Ticks into the get-up, or -1 before it. */
 		int gettingUp = -1;
+		/** Ticks since this client last told the server where the body lies. */
+		int sinceReport = REPORT_EVERY;
 
 		Live(RagdollCorpse ragdoll, int down) {
 			this.ragdoll = ragdoll;
@@ -191,22 +188,38 @@ public final class LiveRagdolls {
 			}
 
 			RagdollCorpse ragdoll = live.ragdoll;
+			Body torsoBefore = ragdoll.body.body(HumanoidRagdoll.TORSO);
+			double bx = torsoBefore.x.x;
+			double by = torsoBefore.x.y;
+			double bz = torsoBefore.x.z;
 			ragdoll.tick(timeScale);
 			boolean rested = ragdoll.body.asleep() || (live.age > 15 && ragdoll.body.sim.maxMotion() < 0.4);
+			live.sinceReport++;
+			// The ragdoll is the body (RagdollRest): the client the server
+			// listens to for this mob tells it where, every tick in flight and
+			// where it comes to rest, and its ragdoll is never pulled back.
+			boolean reporter = reporter(body);
 			if (live.thrown && (rested || live.age > MAX_THROWN_TICKS)) {
 				live.thrown = false;
+				if (reporter) {
+					report(body, ragdoll, live);
+				}
+			} else if (reporter && (live.thrown || (rested && live.sinceReport >= REPORT_EVERY
+					&& apart(body) > REPORT_DRIFT))) {
+				report(body, ragdoll, live);
 			}
 			if (live.thrown) {
 				if (body == Minecraft.getInstance().player) {
 					carry((LocalPlayer) body, ragdoll);
-				} else {
+				} else if (!reporter) {
 					tether(body, ragdoll, 0.4);
-					hold(body, ragdoll, THROWN_LEAD);
 				}
 			} else {
 				tether(body, ragdoll, 1.0);
-				hold(body, ragdoll, HELD);
 			}
+			Body torsoAfter = ragdoll.body.body(HumanoidRagdoll.TORSO);
+			biggestStep = Math.max(biggestStep, Math.sqrt((torsoAfter.x.x - bx) * (torsoAfter.x.x - bx)
+					+ (torsoAfter.x.y - by) * (torsoAfter.x.y - by) + (torsoAfter.x.z - bz) * (torsoAfter.x.z - bz)));
 
 			if (!flagged && live.down <= 0 && !live.thrown && live.age > 10) {
 				if (legless) {
@@ -256,34 +269,46 @@ public final class LiveRagdolls {
 	}
 
 	/**
-	 * Keeps the ragdoll on its entity: past {@code reach} the whole body is
-	 * carried back to it (every part by the same step, so the pose and the
-	 * motion are untouched), and a torso sunk below the entity's feet is
-	 * lifted back up to them.
+	 * Tells the server where this mob's ragdoll lies, so the mob is put there
+	 * (RagdollRest): the ragdoll leads, smooth, and the body follows it. A
+	 * player's position is that player's own client's to report, and it does.
 	 */
-	static void hold(LivingEntity entity, RagdollCorpse ragdoll, double reach) {
+	private static void report(LivingEntity body, RagdollCorpse ragdoll, Live live) {
 		Body torso = ragdoll.body.body(HumanoidRagdoll.TORSO);
-		double dx = entity.getX() - torso.x.x;
-		double dz = entity.getZ() - torso.x.z;
-		double apart = Math.hypot(dx, dz);
-		double mx = 0.0;
-		double mz = 0.0;
-		if (apart > reach) {
-			double k = (apart - reach) / apart;
-			mx = dx * k;
-			mz = dz * k;
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+				new RagdollRestPayload(body.getId(), torso.x.x, torso.x.y, torso.x.z));
+		live.sinceReport = 0;
+		reports++;
+	}
+
+	/**
+	 * Whether this client is the one the server listens to for where this
+	 * body is: a mob (a player reports its own position), and this client's
+	 * player the nearest to it, as the server reckons it.
+	 */
+	private static boolean reporter(LivingEntity body) {
+		Minecraft client = Minecraft.getInstance();
+		return !(body instanceof net.minecraft.world.entity.player.Player) && client.level != null
+				&& client.player != null && client.level.getNearestPlayer(body, 64.0) == client.player
+				&& net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(RagdollRestPayload.TYPE);
+	}
+
+	/** The farthest any live ragdoll's torso has moved in one tick (since the last reset), for the client gametest. */
+	private static double biggestStep;
+
+	public static double biggestStep(boolean reset) {
+		double step = biggestStep;
+		if (reset) {
+			biggestStep = 0.0;
 		}
-		double sunk = entity.getY() - torso.x.y;
-		double my = sunk > SUNK ? sunk - 0.25 : 0.0;
-		if (mx == 0.0 && mz == 0.0 && my == 0.0) {
-			return;
-		}
-		for (int i = 0; i < HumanoidRagdoll.PARTS; i++) {
-			Body b = ragdoll.body.body(i);
-			b.x.add(mx, my, mz);
-			b.tickX.add(mx, my, mz);
-		}
-		ragdoll.body.wake();
+		return step;
+	}
+
+	/** Rest reports sent this session, for the client gametest. */
+	private static long reports;
+
+	public static long reports() {
+		return reports;
 	}
 
 	/** How far this entity's live ragdoll's torso is from it, flat; -1 with none. For the client gametest. */
@@ -294,6 +319,27 @@ public final class LiveRagdolls {
 		}
 		Body torso = live.ragdoll.body.body(HumanoidRagdoll.TORSO);
 		return Math.hypot(entity.getX() - torso.x.x, entity.getZ() - torso.x.z);
+	}
+
+	/** A line about this entity's live ragdoll, for the client gametest's failure messages. */
+	public static String describe(Entity entity) {
+		Live live = of(entity);
+		if (live == null) {
+			return "none";
+		}
+		return "age " + live.age + (live.thrown ? " thrown" : " down") + " apart " + String.format("%.2f", apart(entity))
+				+ (entity instanceof LivingEntity body && reporter(body) ? " reporter" : " not reporter")
+				+ " asleep " + live.ragdoll.body.asleep();
+	}
+
+	/** Where this entity's live ragdoll's torso is, or null. For the client gametest. */
+	public static @Nullable Vec3 torso(Entity entity) {
+		Live live = of(entity);
+		if (live == null) {
+			return null;
+		}
+		Body torso = live.ragdoll.body.body(HumanoidRagdoll.TORSO);
+		return new Vec3(torso.x.x, torso.x.y, torso.x.z);
 	}
 
 	/** Whether the crosshair's pick box for this entity holds its live ragdoll's torso. For the client gametest. */
