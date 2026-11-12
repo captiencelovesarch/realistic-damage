@@ -205,6 +205,7 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 			sedationAndNumbing(context, singleplayer);
 			bleedingKit(context, singleplayer);
 			bonesAndSenses(context, singleplayer);
+			foodAndDrink(context, singleplayer);
 		}
 		context.waitTicks(5);
 		boolean cleared = context.computeOnClient(client -> !RulesView.received());
@@ -460,6 +461,52 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 				server.getPlayerList().getPlayers().getFirst(), dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM));
 		singleplayer.getServer().runCommand("rdmg heal " + name);
 		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
+		context.waitTicks(5);
+	}
+
+	/**
+	 * Phase 4, round 3: drinking for real, with the use key. Spirits double the
+	 * world through the core's afterimage; coffee comes back as its bottle and
+	 * leaves you Caffeinated.
+	 */
+	private void foodAndDrink(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runCommand("rdmg config enableMedicine true");
+		context.waitFor(client -> RulesView.on(Half.MEDICINE), 60);
+		String name = context.computeOnClient(client -> client.player.getName().getString());
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runCommand("effect clear " + name);
+		singleplayer.getServer().runCommand("item replace entity " + name
+				+ " weapon.mainhand with minecraft:potion[potion_contents={potion:\"realisticdamage:spirits\"}]");
+		context.setScreen(() -> null);
+		context.waitTicks(10);
+		context.getInput().holdKey(options -> options.keyUse);
+		context.waitFor(client -> client.player.hasEffect(dev.captience.realisticdamage.fieldkit.medicine.Provisions.TIPSY),
+				80);
+		context.getInput().releaseKey(options -> options.keyUse);
+		context.waitTicks(5);
+		double floor = dev.captience.realisticdamage.config.Balance.SPIRITS_AFTERIMAGE
+				* dev.captience.realisticdamage.client.ClientEffectsConfig.get().afterimageIntensity;
+		double doubled = context.computeOnClient(client -> dev.captience.realisticdamage.client.Afterimage.strength());
+		if (doubled < floor - 0.01) {
+			throw new AssertionError("tipsy, the world should double at " + floor + ", got " + doubled);
+		}
+		singleplayer.getServer().runCommand("effect clear " + name);
+		context.waitFor(client -> dev.captience.realisticdamage.client.Afterimage.strength() < 0.05, 60);
+
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with realisticdamage:coffee");
+		context.waitTicks(5);
+		context.getInput().holdKey(options -> options.keyUse);
+		context.waitFor(client -> client.player.hasEffect(
+				dev.captience.realisticdamage.fieldkit.medicine.Provisions.CAFFEINATED), 80);
+		context.getInput().releaseKey(options -> options.keyUse);
+		context.waitFor(client -> client.player.getMainHandItem().is(net.minecraft.world.item.Items.GLASS_BOTTLE), 20);
+
+		singleplayer.getServer().runCommand("effect clear " + name);
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with air");
+		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
+		// The world is left straight after this stage: let the switch's own
+		// sync (every 10 ticks) land first, so the leaving is all that's tested.
+		context.waitFor(client -> !RulesView.on(Half.MEDICINE), 60);
 		context.waitTicks(5);
 	}
 

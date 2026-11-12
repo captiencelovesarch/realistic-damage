@@ -167,6 +167,21 @@ someone with it and hold to treat them; each lands on the worst wound it can hel
   (they're no protection). Bright light stops making a concussion worse, and the world
   looks darker through them.
 
+**Food and drink** (Medicine, phase 4).
+
+- **Coffee** (cocoa beans + water bottle + sugar; drunk, the bottle comes back):
+  Caffeinated for 3 minutes. Sedation takes you a stage less far (one dart leaves you
+  stumbling, not out), and you don't nod off in microsleeps. Your heart runs faster, so
+  open wounds bleed more.
+- **Spirits** (brew a potato into a water bottle): Tipsy for 2 minutes. A limp and a sore
+  arm slow you half as much, the world doubles as it moves, and wounds bleed a little more.
+- **Blood Sausage** (raw porkchop + blood bag makes a raw one, and the bag's bottle comes
+  back; cook it like pork): a cooked porkchop's worth of food, and 20 more Blood than any
+  other food that size. A bag that has gone off makes nothing.
+- **Iron Tonic** (brew an iron nugget into an awkward potion; redstone makes it last 8
+  minutes): Blood comes back twice as fast for 3 minutes. Like all Blood coming back, it
+  waits until you've stopped bleeding.
+
 ## Playing with it
 
 Injuries show on a small body diagram that fades in when something's wrong. States and

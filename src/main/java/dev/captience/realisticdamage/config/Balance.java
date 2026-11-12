@@ -1546,4 +1546,32 @@ public final class Balance {
 	public static final double STETHOSCOPE_VOLUME = 0.85;
 	/** Tinted goggles: how dark the view goes (alpha of the tint, 0 to 255). */
 	public static final int GOGGLES_TINT_ALPHA = 92;
+
+	// --- Field kit, phase 4 round 3: food and drink (2.0) ---
+
+	/** A bottle of coffee keeps you up for three minutes. */
+	public static final int COFFEE_TICKS = 3600;
+	/**
+	 * Sedation in a caffeinated body counts for this much less, as if the body
+	 * were this much bigger: one arrow leaves it stumbling instead of out.
+	 */
+	public static final double COFFEE_SEDATION_RESIST = 1.5;
+	/** A heart on coffee beats harder: open wounds bleed this much more. */
+	public static final double COFFEE_BLEED_FACTOR = 1.15;
+	/** Your own heart on coffee runs as if under this much distress (Adrenaline's is 0.6). */
+	public static final double COFFEE_HEART_DISTRESS = 0.3;
+	/** A bottle of spirits: two minutes tipsy. */
+	public static final int SPIRITS_TICKS = 2400;
+	/** Tipsy, a limp and a sore arm slow you by this share of what they would. */
+	public static final double SPIRITS_PAIN_FACTOR = 0.5;
+	/** Tipsy, open wounds bleed this much more. */
+	public static final double SPIRITS_BLEED_FACTOR = 1.1;
+	/** Tipsy, the world doubles as it moves: the afterimage at least this strong (before the slider). */
+	public static final double SPIRITS_AFTERIMAGE = 0.35;
+	/** A blood sausage: Blood back on top of what its food gives. */
+	public static final double BLOOD_SAUSAGE_BLOOD = 20.0;
+	/** An iron tonic: Blood comes back this much faster, for three minutes, or eight from the long brew. */
+	public static final double IRON_TONIC_REGEN_FACTOR = 2.0;
+	public static final int IRON_TONIC_TICKS = 3600;
+	public static final int IRON_TONIC_LONG_TICKS = 9600;
 }

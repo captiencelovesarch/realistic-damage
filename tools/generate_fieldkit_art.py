@@ -795,6 +795,311 @@ def preview_items(sprites, title, out_name, neighbours):
     return out
 
 
+
+# --- phase 4, round 3: food and drink ---
+# Spirits and the iron tonic are brewed, so they are vanilla's potion bottle in
+# their own colour, like the phase 3 potions; coffee and the blood sausages are
+# items of their own. Each drink's effect gets an icon.
+
+ROUND3_COLOURS = {
+    "caffeinated": 0x6B4226,
+    "tipsy": 0xD9962B,
+    "iron_tonic": 0xA8432F,
+}
+
+# Vanilla's bottle (glass and cork as in potion.png / honey_bottle.png), filled with coffee.
+COFFEE_PALETTE = {
+    ".": CLEAR,
+    "A": (212, 109, 73, 255), "B": (169, 71, 37, 255), "D": (204, 175, 165, 255), "F": (151, 55, 22, 255),
+    "C": (212, 229, 247, 255), "E": (179, 207, 236, 255), "G": (93, 143, 194, 255), "L": (139, 173, 208, 255),
+    "c": (196, 146, 92, 255),   # crema
+    "m": (120, 76, 44, 255),
+    "M": (88, 52, 28, 255),
+    "N": (64, 36, 18, 255),
+}
+COFFEE = [
+    "................",
+    "................",
+    ".......AAB......",
+    "......CDDDE.....",
+    "......EBBFE.....",
+    ".......E.G......",
+    ".......E.G......",
+    "......C...G.....",
+    ".....CcEcccG....",
+    "....CmEMMMMNG...",
+    "....CmEMMMNNG...",
+    "....EmMMMMLNG...",
+    "....GMMMMMLNG...",
+    ".....GMNNLNG....",
+    "......GGGGG.....",
+    "................",
+]
+
+
+def coffee_sprite():
+    im = Image.new("RGBA", (16, 16))
+    im.putdata([COFFEE_PALETTE[c] for row in COFFEE for c in row])
+    return im
+
+
+SAUSAGE_SPANS = {2: (10, 12), 3: (9, 13), 4: (8, 13), 5: (7, 12), 6: (6, 11), 7: (5, 10),
+         8: (4, 9), 9: (3, 8), 10: (2, 7), 11: (2, 6), 12: (3, 5)}
+
+def sausage_grid():
+    grid = blank16()
+    for y, (l, r) in SAUSAGE_SPANS.items():
+        for x in range(l, r + 1):
+            i, n = x - l, r - l + 1
+            grid[y][x] = "H" if i == 0 or (i == 1 and n >= 5) else ("D" if i >= n - 2 and n >= 4 else ("d" if i == n - 1 else "R"))
+    for (x, y) in ((8, 5), (6, 7), (9, 7), (5, 9)):
+        grid[y][x] = "F"
+    # The ties: each end pinched into string, a tail beyond it.
+    for (x, y) in ((11, 2), (12, 2)):
+        grid[y][x] = "T"
+    grid[2][10] = "."
+    grid[2][13] = "t"
+    for (x, y) in ((3, 12), (4, 12)):
+        grid[y][x] = "T"
+    grid[12][5] = "."
+    grid[12][2] = "t"
+    return outline16(grid, "K")
+
+RAW_SAUSAGE = {".": CLEAR, "K": (60, 12, 26, 255), "H": (164, 58, 82, 255), "R": (120, 26, 48, 255),
+       "D": (90, 18, 36, 255), "d": (72, 14, 30, 255), "F": (236, 196, 196, 255),
+       "T": (226, 218, 196, 255), "t": (196, 186, 162, 255)}
+COOKED_SAUSAGE = {".": CLEAR, "K": (30, 16, 14, 255), "H": (108, 62, 52, 255), "R": (64, 34, 30, 255),
+          "D": (46, 24, 22, 255), "d": (36, 18, 16, 255), "F": (222, 206, 176, 255),
+          "T": (214, 196, 160, 255), "t": (176, 156, 120, 255)}
+
+
+def blank18():
+    return [["."] * 18 for _ in range(18)]
+
+
+CAFFEINE_PALETTE = {".": CLEAR, "K": (40, 20, 8, 255), "H": (168, 112, 66, 255), "B": (122, 76, 40, 255),
+                    "D": (86, 50, 24, 255), "C": (44, 22, 10, 255), "W": (214, 168, 116, 255),
+                    "Y": (255, 236, 170, 255), "y": (214, 170, 80, 255)}
+
+CAFFEINE = [
+    "..................",
+    "..............y...",
+    "..............y...",
+    "............yyYyy.",
+    ".......KKKKK..y...",
+    ".....KKHHHHBK.y...",
+    "....KHWWHHHBBK....",
+    "...KHWHHHHBBCBK...",
+    "..KHHHHHHBBCBBK...",
+    "..KHHHHHHBCBBDK...",
+    ".KHHHHHBCCBBDK....",
+    ".KHHHHCCBBBDDK....",
+    ".KHHHCBBBBDDK.....",
+    "..KHCBBBBDDK......",
+    "...KBBBBDKK.......",
+    "....KKKKK.........",
+    "..................",
+    "..................",
+]
+
+def caffeine_grid():
+    """A roasted coffee bean, its crease down the middle; and a spark: wide awake."""
+    return [list(r) for r in CAFFEINE]
+
+TIPSY_PALETTE = {".": CLEAR, "K": (66, 36, 8, 255), "C": (176, 104, 60, 255), "c": (132, 72, 38, 255),
+                 "G": (214, 230, 236, 255), "A": (232, 160, 48, 255), "a": (196, 118, 26, 255),
+                 "H": (255, 214, 130, 255),
+                 "k": (150, 120, 84, 255), "g": (226, 214, 190, 255), "p": (238, 206, 150, 255)}
+
+# A squat bottle of spirits, corked.
+BOTTLE = [
+    "..KKK..",
+    "..KcK..",
+    "..KCK..",
+    "..KGK..",
+    ".KGGGK.",
+    "KGGGGGK",
+    "KHAAAaK",
+    "KHAAAaK",
+    "KHAAAaK",
+    "KAAAaaK",
+    "KAAAaaK",
+    ".KKKKK.",
+]
+GHOST = {"K": "k", "c": "k", "C": "p", "G": "g", "H": "g", "A": "p", "a": "p"}
+
+def tipsy_grid():
+    """The bottle and, a little up and to the right, its double: the room isn't quite steady."""
+    grid = blank18()
+    def put(ox, oy, ghost):
+        for j, row in enumerate(BOTTLE):
+            for i, c in enumerate(row):
+                if c != ".":
+                    grid[oy + j][ox + i] = GHOST[c] if ghost else c
+    put(9, 1, True)
+    put(4, 5, False)
+    return grid
+
+TONIC_PALETTE = {".": CLEAR, "K": (60, 8, 10, 255), "D": (150, 20, 26, 255), "R": (210, 40, 44, 255),
+                 "H": (246, 110, 100, 255), "W": (255, 206, 196, 255),
+                 "k": (44, 46, 52, 255), "I": (224, 226, 232, 255), "i": (160, 164, 174, 255)}
+DROP = [
+    "....KK....",
+    "...KRDK...",
+    "...KRDK...",
+    "..KHRRDK..",
+    "..KHRRDK..",
+    ".KHRRRRDK.",
+    ".KWHRRRDK.",
+    "KHWRRRRRDK",
+    "KHHRRRRRDK",
+    "KHRRRRRRDK",
+    "KRRRRRRRDK",
+    ".KRRRRRDK.",
+    "..KDDDDK..",
+    "...KKKK...",
+]
+ARROW = [
+    "...k...",
+    "..kIk..",
+    ".kIIik.",
+    "kIIIiik",
+    "kkIikkk",
+    "..kIk..",
+    "..kIk..",
+    "..kik..",
+    "..kik..",
+    "..kkk..",
+]
+
+def tonic_grid():
+    """A drop of blood, and the iron's arrow up beside it: Blood coming back."""
+    grid = blank18()
+    for j, row in enumerate(DROP):
+        for i, c in enumerate(row):
+            if c != ".":
+                grid[3 + j][1 + i] = c
+    for j, row in enumerate(ARROW):
+        for i, c in enumerate(row):
+            if c != "." and grid[1 + j][11 + i] == ".":
+                grid[1 + j][11 + i] = c
+    return grid
+
+
+def round3_items():
+    def make(grid, palette):
+        rows = ["".join(r) for r in grid]
+        im = Image.new("RGBA", (16, 16))
+        im.putdata(soft_outline(rows, palette))
+        return im
+    return {
+        "coffee": coffee_sprite(),
+        "raw_blood_sausage": make(sausage_grid(), RAW_SAUSAGE),
+        "blood_sausage": make(sausage_grid(), COOKED_SAUSAGE),
+    }
+
+
+def round3_icons():
+    return {
+        "caffeinated": sprite(caffeine_grid(), CAFFEINE_PALETTE),
+        "tipsy": sprite(tipsy_grid(), TIPSY_PALETTE),
+        "iron_tonic": sprite(tonic_grid(), TONIC_PALETTE),
+    }
+
+
+def preview_round3(items, effects):
+    PREVIEW.mkdir(parents=True, exist_ok=True)
+    big = 16 * 8
+    pad = 24
+    W = 980
+    sheet = Image.new("RGBA", (W, 1000), (198, 198, 198, 255))
+    d = ImageDraw.Draw(sheet)
+    label(d, (pad, 6), "Realistic Damage 2.0, field kit: phase 4 round 3, food and drink (Medicine) - 8x")
+    # Row 1: the items, then the effect icons, at 8x.
+    x = pad
+    for n, im in items.items():
+        sheet.alpha_composite(im.resize((big, big), Image.NEAREST), (x, 28))
+        label(d, (x, 28 + big + 4), n.replace("_", " "))
+        x += big + pad
+    x += pad
+    for n, im in effects.items():
+        sheet.alpha_composite(im.resize((18 * 7, 18 * 7), Image.NEAREST), (x, 28))
+        label(d, (x, 28 + big + 4), "effect: " + n.replace("_", " "))
+        x += 18 * 7 + pad
+    # Row 2: the items in slots beside vanilla's.
+    y2 = 28 + big + 34
+    neighbours = ["honey_bottle", "potion", "cocoa_beans", "porkchop", "cooked_porkchop", "cooked_beef"]
+    label(d, (pad, y2), "in inventory slots at GUI scale 2 and 3, ours then " + ", ".join(neighbours))
+    row = list(items.values()) + [vanilla(f"assets/minecraft/textures/item/{p}.png") for p in neighbours]
+    for gi, gs in enumerate((2, 3)):
+        yy = y2 + 16 + gi * (18 * 2 + 12)
+        for i, ic in enumerate(row):
+            if ic is None:
+                continue
+            xx = pad + i * (18 * gs + 2)
+            sheet.alpha_composite(slot(18 * gs), (xx, yy))
+            sheet.alpha_composite(ic.resize((16 * gs, 16 * gs), Image.NEAREST), (xx + gs, yy + gs))
+    # Row 3: the effect icons in the inventory's effect list and on the HUD.
+    y3 = y2 + 16 + 18 * 2 + 12 + 18 * 3 + 30
+    label(d, (pad, y3), "effects in the inventory's list and on the HUD at GUI scale 2 and 3, beside regeneration, nausea, haste")
+    bg = vanilla("assets/minecraft/textures/gui/sprites/container/inventory/effect_background.png")
+    hud_bg = vanilla("assets/minecraft/textures/gui/sprites/hud/effect_background.png")
+    erow = list(effects.values()) + [vanilla(f"assets/minecraft/textures/mob_effect/{n}.png")
+                                     for n in ("regeneration", "nausea", "haste")]
+    for gi, gs in enumerate((2, 3)):
+        yy = y3 + 16
+        for i, ic in enumerate(erow):
+            if ic is None:
+                continue
+            xx = pad + gi * 300 + i * (32 * gs // 2 + 4) if gs == 2 else pad + 300 + i * (32 * gs // 2 + 4)
+            xx = pad + i * (32 * gs + 4) if gi == 0 else pad + i * (32 * gs + 4)
+            yy = y3 + 16 + gi * (32 * 2 + 10)
+            if bg is not None:
+                panel = bg.resize((bg.size[0] * gs, bg.size[1] * gs), Image.NEAREST)
+                sheet.alpha_composite(panel.crop((0, 0, 32 * gs, 32 * gs)), (xx, yy))
+            sheet.alpha_composite(ic.resize((18 * gs, 18 * gs), Image.NEAREST), (xx + 7 * gs, yy + 7 * gs))
+    yh = y3 + 16 + 32 * 2 + 10 + 32 * 3 + 16
+    for gi, gs in enumerate((2, 3)):
+        for i, ic in enumerate(erow):
+            if ic is None:
+                continue
+            xx = pad + i * (24 * gs + 4) + gi * 460
+            if hud_bg is not None:
+                sheet.alpha_composite(hud_bg.resize((24 * gs, 24 * gs), Image.NEAREST), (xx, yh))
+            sheet.alpha_composite(ic.resize((18 * gs, 18 * gs), Image.NEAREST), (xx + 3 * gs, yh + 3 * gs))
+    # Row 4: the two brewed drinks' bottles and arrow in their colours.
+    y4 = yh + 24 * 3 + 30
+    label(d, (pad, y4), "brewed: spirits (tipsy) and iron tonic - drinkable, splash, lingering, tipped arrow (6x)")
+    bottle = vanilla("assets/minecraft/textures/item/potion.png")
+    overlay = vanilla("assets/minecraft/textures/item/potion_overlay.png")
+    splash = vanilla("assets/minecraft/textures/item/splash_potion.png")
+    lingering = vanilla("assets/minecraft/textures/item/lingering_potion.png")
+    arrow_base = vanilla("assets/minecraft/textures/item/tipped_arrow_base.png")
+    arrow_head = vanilla("assets/minecraft/textures/item/tipped_arrow_head.png")
+    s = 6
+    for k, (n, title) in enumerate((("tipsy", "Spirits"), ("iron_tonic", "Iron Tonic"))):
+        x0 = pad + k * 440
+        label(d, (x0, y4 + 14), title)
+        forms = []
+        for body in (bottle, splash, lingering):
+            if body is not None and overlay is not None:
+                im = Image.new("RGBA", (16, 16))
+                im.alpha_composite(tint(overlay, ROUND3_COLOURS[n]))
+                im.alpha_composite(body)
+                forms.append(im)
+        if arrow_base is not None and arrow_head is not None:
+            im = Image.new("RGBA", (16, 16))
+            im.alpha_composite(arrow_base)
+            im.alpha_composite(tint(arrow_head, ROUND3_COLOURS[n]))
+            forms.append(im)
+        for j, im in enumerate(forms):
+            sheet.alpha_composite(im.resize((16 * s, 16 * s), Image.NEAREST), (x0 + j * (16 * s + 6), y4 + 32))
+    sheet = sheet.crop((0, 0, W, y4 + 32 + 16 * s + 12))
+    out = PREVIEW / "fieldkit_food_drink.png"
+    sheet.save(out)
+    return out
+
+
 def main():
     sprites = icons()
     out = preview(sprites)
@@ -809,6 +1114,19 @@ def main():
                         "fieldkit_items_bones_senses.png",
                         ["stick", "string", "white_wool", "bone_meal", "copper_ingot", "leather"])
     print("preview:", out)
+    round3 = round3_items()
+    round3_effects = round3_icons()
+    out = preview_round3(round3, round3_effects)
+    print("preview:", out)
+    if "--install-round3" in sys.argv:
+        ITEM_TEXTURES.mkdir(parents=True, exist_ok=True)
+        for n, im in round3.items():
+            im.save(ITEM_TEXTURES / f"{n}.png")
+            print("wrote", ITEM_TEXTURES / f"{n}.png")
+        TEXTURES.mkdir(parents=True, exist_ok=True)
+        for n, im in round3_effects.items():
+            im.save(TEXTURES / f"{n}.png")
+            print("wrote", TEXTURES / f"{n}.png")
     if "--install-round2" in sys.argv:
         ITEM_TEXTURES.mkdir(parents=True, exist_ok=True)
         for n, im in round2.items():

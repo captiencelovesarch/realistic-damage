@@ -60,13 +60,19 @@ public final class FieldKitClient implements ClientModInitializer {
 				refreshCreativeTabs();
 			}
 		});
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(() -> {
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			// At once, not queued: leaving a world drops the client's queued
+			// tasks (Minecraft.disconnect -> dropAllTasks), and a clear queued
+			// from a disconnect that runs inside a task went with them, leaving
+			// the old server's switches in place.
 			RulesView.clear();
 			HeavyEyelids.reset();
 			// No creative screen outlives the world, and the next world brings its
-			// own registries: let vanilla build the tabs afresh when it next needs them.
-			CreativeTabsAccessor.realisticdamage$setCachedParameters(null);
-		}));
+			// own registries: let vanilla build the tabs afresh when it next needs
+			// them. Queued, so no open creative screen draws in between; if it's
+			// dropped, vanilla rebuilds them anyway for the new registries.
+			client.execute(() -> CreativeTabsAccessor.realisticdamage$setCachedParameters(null));
+		});
 		ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
 			Optional<Half> off = Kit.offHalf(stack, RulesView::on);
 			off.ifPresent(half -> lines.add(Component.translatable("realisticdamage.fieldkit.off.tooltip",

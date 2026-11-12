@@ -1,0 +1,10 @@
+{
+	"type": "minecraft:campfire_cooking",
+	"category": "food",
+	"cookingtime": 600,
+	"experience": 0.35,
+	"ingredient": "realisticdamage:raw_blood_sausage",
+	"result": {
+		"id": "realisticdamage:blood_sausage"
+	}
+}

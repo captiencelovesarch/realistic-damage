@@ -8,6 +8,8 @@ import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.fieldkit.brew.BrewedEffects;
 import dev.captience.realisticdamage.fieldkit.brew.HaemorrhageMath;
 import dev.captience.realisticdamage.fieldkit.medicine.Dressings;
+import dev.captience.realisticdamage.fieldkit.medicine.Provisions;
+import dev.captience.realisticdamage.fieldkit.medicine.ProvisionsMath;
 import dev.captience.realisticdamage.systems.BleedingSystem;
 import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -23,6 +25,7 @@ import org.spongepowered.asm.mixin.injection.At;
  *   and a hand pressed on them holds back only part of what it would.</li>
  *   <li><b>Adrenaline</b> races the heart, so whatever is open bleeds harder
  *   while it lasts.</li>
+ *   <li><b>Coffee</b> and <b>spirits</b> (phase 4) do the same, by less.</li>
  * </ul>
  */
 @Mixin(BleedingSystem.class)
@@ -49,7 +52,7 @@ abstract class FieldKitBleedMixin {
 		if (BrewedEffects.active(body, BrewedEffects.ADRENALINE)) {
 			rate *= Balance.ADRENALINE_BLEED_FACTOR;
 		}
-		return rate;
+		return rate * ProvisionsMath.bleedFactor(Provisions.caffeinated(body), Provisions.tipsy(body));
 	}
 
 	@ModifyExpressionValue(method = "tick", at = @At(value = "INVOKE",

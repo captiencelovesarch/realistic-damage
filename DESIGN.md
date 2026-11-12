@@ -824,3 +824,34 @@ their synced snapshot, the way `BloodEmitter` times a stranger's artery.
 Treatments used on a body are routed in a `UseEntityCallback` phase after the
 default one: the core's grip and drag listeners run first, and the entity's own
 `interact` (trades, saddles) never sees the click.
+### Medicine, round 3: food and drink (phase 4)
+
+`Provisions` holds the four. Coffee and the blood sausages are items; spirits
+and the iron tonic are potions (water + potato, awkward + iron nugget), so the
+brewing stand, splash and lingering forms and the creative tab come from
+vanilla and `Kit`, as for phase 3. Each drink's effect (Caffeinated, Tipsy,
+Iron Tonic) is a bare `FieldKitEffect` the hooks ask about; the numbers are
+`ProvisionsMath`, apart from the items so the unit tests can load them.
+
+Coffee: `Sedation.scale` multiplies the body's size by `COFFEE_SEDATION_RESIST`
+while caffeinated, so every stage reading (the consciousness cap, the slowing,
+the salts, the client's eyelids) sees the same lighter stage.
+`CoffeeMicrosleepMixin` cancels `ConsciousnessSystem.tickMicrosleep` while
+caffeinated and not mid-blink, unwinding its phase as a well mind does.
+
+Bleeding: `FieldKitBleedMixin` multiplies the rate by `ProvisionsMath.bleedFactor`
+after Adrenaline's. Your own heart: `HeartRaceMixin` gives Cardio a distress
+floor of 0.3 on coffee (Adrenaline's is 0.6).
+
+Spirits' weaker numbing is `NumbingPainMixin` again: the walking and arm
+penalties times `SPIRITS_PAIN_FACTOR` instead of zero. Flinches and the hit
+blur stay; you still feel it. The doubled view is `TipsyAfterimageMixin`, a
+floor on the concussion's input to `Afterimage.frame`, so it rides the same
+slider and the same VR path.
+
+The blood sausage adds `BLOOD_SAUSAGE_BLOOD` in `finishUsingItem`, after the
+core's own food Blood. The blood bag has a glass-bottle crafting remainder, and
+`SwitchedRecipe` refuses any grid holding a bag that has gone off. Coffee's
+recipe matches only a water bottle, through Fabric's `fabric:components`
+ingredient. The iron tonic doubles the first `restoreBlood` in
+`HealingSystem.tick`, the passive one that waits for the bleeding to stop.

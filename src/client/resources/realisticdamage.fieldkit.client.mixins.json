@@ -11,7 +11,8 @@
 		"GearRenderStateMixin",
 		"GearExtractMixin",
 		"SlingPoseMixin",
-		"SlingFirstPersonMixin"
+		"SlingFirstPersonMixin",
+		"TipsyAfterimageMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

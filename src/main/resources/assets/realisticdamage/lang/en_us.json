@@ -419,5 +419,19 @@
 	"realisticdamage.fieldkit.salts.awake": "They're awake.",
 	"realisticdamage.fieldkit.salts.blood": "They've lost too much blood. Salts won't bring them round.",
 	"realisticdamage.fieldkit.salts.air": "They can't breathe. Salts won't help.",
-	"realisticdamage.fieldkit.salts.sedated": "They're drugged too deep to come round."
+	"realisticdamage.fieldkit.salts.sedated": "They're drugged too deep to come round.",
+	"item.realisticdamage.coffee": "Coffee",
+	"item.realisticdamage.raw_blood_sausage": "Raw Blood Sausage",
+	"item.realisticdamage.blood_sausage": "Blood Sausage",
+	"effect.realisticdamage.caffeinated": "Caffeinated",
+	"effect.realisticdamage.tipsy": "Tipsy",
+	"effect.realisticdamage.iron_tonic": "Iron Tonic",
+	"item.minecraft.potion.effect.spirits": "Spirits",
+	"item.minecraft.splash_potion.effect.spirits": "Splash Spirits",
+	"item.minecraft.lingering_potion.effect.spirits": "Lingering Spirits",
+	"item.minecraft.tipped_arrow.effect.spirits": "Arrow of Spirits",
+	"item.minecraft.potion.effect.iron_tonic": "Iron Tonic",
+	"item.minecraft.splash_potion.effect.iron_tonic": "Splash Iron Tonic",
+	"item.minecraft.lingering_potion.effect.iron_tonic": "Lingering Iron Tonic",
+	"item.minecraft.tipped_arrow.effect.iron_tonic": "Arrow of Iron Tonic"
 }

@@ -108,7 +108,16 @@ public final class Sedation {
 
 	public static Stage stage(LivingEntity entity) {
 		State state = peek(entity);
-		return state == null ? Stage.NONE : SedationMath.stage(state.level, MobAnatomy.vitalityScale(entity));
+		return state == null ? Stage.NONE : SedationMath.stage(state.level, scale(entity));
+	}
+
+	/**
+	 * How big a body counts as for what is in it: its size, and on coffee
+	 * (phase 4) bigger again, so the same dose takes it a stage less far.
+	 */
+	public static double scale(LivingEntity entity) {
+		return dev.captience.realisticdamage.fieldkit.medicine.ProvisionsMath.sedationScale(
+				MobAnatomy.vitalityScale(entity), dev.captience.realisticdamage.fieldkit.medicine.Provisions.caffeinated(entity));
 	}
 
 	/** Bosses, the mindless and anything without a body to sedate turn it away. */
@@ -139,7 +148,7 @@ public final class Sedation {
 		double taken = SedationMath.absorbed(state.pending);
 		state.pending -= taken;
 		state.level += taken;
-		double scale = MobAnatomy.vitalityScale(entity);
+		double scale = scale(entity);
 		state.level -= SedationMath.cleared(state.pending, state.level, scale);
 		Stage stage = SedationMath.stage(state.level, scale);
 		slow(entity, state, stage);

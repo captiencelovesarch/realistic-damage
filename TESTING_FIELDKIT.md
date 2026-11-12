@@ -7,6 +7,38 @@ version numbers: `2.0.0-items.N`. Newest round on top.
 branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
 and is in all three instances. Everything below applies to it unchanged.
 
+## items.9: food and drink (Nov 12 2026)
+
+The jar is `realistic-damage-2.0.0-items.9.jar`, in "Realistic Damage items"
+(items.8 parked in `mods/replaced-jars/`). Medicine on; Weapons on too for
+item 2.
+
+- [ ] **1. Coffee.** Craft cocoa beans + a water bottle + sugar. A different
+  potion in place of the water makes nothing. Drink it: the bottle comes back
+  and "Caffeinated" shows for 3:00. Listen with the stethoscope in the air:
+  your heart is a little quicker than before.
+- [ ] **2. Coffee against Sedation.** Have someone hit you with one Sedation
+  arrow while you're Caffeinated: you stumble (slow, heavy eyelids) but stay up.
+  A second arrow drops you.
+- [ ] **3. No microsleeps.** Stumbling from an arrow without coffee, you blink
+  out in short blackouts now and then. Stumbling in 2, on coffee, you don't.
+- [ ] **4. Spirits.** Brew a potato into a water bottle: "Spirits", amber.
+  Drink it: "Tipsy" for 2:00, and the world smears and doubles as you turn.
+  Turning down the afterimage slider turns that down too.
+- [ ] **5. Spirits and a broken leg.** With a broken leg, the limp is about
+  half as slow tipsy. Getting hit still flinches.
+- [ ] **6. Blood sausage.** Porkchop + a blood bag makes a Raw Blood Sausage
+  and gives the glass bottle back. A bag that has gone off (over 3 days old)
+  won't go in. Cook it in a furnace, smoker or campfire. Eat it low on Blood:
+  more comes back than from a cooked porkchop.
+- [ ] **7. Iron tonic.** Brew an iron nugget into an awkward potion: "Iron
+  Tonic", rust-red; redstone makes it 8:00. Low on Blood and not bleeding, it
+  comes back noticeably faster while it lasts.
+- [ ] **8. Bleeding more.** Caffeinated or Tipsy, an open wound drips a little
+  faster than it would.
+- [ ] **9. The switch.** Medicine off: coffee, spirits, the sausages and the
+  tonic can't be crafted, brewed or used, and their effects end at once.
+
 ## items.8: the ragdoll is the body, and dragging (Nov 12 2026)
 
 The jar is `realistic-damage-2.0.0-items.8.jar`, in "Realistic Damage items"

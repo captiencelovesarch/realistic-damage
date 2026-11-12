@@ -54,8 +54,9 @@ public final class Medicine {
 			new Item.Properties().stacksTo(4), Half.MEDICINE);
 	public static final Item NEEDLE_AND_THREAD = Kit.item("needle_and_thread", NeedleItem::new,
 			new Item.Properties().durability(Balance.NEEDLE_USES), Half.MEDICINE);
+	/** Its bottle comes back when it goes into a blood sausage (round 3). */
 	public static final Item BLOOD_BAG = Kit.item("blood_bag", BloodBagItem::new,
-			new Item.Properties().stacksTo(1), Half.MEDICINE);
+			new Item.Properties().stacksTo(1).craftRemainder(net.minecraft.world.item.Items.GLASS_BOTTLE), Half.MEDICINE);
 	public static final Item SPLINT = Kit.item("splint", SplintItem::new,
 			new Item.Properties().stacksTo(8), Half.MEDICINE);
 	public static final Item SLING = Kit.item("sling", SlingItem::new,
