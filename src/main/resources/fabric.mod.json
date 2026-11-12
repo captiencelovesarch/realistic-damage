@@ -46,7 +46,8 @@
 			"dev.captience.realisticdamage.client.gametest.AfflictionsClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.VrLensClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.VivecraftClientGameTest",
-			"dev.captience.realisticdamage.fieldkit.client.gametest.FieldKitClientGameTest"
+			"dev.captience.realisticdamage.fieldkit.client.gametest.FieldKitClientGameTest",
+			"dev.captience.realisticdamage.fieldkit.client.gametest.GearClientGameTest"
 		],
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",

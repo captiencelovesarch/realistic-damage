@@ -7,6 +7,28 @@ version numbers: `2.0.0-items.N`. Newest round on top.
 branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
 and is in all three instances. Everything below applies to it unchanged.
 
+## items.7: the gear you can see (Nov 12 2026)
+
+The jar is `realistic-damage-2.0.0-items.7.jar`, in "Realistic Damage items"
+(items.6 parked in `mods/replaced-jars/`). F5 to see yourself.
+
+- [ ] **1. Bandages.** A white wrap round the middle of the limb, round the
+  chest, or round the forehead. One that has soaked through goes red.
+- [ ] **2. Tourniquet.** A leather strap high on the limb with its stick
+  across the front.
+- [ ] **3. Splint.** Two sticks down the sides of the limb, tied in three places.
+- [ ] **4. Sling.** The arm held forward across your stomach in a cloth pouch,
+  its strap tied round the back of your neck. In first person the arm lies low
+  across the bottom of the view in the sling, and whatever that hand holds
+  isn't shown.
+- [ ] **5. Stethoscope.** While you listen, the earpieces are in your ears and
+  the tube runs down the front of your chest.
+- [ ] **6. Tinted goggles.** Real goggles on the head (strap, two violet lenses),
+  not a flat picture.
+- [ ] **7. On others.** The same on a friend, a zombie, a skeleton, a villager
+  (a villager's arms are one crossed piece: no arm gear on it). Under armour
+  the gear is hidden, as it would be.
+
 ## items.6: your items.5 fixes (Nov 12 2026)
 
 The jar is `realistic-damage-2.0.0-items.6.jar`, in "Realistic Damage items"

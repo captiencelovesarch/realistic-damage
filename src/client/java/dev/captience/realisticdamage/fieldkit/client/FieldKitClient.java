@@ -30,6 +30,25 @@ import net.minecraft.network.chat.Component;
  * first-launch question.
  */
 public final class FieldKitClient implements ClientModInitializer {
+	/**
+	 * The worn gear (items.7) on every body that can wear it: players, every
+	 * humanoid mob, and the illager and villager shapes.
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static void registerGearLayer() {
+		net.fabricmc.fabric.api.client.rendering.v1.LivingEntityRenderLayerRegistrationCallback.EVENT
+				.register((entityType, renderer, helper, context) -> {
+					boolean wears = renderer instanceof net.minecraft.client.renderer.entity.player.AvatarRenderer<?>
+							|| renderer instanceof net.minecraft.client.renderer.entity.HumanoidMobRenderer<?, ?, ?>
+							|| renderer.getModel() instanceof net.minecraft.client.model.monster.illager.IllagerModel<?>
+							|| renderer.getModel() instanceof net.minecraft.client.model.npc.VillagerModel
+							|| renderer.getModel() instanceof net.minecraft.client.model.monster.witch.WitchModel;
+					if (wears) {
+						helper.register(new GearLayer((net.minecraft.client.renderer.entity.RenderLayerParent) renderer));
+					}
+				});
+	}
+
 	@Override
 	public void onInitializeClient() {
 		ClientPlayNetworking.registerGlobalReceiver(RulesPayload.TYPE, (payload, context) -> {
@@ -55,6 +74,7 @@ public final class FieldKitClient implements ClientModInitializer {
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(Welcome::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(FieldKitClient::loosenTick);
+		registerGearLayer();
 		// The stethoscope (phase 4, round 2): after the core's heart has ticked.
 		ClientTickEvents.END_CLIENT_TICK.register(StethoscopeEar::tick);
 		// A blood bag says how long it keeps, from the world's clock (phase 4).
