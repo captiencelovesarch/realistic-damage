@@ -2,6 +2,7 @@ package dev.captience.realisticdamage.client;
 
 import dev.captience.realisticdamage.ragdoll.HumanoidRagdoll;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaterniond;
@@ -208,10 +209,13 @@ public final class RagdollView {
 			eye.lerp(onChest, steady);
 		}
 		Vec3 ragdollEye = new Vec3(eye.x, eye.y, eye.z);
-		float down = down(partial);
 		LocalPlayer player = Minecraft.getInstance().player;
-		if (down < 1.0F && player != null) {
-			return player.getEyePosition(partial).lerp(ragdollEye, down);
+		LiveRagdolls.Live live = LiveRagdolls.own();
+		if (live != null && live.gettingUp >= 0 && live.plan != null && player != null) {
+			// Getting up: the eyes ride the head through every stage of it.
+			return live.ragdoll.getUpEye(partial, player.getPosition(partial),
+					Mth.rotLerp(partial, player.yBodyRotO, player.yBodyRot), live.plan, live.progress(partial),
+					player.getEyePosition(partial));
 		}
 		return ragdollEye;
 	}

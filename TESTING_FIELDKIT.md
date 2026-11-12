@@ -7,11 +7,16 @@ version numbers: `2.0.0-items.N`. Newest round on top.
 branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
 and is in all three instances. Everything below applies to it unchanged.
 
+## items.10: food and drink with getting up in stages (Nov 12 2026)
+
+The jar is `realistic-damage-2.0.0-items.10.jar`, in "Realistic Damage items"
+(items.8.getup and items.9 parked in `mods/replaced-jars/`). It is items.9
+below and the get-up from `claude/getup` together: test both lists, this
+file's items.9 and the get-up one in `TESTING_2.0.md`.
+
 ## items.9: food and drink (Nov 12 2026)
 
-The jar is `realistic-damage-2.0.0-items.9.jar`, in "Realistic Damage items"
-(items.8 parked in `mods/replaced-jars/`). Medicine on; Weapons on too for
-item 2.
+Shipped in the items.10 jar above. Medicine on; Weapons on too for item 2.
 
 - [ ] **1. Coffee.** Craft cocoa beans + a water bottle + sugar. A different
   potion in place of the water makes nothing. Drink it: the bottle comes back

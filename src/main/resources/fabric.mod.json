@@ -33,6 +33,7 @@
 			"dev.captience.realisticdamage.client.gametest.DecapitationClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.NeckClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.KnockdownClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.GetUpClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.StandClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.StumbleClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.BloodClientGameTest",
