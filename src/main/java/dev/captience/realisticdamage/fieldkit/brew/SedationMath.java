@@ -8,8 +8,9 @@ import dev.captience.realisticdamage.config.Balance;
  *
  * <p>Each application is a dose. A dose waits in the body ({@code pending})
  * and takes hold over {@link Balance#SEDATION_ABSORB_TICKS}, so the eyelids get
- * heavy before the lights go out; what has taken hold ({@code level}) clears
- * over {@link Balance#SEDATION_CLEAR_TICKS} per dose. The stage is the level
+ * heavy before the lights go out; what has taken hold ({@code level}) halves
+ * every {@link Balance#SEDATION_HALF_LIFE_TICKS}, so a bigger dose is a little
+ * longer and not twice as long. The stage is the level
  * over the body's size, so one arrow drops a zombie or a player and a ravager
  * takes five.
  */
@@ -41,9 +42,24 @@ public final class SedationMath {
 		return Math.min(Math.max(0.0, pending), 1.0 / Balance.SEDATION_ABSORB_TICKS);
 	}
 
-	/** How much the body clears this tick: nothing while a dose is still taking hold. */
-	public static double cleared(double pending, double level) {
-		return pending > 0.0 ? 0.0 : Math.min(Math.max(0.0, level), 1.0 / Balance.SEDATION_CLEAR_TICKS);
+	/**
+	 * How much the body clears this tick: nothing while a dose is still taking
+	 * hold; a share of what is in it after that (a half-life), the last scrap
+	 * all at once; and barely anything while it has stopped the breathing.
+	 */
+	public static double cleared(double pending, double level, double vitalityScale) {
+		if (pending > 0.0 || level <= 0.0) {
+			return 0.0;
+		}
+		double scale = Math.max(1.0, vitalityScale);
+		double s = level / scale;
+		if (s >= Balance.SEDATION_OVERDOSE) {
+			return Math.min(level, scale / Balance.SEDATION_OVERDOSE_CLEAR_TICKS);
+		}
+		if (s < Balance.SEDATION_CLEAR_FLOOR) {
+			return level;
+		}
+		return level * (1.0 - Math.pow(0.5, 1.0 / Balance.SEDATION_HALF_LIFE_TICKS));
 	}
 
 	public static Stage stage(double level, double vitalityScale) {
@@ -83,8 +99,17 @@ public final class SedationMath {
 	}
 
 	/** Ticks until a body with this much in it is clear: what is waiting, then what has taken hold. */
-	public static int ticksToClear(double pending, double level) {
-		return (int) Math.ceil(Math.max(0.0, pending) * Balance.SEDATION_ABSORB_TICKS
-				+ Math.max(0.0, pending + level) * Balance.SEDATION_CLEAR_TICKS);
+	public static int ticksToClear(double pending, double level, double vitalityScale) {
+		double scale = Math.max(1.0, vitalityScale);
+		double s = (Math.max(0.0, pending) + Math.max(0.0, level)) / scale;
+		double ticks = Math.max(0.0, pending) * Balance.SEDATION_ABSORB_TICKS;
+		if (s > Balance.SEDATION_OVERDOSE) {
+			ticks += (s - Balance.SEDATION_OVERDOSE) * Balance.SEDATION_OVERDOSE_CLEAR_TICKS;
+			s = Balance.SEDATION_OVERDOSE;
+		}
+		if (s >= Balance.SEDATION_CLEAR_FLOOR) {
+			ticks += Balance.SEDATION_HALF_LIFE_TICKS * Math.log(s / Balance.SEDATION_CLEAR_FLOOR) / Math.log(2.0) + 1.0;
+		}
+		return (int) Math.ceil(ticks);
 	}
 }

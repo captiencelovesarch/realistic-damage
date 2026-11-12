@@ -80,6 +80,10 @@ public class BrokenNeckGameTest {
 	private static Zombie dropped(GameTestHelper helper, int x, int z, double y, boolean limp) {
 		Zombie zombie = helper.spawn(EntityTypes.ZOMBIE, new Vec3(x + 0.5, y, z + 0.5));
 		zombie.setPersistenceRequired();
+		// A helmet keeps it from catching fire in the sun on the way down: a
+		// burn is an injury, and these tests count injuries.
+		zombie.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD,
+				new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.LEATHER_HELMET));
 		RealisticDamageData data = RDAttachments.get(zombie);
 		if (limp) {
 			data.setConsciousness(0.0);
@@ -151,7 +155,9 @@ public class BrokenNeckGameTest {
 		helper.succeedWhen(() -> {
 			helper.assertTrue(zombie.isInWater(), "not in the water yet");
 			helper.assertTrue(zombie.isAlive() && !data.neckBroken() && !data.whiplashed() && !legsHurt(data),
-					"three blocks of water did not stop the fall");
+					"three blocks of water did not stop the fall (alive " + zombie.isAlive() + ", neck "
+							+ data.neckBroken() + ", whiplash " + data.whiplashed() + ", legs "
+							+ data.part(BodyPart.LEFT_LEG).fraction() + "/" + data.part(BodyPart.RIGHT_LEG).fraction() + ")");
 			clear(helper, 2, 2, 3);
 			zombie.discard();
 		});

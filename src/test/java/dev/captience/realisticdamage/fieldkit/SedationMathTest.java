@@ -63,7 +63,7 @@ class SedationMathTest {
 			double taken = SedationMath.absorbed(pending);
 			pending -= taken;
 			level += taken;
-			level -= SedationMath.cleared(pending, level);
+			level -= SedationMath.cleared(pending, level, PLAYER);
 			Stage stage = SedationMath.stage(level, PLAYER);
 			if (drowsyAt < 0 && stage == Stage.DROWSY) {
 				drowsyAt = tick;
@@ -81,13 +81,70 @@ class SedationMathTest {
 				"out once 0.85 of the dose has taken hold");
 	}
 
-	/** Nothing clears while a dose is still taking hold; after that, a dose a clearing time. */
+	/** Nothing clears while a dose is still taking hold; after that, half of it every half-life. */
 	@Test
 	void itWearsOffWithTime() {
-		assertEquals(0.0, SedationMath.cleared(0.5, 1.0), 1e-12);
-		assertEquals(1.0 / Balance.SEDATION_CLEAR_TICKS, SedationMath.cleared(0.0, 1.0), 1e-12);
-		assertEquals(Balance.SEDATION_CLEAR_TICKS, SedationMath.ticksToClear(0.0, 1.0));
-		assertEquals(0, SedationMath.ticksToClear(0.0, 0.0));
+		assertEquals(0.0, SedationMath.cleared(0.5, 1.0, PLAYER), 1e-12);
+		double level = 1.0;
+		for (int tick = 0; tick < Balance.SEDATION_HALF_LIFE_TICKS; tick++) {
+			level -= SedationMath.cleared(0.0, level, PLAYER);
+		}
+		assertEquals(0.5, level, 1e-9, "half of it gone in a half-life");
+		assertEquals(0.01, SedationMath.cleared(0.0, 0.01, PLAYER), 1e-12, "the last scrap clears at once");
+		assertEquals(0, SedationMath.ticksToClear(0.0, 0.0, PLAYER));
+	}
+
+	/**
+	 * How long one body is on the floor, the way the game runs it: absorbed,
+	 * cleared, and out while the stage says so. The user's playtest: a strong
+	 * arrow had them down for well over two minutes, and the effect said four.
+	 */
+	@Test
+	void oneArrowIsAShortSleepAndAStrongOneNotMuchLonger() {
+		int oneOut = ticksOut(1.0);
+		int strongOut = ticksOut(2.0);
+		assertTrue(oneOut >= 40 && oneOut <= 120, "one arrow holds a player out 2-6 s, then they come round: " + oneOut);
+		assertTrue(strongOut <= 500, "a strong one, under half a minute held out: " + strongOut);
+		assertTrue(strongOut > oneOut, "but longer than one");
+		int effect = SedationMath.ticksToClear(1.0, 0.0, PLAYER);
+		assertTrue(effect <= 1200, "one arrow's effect is gone within a minute: " + effect);
+		assertTrue(SedationMath.ticksToClear(2.0, 0.0, PLAYER) <= 1600, "a strong one within 80 s");
+	}
+
+	/** An overdose barely clears, so the hypoxia debt (20 s) runs all the way up. */
+	@Test
+	void anOverdoseOutlastsTheBreath() {
+		double pending = 3.0;
+		double level = 0.0;
+		int overdosed = 0;
+		for (int tick = 0; tick < 6000; tick++) {
+			double taken = SedationMath.absorbed(pending);
+			pending -= taken;
+			level += taken;
+			level -= SedationMath.cleared(pending, level, PLAYER);
+			if (SedationMath.stage(level, PLAYER) == Stage.OVERDOSE) {
+				overdosed++;
+			}
+		}
+		assertTrue(overdosed > Balance.HYPOXIA_DEBT_MAX * 20 + 400,
+				"overdosed long enough to run up the debt and then some: " + overdosed + " ticks");
+	}
+
+	/** Ticks a player is held out (the stage, not the coming round after) from this many doses at once. */
+	private static int ticksOut(double doses) {
+		double pending = doses;
+		double level = 0.0;
+		int out = 0;
+		for (int tick = 0; tick < 6000; tick++) {
+			double taken = SedationMath.absorbed(pending);
+			pending -= taken;
+			level += taken;
+			level -= SedationMath.cleared(pending, level, PLAYER);
+			if (SedationMath.stage(level, PLAYER) == Stage.OUT) {
+				out++;
+			}
+		}
+		return out;
 	}
 
 	/**

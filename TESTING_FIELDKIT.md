@@ -7,6 +7,24 @@ version numbers: `2.0.0-items.N`. Newest round on top.
 branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
 and is in all three instances. Everything below applies to it unchanged.
 
+## items.6: your items.5 fixes (Nov 12 2026)
+
+The jar is `realistic-damage-2.0.0-items.6.jar`, in "Realistic Damage items"
+(items.5 parked in `mods/replaced-jars/`). Turn **Weapons** on for Sedation
+and dragging.
+
+- [ ] **1. Sedation is short now.** One Arrow of Sedation: drowsy, stumbling,
+  down at about 8 s, and back up about 12 s after that. A strong (glowstone)
+  arrow is about 30 s on the floor, not 2½ minutes. The effect timer reads
+  under a minute for one, about 1:15 for a strong one, not 4:20. Three doses still stop the
+  breathing and kill unless you drink milk.
+- [ ] **2. Hitboxes on the body.** F3+B, then knock a zombie down (a blast, or
+  an Arrow of Sedation): its box drops to a low one where it lies, and the
+  ragdoll stays on it, even next to a hole. It stands back up with the mob.
+- [ ] **3. Dragging.** Sedate a zombie or a villager and sneak-use the body with
+  an empty hand where you see it lying: you get hold of it. Same for a downed
+  friend in multiplayer.
+
 ## items.5: bones, head and senses (phase 4, round 2)
 
 The jar is `realistic-damage-2.0.0-items.5.jar`, in "Realistic Damage items"

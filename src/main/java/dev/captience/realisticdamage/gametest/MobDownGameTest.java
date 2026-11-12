@@ -60,6 +60,42 @@ public class MobDownGameTest {
 		helper.succeed();
 	}
 
+	/**
+	 * A mob on the floor has its hitbox on the floor too (items.6): low and
+	 * wide while it is out, standing again once it is up. The standing column
+	 * over a body lying on the ground was what arrows hit and hands missed.
+	 */
+	@GameTest(environment = "realisticdamage:isolated")
+	public void aDownZombieLiesInALowBox(GameTestHelper helper) {
+		Zombie zombie = helper.spawn(EntityTypes.ZOMBIE, AT);
+		Villager villager = helper.spawn(EntityTypes.VILLAGER, new BlockPos(3, 1, 1));
+		try {
+			zombie.setNoAi(true);
+			double standing = zombie.getBbHeight();
+			out(zombie);
+			zombie.tick();
+			double lying = zombie.getBbHeight();
+			double wide = zombie.getBbWidth();
+			helper.assertTrue(lying < 0.6 && Math.abs(wide - 0.6) < 1.0e-4,
+					"an unconscious zombie's box is still standing, or got wider: " + wide + " x " + lying);
+			helper.assertTrue(zombie.getPickRadius() > 0.3F,
+					"a zombie lying down can't be picked out along its body: " + zombie.getPickRadius());
+			RDAttachments.get(villager).knockDown(40);
+			villager.tick();
+			helper.assertTrue(villager.getBbHeight() < 0.6, "a knocked-down villager's box is still standing");
+			RealisticDamageData data = RDAttachments.get(zombie);
+			data.setUnconscious(false);
+			data.setConsciousness(100.0);
+			zombie.tick();
+			helper.assertTrue(Math.abs(zombie.getBbHeight() - standing) < 1.0e-4 && zombie.getPickRadius() == 0.0F,
+					"a zombie back on its feet has its box back: " + zombie.getBbHeight() + " of " + standing);
+		} finally {
+			zombie.discard();
+			villager.discard();
+		}
+		helper.succeed();
+	}
+
 	@GameTest(environment = "realisticdamage:isolated")
 	public void aKnockedDownZombieStrikesAtNothing(GameTestHelper helper) {
 		Zombie zombie = helper.spawn(EntityTypes.ZOMBIE, AT);

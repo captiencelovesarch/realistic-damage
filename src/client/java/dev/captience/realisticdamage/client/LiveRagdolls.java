@@ -32,10 +32,11 @@ import org.jspecify.annotations.Nullable;
  * <p>Two stages. <b>Thrown:</b> the ragdoll leads. Your own client carries your
  * real position along with it (movement is yours to report; the knockdown has
  * already taken your steering); everyone else's ragdoll for you, and every
- * mob's, is kept loosely near where the entity is. <b>Down:</b> once it has
- * come to rest the entity leads, and the ragdoll is pulled along by its torso
- * wherever the entity goes, so a rescuer dragging an unconscious body drags
- * the ragdoll across the ground. Then, the knockdown over, the body awake and
+ * mob's, leads its entity by no more than {@link #THROWN_LEAD}. <b>Down:</b>
+ * once it has come to rest the entity leads, and the ragdoll is pulled along
+ * by its torso wherever the entity goes, never more than {@link #HELD} from
+ * it, so a rescuer dragging an unconscious body drags the ragdoll across the
+ * ground, and the hitbox is always on the body. Then, the knockdown over, the body awake and
  * still: it gets up, the ragdoll's pose blending into vanilla's standing one
  * over a second. A body with no legs left stays down, as it always has.
  */
@@ -52,6 +53,19 @@ public final class LiveRagdolls {
 	private static final double TETHER_SPEED = 4.0;
 	/** Farther than this from the entity, a ragdoll is moved bodily (a teleport, a correction). */
 	private static final double SNAP = 4.0;
+	/**
+	 * Once down, the torso is never farther than this from the entity: the
+	 * whole body is carried the rest of the way, pose and all. The entity's
+	 * hitbox is where everything that touches a body looks (a blow, an arrow,
+	 * a hand reaching to drag it), so the body drawn must stay on it; a softer
+	 * pull left a ragdoll lying blocks from its hitbox, in a pit the entity
+	 * never fell into (items.5 playtest).
+	 */
+	static final double HELD = 0.6;
+	/** ...and while thrown, the most the ragdoll may lead its entity by. */
+	static final double THROWN_LEAD = 1.75;
+	/** A torso this far below its entity's feet has fallen somewhere the entity did not: lifted back. */
+	private static final double SUNK = 0.7;
 
 	static final class Live {
 		final RagdollCorpse ragdoll;
@@ -187,9 +201,11 @@ public final class LiveRagdolls {
 					carry((LocalPlayer) body, ragdoll);
 				} else {
 					tether(body, ragdoll, 0.4);
+					hold(body, ragdoll, THROWN_LEAD);
 				}
 			} else {
 				tether(body, ragdoll, 1.0);
+				hold(body, ragdoll, HELD);
 			}
 
 			if (!flagged && live.down <= 0 && !live.thrown && live.age > 10) {
@@ -237,6 +253,57 @@ public final class LiveRagdolls {
 		ragdoll.body.wake();
 		double speed = Math.min(TETHER_SPEED, (apart - 0.3) * TETHER) * strength;
 		torso.v.add(dx / apart * speed * 0.25, 0.0, dz / apart * speed * 0.25);
+	}
+
+	/**
+	 * Keeps the ragdoll on its entity: past {@code reach} the whole body is
+	 * carried back to it (every part by the same step, so the pose and the
+	 * motion are untouched), and a torso sunk below the entity's feet is
+	 * lifted back up to them.
+	 */
+	static void hold(LivingEntity entity, RagdollCorpse ragdoll, double reach) {
+		Body torso = ragdoll.body.body(HumanoidRagdoll.TORSO);
+		double dx = entity.getX() - torso.x.x;
+		double dz = entity.getZ() - torso.x.z;
+		double apart = Math.hypot(dx, dz);
+		double mx = 0.0;
+		double mz = 0.0;
+		if (apart > reach) {
+			double k = (apart - reach) / apart;
+			mx = dx * k;
+			mz = dz * k;
+		}
+		double sunk = entity.getY() - torso.x.y;
+		double my = sunk > SUNK ? sunk - 0.25 : 0.0;
+		if (mx == 0.0 && mz == 0.0 && my == 0.0) {
+			return;
+		}
+		for (int i = 0; i < HumanoidRagdoll.PARTS; i++) {
+			Body b = ragdoll.body.body(i);
+			b.x.add(mx, my, mz);
+			b.tickX.add(mx, my, mz);
+		}
+		ragdoll.body.wake();
+	}
+
+	/** How far this entity's live ragdoll's torso is from it, flat; -1 with none. For the client gametest. */
+	public static double apart(Entity entity) {
+		Live live = of(entity);
+		if (live == null) {
+			return -1.0;
+		}
+		Body torso = live.ragdoll.body.body(HumanoidRagdoll.TORSO);
+		return Math.hypot(entity.getX() - torso.x.x, entity.getZ() - torso.x.z);
+	}
+
+	/** Whether the crosshair's pick box for this entity holds its live ragdoll's torso. For the client gametest. */
+	public static boolean torsoPickable(Entity entity) {
+		Live live = of(entity);
+		if (live == null) {
+			return false;
+		}
+		Body torso = live.ragdoll.body.body(HumanoidRagdoll.TORSO);
+		return entity.getBoundingBox().inflate(entity.getPickRadius() + 0.05).contains(torso.x.x, torso.x.y, torso.x.z);
 	}
 
 	/** The live ragdoll for this entity, or null. */

@@ -102,6 +102,9 @@ public class KnockdownClientGameTest implements FabricClientGameTest {
 			boolean wentDown = false;
 			boolean gotUp = false;
 			boolean done = false;
+			double farthest = 0.0;
+			double lowBox = 99.0;
+			boolean pickable = false;
 			for (int t = 0; t < 240 && !done; t++) {
 				context.waitTicks(1);
 				int stage = context.computeOnClient(client -> {
@@ -110,6 +113,15 @@ public class KnockdownClientGameTest implements FabricClientGameTest {
 				});
 				if (stage == 0 && !wentDown) {
 					wentDown = true;
+				}
+				if (stage == 0) {
+					// The body drawn stays on its hitbox, and the hitbox lies down with it.
+					farthest = Math.max(farthest, context.computeOnClient(client ->
+							LiveRagdolls.apart(client.level.getEntity(id[0]))));
+					lowBox = Math.min(lowBox, context.computeOnClient(client ->
+							(double) client.level.getEntity(id[0]).getBbHeight()));
+					// Where it lies, settled, is where the crosshair finds it (to drag it, to hit it).
+					pickable = context.computeOnClient(client -> LiveRagdolls.torsoPickable(client.level.getEntity(id[0])));
 				}
 				if (stage == 1 && !gotUp) {
 					gotUp = true;
@@ -127,7 +139,18 @@ public class KnockdownClientGameTest implements FabricClientGameTest {
 			}
 			context.waitTicks(5);
 			context.takeScreenshot("rd_knock_03_zombie_standing");
-			System.out.println("[rd] zombie knockdown: down " + wentDown + ", got up " + gotUp + ", done " + done);
+			System.out.println("[rd] zombie knockdown: down " + wentDown + ", got up " + gotUp + ", done " + done
+					+ ", ragdoll at most " + String.format("%.2f", farthest) + " from its entity, box as low as "
+					+ String.format("%.2f", lowBox));
+			if (farthest > 1.85) {
+				throw new AssertionError("the zombie's ragdoll lay " + farthest + " blocks from its hitbox");
+			}
+			if (!pickable) {
+				throw new AssertionError("the settled zombie's body lay outside where the crosshair picks it");
+			}
+			if (lowBox > 0.6) {
+				throw new AssertionError("the knocked-down zombie's hitbox never lay down: " + lowBox + " tall");
+			}
 			if (!wentDown) {
 				throw new AssertionError("a blast the zombie lived through did not ragdoll it");
 			}

@@ -139,8 +139,9 @@ public final class Sedation {
 		double taken = SedationMath.absorbed(state.pending);
 		state.pending -= taken;
 		state.level += taken;
-		state.level -= SedationMath.cleared(state.pending, state.level);
-		Stage stage = SedationMath.stage(state.level, MobAnatomy.vitalityScale(entity));
+		double scale = MobAnatomy.vitalityScale(entity);
+		state.level -= SedationMath.cleared(state.pending, state.level, scale);
+		Stage stage = SedationMath.stage(state.level, scale);
 		slow(entity, state, stage);
 		// Its body has to be ticked for the stage's hold on consciousness to
 		// bite, injured or not.
@@ -175,7 +176,7 @@ public final class Sedation {
 		// The effect lasts as long as the drug does: a potion's own duration
 		// is only how long the dose takes to give.
 		MobEffectInstance effect = entity.getEffect(BrewedEffects.SEDATION);
-		int left = SedationMath.ticksToClear(state.pending, state.level);
+		int left = SedationMath.ticksToClear(state.pending, state.level, scale);
 		if (effect != null && left > effect.getDuration() + 20) {
 			entity.forceAddEffect(new MobEffectInstance(BrewedEffects.SEDATION, left, effect.getAmplifier(),
 					effect.isAmbient(), effect.isVisible(), effect.showIcon()), null);

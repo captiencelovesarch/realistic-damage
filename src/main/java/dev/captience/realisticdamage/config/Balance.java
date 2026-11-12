@@ -1459,8 +1459,21 @@ public final class Balance {
 	public static final int SEDATION_DOSE_TICKS = 100;
 	/** How long a dose takes to take hold, ticks (the eyelids get heavy, then you go). */
 	public static final int SEDATION_ABSORB_TICKS = 200;
-	/** How long the body takes to clear one dose once it has taken hold, ticks. */
-	public static final int SEDATION_CLEAR_TICKS = 2400;
+	/**
+	 * Once a dose has taken hold the body clears it by half-lives, like a real
+	 * drug: half of what is in it every this many ticks. So one arrow has a
+	 * player down for about 12 s and a strong one about 30 s, where a fixed
+	 * clearing rate kept two doses on the floor for over two minutes (items.6).
+	 */
+	public static final int SEDATION_HALF_LIFE_TICKS = 200;
+	/** Below this much (per unit of body size) what is left is gone, and the effect ends. */
+	public static final double SEDATION_CLEAR_FLOOR = 0.05;
+	/**
+	 * A body that has stopped breathing barely clears it: a dose per this many
+	 * ticks, the old steady rate, so an overdose still runs the hypoxia debt
+	 * all the way up unless milk clears it first.
+	 */
+	public static final int SEDATION_OVERDOSE_CLEAR_TICKS = 2400;
 	/** Stage bars, in doses per unit of body size (a zombie or a player is 1, a ravager 5). */
 	public static final double SEDATION_DROWSY = 0.25;
 	public static final double SEDATION_STUMBLING = 0.5;
