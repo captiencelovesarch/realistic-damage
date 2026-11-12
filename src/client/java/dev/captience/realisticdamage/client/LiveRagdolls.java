@@ -45,8 +45,8 @@ import org.jspecify.annotations.Nullable;
 public final class LiveRagdolls {
 	private LiveRagdolls() {}
 
-	/** Ticks the get-up takes. */
-	static final int GET_UP_TICKS = 22;
+	/** Ticks the get-up takes (GetUp: in stages, not one swing). */
+	static final int GET_UP_TICKS = GetUp.TICKS;
 	/** Thrown for at most this long before the entity leads regardless, ticks. */
 	private static final int MAX_THROWN_TICKS = 70;
 	/** The torso's pull toward the entity once down: velocity per block apart, blocks a second. */
@@ -78,13 +78,31 @@ public final class LiveRagdolls {
 			this.down = down;
 		}
 
+		/** How it is getting up, from the moment it starts to. */
+		GetUp.@org.jspecify.annotations.Nullable Plan plan;
+
+		/** 0 lying, rising to 1 standing over the get-up. */
+		double progress(float partial) {
+			if (gettingUp < 0) {
+				return 0.0;
+			}
+			if (!Double.isNaN(heldProgress)) {
+				return heldProgress;
+			}
+			return Mth.clamp((gettingUp + partial) / GET_UP_TICKS, 0.0F, 1.0F);
+		}
+
 		/** 1 lying, falling to 0 standing over the get-up. */
 		float blend(float partial) {
-			if (gettingUp < 0) {
-				return 1.0F;
+			return (float) (1.0 - progress(partial));
+		}
+
+		/** This frame of the body: the ragdoll, or part of the way up from it. */
+		RagdollCorpse.Frame frame(float partial, net.minecraft.world.phys.Vec3 feet, float bodyYaw) {
+			if (gettingUp < 0 || plan == null) {
+				return ragdoll.frame(partial);
 			}
-			float t = Mth.clamp((gettingUp + partial) / GET_UP_TICKS, 0.0F, 1.0F);
-			return 1.0F - t * t * (3.0F - 2.0F * t);
+			return ragdoll.getUpFrame(partial, feet, bodyYaw, plan, progress(partial));
 		}
 	}
 
@@ -179,9 +197,10 @@ public final class LiveRagdolls {
 				if (flagged) {
 					// Knocked down again on the way up: down it goes again.
 					live.gettingUp = -1;
+					live.plan = null;
 					live.thrown = true;
 					live.ragdoll.body.wake();
-				} else if (++live.gettingUp >= GET_UP_TICKS) {
+				} else if (Double.isNaN(heldProgress) && ++live.gettingUp >= GET_UP_TICKS) {
 					it.remove();
 				}
 				continue;
@@ -227,6 +246,9 @@ public final class LiveRagdolls {
 					it.remove();
 				} else {
 					live.gettingUp = 0;
+					// Face up or face down decides the way up (GetUp).
+					live.plan = GetUp.plan(ragdoll.body.orientation(HumanoidRagdoll.TORSO, 1.0F,
+							new org.joml.Quaterniond()), body.yBodyRot);
 				}
 			}
 		}
@@ -393,6 +415,18 @@ public final class LiveRagdolls {
 	/** For the client gametest. */
 	public static int count() {
 		return LIVE.size();
+	}
+
+	/** For the client gametest: every get-up held at this progress (0-1); NaN to let them run. */
+	public static double heldProgress = Double.NaN;
+
+	/** For the client gametest: which way this body is getting up ("face_down", "face_up"), and facing where. */
+	public static @Nullable String getUpRoute(Entity entity) {
+		Live live = of(entity);
+		if (live == null || live.plan == null) {
+			return null;
+		}
+		return (live.plan.route() == GetUp.FACE_UP ? "face_up" : "face_down") + " " + live.plan.yaw();
 	}
 
 	/** For the client gametest: -1 no live ragdoll, 0 down, 1 getting up. */
