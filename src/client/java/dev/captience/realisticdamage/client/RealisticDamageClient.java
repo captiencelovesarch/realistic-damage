@@ -92,6 +92,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.LandingPayload.TYPE,
 				(payload, context) -> LandingEffect.trigger(payload.severity(), payload.hardness()));
+		dev.captience.realisticdamage.client.audio.SoundRecipes.init();
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.InjurySoundPayload.TYPE,
 				(payload, context) -> InjuryAudio.play(payload));
@@ -138,6 +139,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 		// hearts and the body diagram too, and not just the world behind them.
 		HudElementRegistry.addLast(RealisticDamage.id("blackout"), ConsciousnessEffects::renderBlackout);
 
+		ClientTickEvents.END_CLIENT_TICK.register(dev.captience.realisticdamage.client.audio.SoundDirector::tick);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			if (!noiseListening) {
 				// The sound manager is not ready when this initialiser runs; it is

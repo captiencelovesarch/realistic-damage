@@ -1,0 +1,9 @@
+{
+	"subtitle": "realisticdamage.subtitle.blood_splat",
+	"variants": [
+		{ "layers": [
+			{ "sound": "realisticdamage:grounded/blood_splat", "far": "realisticdamage:grounded/blood_splat_far" }
+		] }
+	],
+	"small": true
+}

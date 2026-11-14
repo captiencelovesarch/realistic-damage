@@ -119,6 +119,9 @@ public class RealisticDamage implements ModInitializer {
 	private static void registerInjurySounds() {
 		for (dev.captience.realisticdamage.net.InjurySound sound
 				: dev.captience.realisticdamage.net.InjurySound.values()) {
+			if (!sound.hasSoundEvents()) {
+				continue;   // 2.0 audio: a recipe on the client, nothing in the registry
+			}
 			for (boolean visceral : new boolean[] {false, true}) {
 				String path = sound.assetPath(visceral);
 				if (INJURY_SOUNDS.containsKey(path)) {

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Realistic Damage 2.0: sound tuner</title>
+<style>
+  :root { --bg:#15171a; --card:#1e2126; --line:#30353d; --text:#e6e8eb; --dim:#9aa3ad; --accent:#e0584f; --btn:#2a2f36; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f5f4f1; --card:#fff; --line:#dcd9d2; --text:#1d1f22; --dim:#5d646c; --accent:#b93a32; --btn:#ecebe7; }
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font:15px/1.5 system-ui, sans-serif; margin:0; padding:20px 16px 60px; }
+  main { max-width:900px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  .lead { color:var(--dim); margin:0 0 8px; max-width:70ch; }
+  .bar { position:sticky; top:0; z-index:2; background:var(--bg); padding:10px 0; border-bottom:1px solid var(--line);
+         display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  button { font:inherit; color:var(--text); background:var(--btn); border:1px solid var(--line); border-radius:6px;
+           padding:6px 12px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.play { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  label.check { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  #out { display:none; width:100%; height:110px; margin-top:8px; background:var(--card); color:var(--text);
+         border:1px solid var(--line); border-radius:6px; font:12px/1.4 ui-monospace, monospace; padding:8px; }
+  section { background:var(--card); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:6px;
+            padding:14px 16px; margin-top:16px; }
+  h2 { font-size:17px; margin:0; }
+  .blurb { color:var(--dim); margin:2px 0 10px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; margin-bottom:10px; }
+  .take { color:var(--dim); font-size:13px; }
+  .arcade { display:flex; flex-wrap:wrap; gap:8px; align-items:center; color:var(--dim); font-size:13px; margin-bottom:12px; }
+  .arcade audio { height:32px; max-width:100%; }
+  .sliders { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:8px 22px; }
+  .s { display:grid; grid-template-columns:1fr auto; gap:0 8px; font-size:13px; }
+  .s span.v { color:var(--dim); font-variant-numeric:tabular-nums; }
+  .s input { grid-column:1 / -1; width:100%; accent-color:var(--accent); margin:2px 0 0; }
+  .s.changed label { color:var(--accent); }
+</style></head><body><main>
+<h1>Realistic Damage 2.0: Grounded sound tuner</h1>
+<p class="lead">Every Grounded sound here is synthesised live in this page. Drag a slider and it plays again, so you can
+tune each one by ear. <b>New take</b> rolls different random cracks and splats with the same settings.</p>
+<p class="lead">When something sounds right (or you give up on one), press <b>Copy all settings</b> and paste it to
+Claude, with a few words on what still bothers you. Your sliders are remembered if you close the page.
+<b>Reset</b> goes back to the last settings Claude saved from you, not to Claude's first guess.</p>
+
+<div class="bar">
+  <button id="copy">Copy all settings</button>
+  <button id="resetAll">Reset everything</button>
+  <label class="check"><input type="checkbox" id="auto" checked> Play when I let go of a slider</label>
+</div>
+<textarea id="out" readonly></textarea>
+
+<div id="events"></div>
+</main>
+
+<script>
+/*__SYNTH__*/
+</script>
+<script>
+(function () {
+  'use strict';
+  const ARCADE = "__ARCADE__";
+  const { EVENTS, SLIDERS, render, SR } = RDSynth;
+  const KEY = 'rd-audio-tuner-v2';
+  const state = {};
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { saved = {}; }
+  for (const name of Object.keys(EVENTS)) {
+    const s = saved[name] || {}, ev = EVENTS[name], params = Object.assign({}, ev.defaults);
+    for (const key of Object.keys(ev.defaults)) if (s.params && Number.isFinite(s.params[key])) params[key] = s.params[key];
+    state[name] = { seed: s.seed || ev.seed, params };
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* private window: fine */ } }
+
+  let ctx = null, playing = null;
+  function play(name) {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+    if (ctx.state === 'suspended') ctx.resume();
+    const { left, right } = render(name, state[name].params, state[name].seed);
+    const buf = ctx.createBuffer(2, left.length, SR);
+    buf.copyToChannel(left, 0); buf.copyToChannel(right, 1);
+    if (playing) { try { playing.stop(); } catch (e) { /* already ended */ } }
+    playing = ctx.createBufferSource();
+    playing.buffer = buf; playing.connect(ctx.destination); playing.start();
+  }
+
+  function show(value, step) { return step >= 1 ? String(Math.round(value)) : Number(value).toFixed(2); }
+
+  const host = document.getElementById('events');
+  const redraw = {};
+  for (const [name, ev] of Object.entries(EVENTS)) {
+    const sec = document.createElement('section');
+    sec.innerHTML = '<h2></h2><p class="blurb"></p>' +
+      '<div class="row"><button class="play">▶ Play Grounded</button><button class="again">New take</button>' +
+      '<button class="reset">Reset this one</button><span class="take"></span></div>' +
+      '<div class="arcade"><span>Arcade version, to compare:</span></div><div class="sliders"></div>';
+    sec.querySelector('h2').textContent = ev.title;
+    sec.querySelector('.blurb').textContent = ev.blurb;
+    if (ARCADE && ARCADE[name]) {
+      const a = document.createElement('audio');
+      a.controls = true; a.preload = 'auto'; a.src = ARCADE[name];
+      sec.querySelector('.arcade').appendChild(a);
+    } else sec.querySelector('.arcade').remove();
+    const takeLabel = sec.querySelector('.take'), grid = sec.querySelector('.sliders'), rows = {};
+    for (const key of Object.keys(ev.defaults)) {
+      const [label, min, max, step] = SLIDERS[key];
+      const row = document.createElement('div');
+      row.className = 's';
+      row.innerHTML = '<label></label><span class="v"></span><input type="range">';
+      row.querySelector('label').textContent = label;
+      const input = row.querySelector('input');
+      input.min = min; input.max = max; input.step = step;
+      input.addEventListener('input', () => { state[name].params[key] = Number(input.value); paint(); });
+      input.addEventListener('change', () => { save(); if (document.getElementById('auto').checked) play(name); });
+      rows[key] = { row, input, value: row.querySelector('.v'), step };
+      grid.appendChild(row);
+    }
+    function paint() {
+      for (const [key, r] of Object.entries(rows)) {
+        const v = state[name].params[key];
+        r.input.value = v;
+        r.value.textContent = show(v, r.step);
+        r.row.classList.toggle('changed', Math.abs(v - ev.defaults[key]) > 1e-9);
+      }
+      takeLabel.textContent = 'take ' + state[name].seed + (state[name].seed === ev.seed ? ' (the saved one)' : '');
+    }
+    redraw[name] = paint;
+    sec.querySelector('.play').addEventListener('click', () => play(name));
+    sec.querySelector('.again').addEventListener('click', () => { state[name].seed += 1; paint(); save(); play(name); });
+    sec.querySelector('.reset').addEventListener('click', () => {
+      state[name] = { seed: ev.seed, params: Object.assign({}, ev.defaults) }; paint(); save(); play(name);
+    });
+    paint();
+    host.appendChild(sec);
+  }
+
+  document.getElementById('resetAll').addEventListener('click', () => {
+    for (const name of Object.keys(EVENTS)) { state[name] = { seed: EVENTS[name].seed, params: Object.assign({}, EVENTS[name].defaults) }; redraw[name](); }
+    save();
+  });
+  document.getElementById('copy').addEventListener('click', () => {
+    const out = document.getElementById('out');
+    out.value = JSON.stringify(state);
+    out.style.display = 'block';
+    out.focus(); out.select();
+    const btn = document.getElementById('copy');
+    const done = (ok) => { btn.textContent = ok ? 'Copied. Paste it to Claude' : 'Select the box below and copy it'; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(out.value).then(() => done(true), () => done(false));
+    else { try { done(document.execCommand('copy')); } catch (e) { done(false); } }
+  });
+
+  // For tests: render every event once and report, without touching audio.
+  window.rdSelfTest = () => Object.keys(EVENTS).map((name) => {
+    const { left } = render(name, state[name].params, state[name].seed);
+    return name + ' ' + (left.length / SR).toFixed(2) + 's ' + (left.every(Number.isFinite) ? 'ok' : 'BAD');
+  });
+})();
+</script>
+</body></html>

@@ -156,11 +156,94 @@ public final class RealisticDamageCommands {
 						.then(literal("arcade").executes(ctx -> preset(ctx, true)))
 						.then(literal("grounded").executes(ctx -> preset(ctx, false))))
 				.then(configTree())
+				.then(soundTree())
 				.then(literal("burn")
 						.then(argument("player", EntityArgument.player())
 								.executes(RealisticDamageCommands::burn)))
 				.then(RagdollTestCommand.tree());
 
+	}
+
+	/**
+	 * {@code sound <event> [mine|arcade|grounded] [strength] [self|far] [flesh|dry]}
+	 * (2.0 audio): plays one injury sound to whoever ran it. Every argument
+	 * after the event is optional and they are read in order.
+	 */
+	private static LiteralArgumentBuilder<CommandSourceStack> soundTree() {
+		return literal("sound")
+				.then(wordArg("event", Arrays.stream(dev.captience.realisticdamage.net.InjurySound.values())
+						.filter(sound -> !sound.isScream())
+						.map(dev.captience.realisticdamage.net.InjurySound::id).toList())
+						.executes(RealisticDamageCommands::sound)
+						.then(wordArg("set", List.of("mine", "arcade", "grounded"))
+								.executes(RealisticDamageCommands::sound)
+								.then(argument("strength", FloatArgumentType.floatArg(0.0F, 1.0F))
+										.executes(RealisticDamageCommands::sound)
+										.then(wordArg("from", List.of("self", "far"))
+												.executes(RealisticDamageCommands::sound)
+												.then(wordArg("material", List.of("flesh", "dry"))
+														.executes(RealisticDamageCommands::sound))))));
+	}
+
+	private static RequiredArgumentBuilder<CommandSourceStack, String> wordArg(String name, List<String> words) {
+		return argument(name, StringArgumentType.word())
+				.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(words, builder));
+	}
+
+	/** An optional word argument: the default if the command stopped before it. */
+	private static String word(CommandContext<CommandSourceStack> ctx, String name, String fallback) {
+		try {
+			return StringArgumentType.getString(ctx, name).toLowerCase(Locale.ROOT);
+		} catch (IllegalArgumentException absent) {
+			return fallback;
+		}
+	}
+
+	private static int sound(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+		ServerPlayer player = ctx.getSource().getPlayerOrException();
+		String id = word(ctx, "event", "");
+		var event = dev.captience.realisticdamage.net.InjurySound.byId(id);
+		if (event == null || event.isScream()) {
+			ctx.getSource().sendFailure(Component.literal("Unknown sound '" + id + "' (use: "
+					+ String.join(", ", Arrays.stream(dev.captience.realisticdamage.net.InjurySound.values())
+							.filter(sound -> !sound.isScream())
+							.map(dev.captience.realisticdamage.net.InjurySound::id).toList()) + ")"));
+			return 0;
+		}
+		String setWord = word(ctx, "set", "mine");
+		var set = dev.captience.realisticdamage.net.SoundSet.byId(setWord);
+		if (set == null && !setWord.equals("mine")) {
+			ctx.getSource().sendFailure(Component.literal("Unknown sound set '" + setWord + "' (use: mine, arcade, grounded)"));
+			return 0;
+		}
+		float strength;
+		try {
+			strength = FloatArgumentType.getFloat(ctx, "strength");
+		} catch (IllegalArgumentException absent) {
+			strength = 1.0F;
+		}
+		String from = word(ctx, "from", "self");
+		if (!from.equals("self") && !from.equals("far")) {
+			ctx.getSource().sendFailure(Component.literal("Unknown place '" + from + "' (use: self, far)"));
+			return 0;
+		}
+		String materialWord = word(ctx, "material", "flesh");
+		var material = dev.captience.realisticdamage.net.SoundMaterial.byId(materialWord);
+		if (material == null) {
+			ctx.getSource().sendFailure(Component.literal("Unknown material '" + materialWord + "' (use: flesh, dry)"));
+			return 0;
+		}
+		if (!dev.captience.realisticdamage.util.Notifier.soundTest(player, event, set, strength,
+				from.equals("far"), material)) {
+			ctx.getSource().sendFailure(Component.literal("Your game does not have Realistic Damage's sounds"));
+			return 0;
+		}
+		final float heard = strength;
+		ctx.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+				"Played %s (%s set, strength %.2f, %s, %s)", event.id(),
+				set == null ? "your" : set.id(), heard,
+				from.equals("far") ? "six blocks away" : "your own body", material.id())), false);
+		return 1;
 	}
 
 	private static RequiredArgumentBuilder<CommandSourceStack, String> partArg() {

@@ -1,0 +1,13 @@
+{
+	"subtitle": "realisticdamage.subtitle.fracture",
+	"variants": [
+		{ "layers": [
+			{ "sound": "realisticdamage:grounded/fracture", "far": "realisticdamage:grounded/fracture_far" }
+		] }
+	],
+	"dry": [
+		{ "layers": [
+			{ "sound": "realisticdamage:grounded/fracture_dry", "far": "realisticdamage:grounded/fracture_dry_far" }
+		] }
+	]
+}

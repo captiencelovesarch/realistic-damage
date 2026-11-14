@@ -114,6 +114,20 @@ visceral, and is **routed rather than played as a world sound**: the server send
 non-positional for your own body, 40% and positional for anybody else's. Style is
 presentation, so the server never decides it.
 
+**2.0 audio** (see `AUDIO_PLAN.md`) keeps that routing and replaces what is played. The
+two styles became two **sound sets**, Arcade and Grounded (`ClientEffectsConfig.soundSet()`,
+migrated from `visceralInjurySounds`). Each event in each set is a **recipe**, an asset at
+`assets/<ns>/rd_sounds/<set>/<event>.json` (`audio/SoundRecipe`): layers of sound *files*,
+each at a pitch, volume and delay in ticks, with optional variants, a `dry` list for
+bloodless bodies and a `small` flag for the budget. `client/audio/SoundDirector` plays
+them; `LayerSound` is a sound instance carrying its own single-file event, so a recipe can
+name one exact vanilla file without `sounds.json` or the registry. Arcade recipes name
+Minecraft's own files (never copied); Grounded names the mod's synthesised files, stereo
+for your own body and a mono `far` twin for the world. The payload gained `strength`,
+`material` (`MobAnatomy.BLOODLESS` → dry) and a forced set for `/rdmg sound`. New events
+(`DECAPITATION`, `BLOOD_SPLAT`, `WOUND_OPEN`) are recipes only and register nothing.
+Screams are still plain sound events.
+
 **The one sampled exception (1.7): screams.** A synthesised scream is a kazoo, and the
 playtest asked for TF2's by name, so a player's yell on a fracture and scream on a lost
 limb are TF2 pain lines — imported from the player's own TF2 install by
@@ -131,7 +145,7 @@ added later cannot be forgotten in one of two places. Core destruction split int
 1.0's behaviour, `NONE` takes you off the menu.
 
 Client presentation gained `lookInertiaIntensity` (split out of the sensitivity
-control), `showNumericStats`, `injurySoundVolume` and `visceralInjurySounds`. The
+control), `showNumericStats`, `injurySoundVolume` and `visceralInjurySounds` (since 2.0: `soundSetValue`). The
 accessibility screen is now an `OptionsSubScreen` with a scrolling, sectioned list.
 
 ## Added in 1.4

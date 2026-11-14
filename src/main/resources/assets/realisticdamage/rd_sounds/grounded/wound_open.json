@@ -1,0 +1,8 @@
+{
+	"subtitle": "realisticdamage.subtitle.wound_open",
+	"variants": [
+		{ "layers": [
+			{ "sound": "realisticdamage:grounded/wound_open", "far": "realisticdamage:grounded/wound_open_far" }
+		] }
+	]
+}
