@@ -1,5 +1,15 @@
 # Realistic Damage 2.0: what to test
 
+**One jar, one place (Nov 14 2026).** Everything in progress on 2.0 is in
+`realistic-damage-2.0.0-alpha.4.jar`: heads and necks, the field kit through
+items.10 with getting up in stages, and the new injury sounds. It is in the
+Prism instance **"Realistic Damage (dev)"**, the only place dev jars go from
+now on. That instance has Vivecraft in it, so it is also the VR instance: VR
+is switched on from the main menu button. **"Realistic Damage (public)"**
+holds the public version (1.7.0-alpha.13) and nothing else. The old "items"
+and "vr" instances are kept whole in
+`~/.local/share/PrismLauncher/instances-archived/`.
+
 ## Getting up, in stages (Nov 12 2026)
 
 The jar is `realistic-damage-2.0.0-items.8.getup.jar`: items.8 plus the new

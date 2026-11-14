@@ -1,8 +1,9 @@
 # Audio rework: what to test
 
-The jar is `realistic-damage-2.0.0-audio.1.jar`, in the Prism instance
-**"Realistic Damage"** (alpha.3 is parked in its `mods/replaced-jars/`). It is
-alpha.3 plus the new sound system and nothing else.
+The sounds are in the combined jar `realistic-damage-2.0.0-alpha.4.jar`, in
+the Prism instance **"Realistic Damage (dev)"**, together with the field kit
+(Nov 14 2026). Everything below was written for `2.0.0-audio.1`, which was the
+sounds alone, and applies unchanged.
 
 The plan is [AUDIO_PLAN.md](AUDIO_PLAN.md). I cannot hear, so everything below
 is checked by measurement and by tests, and only you can say if it sounds right.

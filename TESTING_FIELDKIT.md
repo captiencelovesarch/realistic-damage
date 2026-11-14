@@ -3,6 +3,16 @@
 The field kit is built on its own branch, beside the neck work, with its own
 version numbers: `2.0.0-items.N`. Newest round on top.
 
+**One jar, one place (Nov 14 2026).** Everything in progress on 2.0 is in
+`realistic-damage-2.0.0-alpha.4.jar`: heads and necks, the field kit through
+items.10 with getting up in stages, and the new injury sounds. It is in the
+Prism instance **"Realistic Damage (dev)"**, the only place dev jars go from
+now on. That instance has Vivecraft in it, so it is also the VR instance: VR
+is switched on from the main menu button. **"Realistic Damage (public)"**
+holds the public version (1.7.0-alpha.13) and nothing else. The old "items"
+and "vr" instances are kept whole in
+`~/.local/share/PrismLauncher/instances-archived/`.
+
 **Combined (Nov 11 2026):** items.1 and items.2 are merged into the `2.0`
 branch with the necks: the jar `realistic-damage-2.0.0-alpha.3.jar` has both
 and is in all three instances. Everything below applies to it unchanged.
