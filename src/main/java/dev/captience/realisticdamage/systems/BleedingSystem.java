@@ -92,11 +92,21 @@ public final class BleedingSystem {
 	 */
 	public static void spray(LivingEntity player, BodyPart part, WoundSeverity severity, Vec3 direction,
 			boolean severance) {
+		spray(player, part, severity, direction, severance, null);
+	}
+
+	/**
+	 * As above, from a place of the caller's choosing (2.0): a dead body that
+	 * has fallen away from where its entity stands bleeds where it landed.
+	 * {@code from} null is the region's own place on the standing body.
+	 */
+	public static void spray(LivingEntity player, BodyPart part, WoundSeverity severity, Vec3 direction,
+			boolean severance, @org.jspecify.annotations.Nullable Vec3 from) {
 		if (!ServerConfig.get().enableBleeding || !MobAnatomy.bleeds(player)) {
 			return;
 		}
 		ServerLevel level = (ServerLevel) player.level();
-		Vec3 at = BodyHitResolver.regionCenter(player, part);
+		Vec3 at = from != null ? from : BodyHitResolver.regionCenter(player, part);
 		// Straight up for want of a direction. Unit length, because `away` is a
 		// direction and the throw speed is applied to it two lines below: the 0.35
 		// this used to be was not shaping the cone, it was quietly throwing the

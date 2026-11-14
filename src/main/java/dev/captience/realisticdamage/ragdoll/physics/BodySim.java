@@ -124,6 +124,7 @@ public final class BodySim {
 		for (Body b : bodies) {
 			b.tickX.set(b.x);
 			b.tickQ.set(b.q);
+			b.impact = 0.0;
 		}
 		gather(world, dt);
 		fluids(world);
@@ -176,7 +177,9 @@ public final class BodySim {
 				selfCollide(bodies[pairs[i]], bodies[pairs[i + 1]]);
 			}
 			for (Joint j : joints) {
-				attach(j);
+				if (!j.child.gone) {
+					attach(j);
+				}
 			}
 			for (int i = 0; i < bodies.length; i++) {
 				worldCollide(i);
@@ -193,6 +196,9 @@ public final class BodySim {
 	public double maxMotion() {
 		double m = 0.0;
 		for (Body b : bodies) {
+			if (b.gone) {
+				continue;
+			}
 			m = Math.max(m, b.v.length());
 			m = Math.max(m, b.w.length() * 0.5);
 		}
@@ -213,6 +219,9 @@ public final class BodySim {
 		double maxY = Double.NEGATIVE_INFINITY;
 		double maxZ = Double.NEGATIVE_INFINITY;
 		for (Body b : bodies) {
+			if (b.gone) {
+				continue;
+			}
 			b.worldExtent(t1);
 			double reach = b.v.length() * dt + 0.25;
 			minX = Math.min(minX, b.x.x - t1.x - reach);
@@ -228,6 +237,9 @@ public final class BodySim {
 
 	private void fluids(PhysicsWorld world) {
 		for (Body b : bodies) {
+			if (b.gone) {
+				continue;
+			}
 			b.worldExtent(t1);
 			PhysicsWorld.Fluid f = world.fluid(b.x.x, b.x.y, b.x.z);
 			if (f.kind() == PhysicsWorld.Fluid.Kind.NONE) {
@@ -259,6 +271,9 @@ public final class BodySim {
 			b.prevQ.set(b.q);
 			b.prevV.set(b.v);
 			b.prevW.set(b.w);
+			if (b.gone) {
+				continue;
+			}
 			b.v.y -= gravity * (1.0 - b.submerged * b.buoyancy) * h;
 			if (b == supported) {
 				b.v.y += supportAccel * h;
@@ -278,6 +293,9 @@ public final class BodySim {
 		for (int pass = 0; pass < iterations; pass++) {
 			contactCount = 0;
 			for (Joint j : joints) {
+				if (j.child.gone) {
+					continue;
+				}
 				attach(j);
 				limit(j);
 				if (pass == 0) {
@@ -287,7 +305,7 @@ public final class BodySim {
 			// Planted feet after the joints, so a leg stood on is where the
 			// body vaults over rather than what it drags along.
 			for (Pin p : pins) {
-				if (p.active) {
+				if (p.active && !p.body.gone) {
 					pin(p, h);
 				}
 			}
@@ -303,6 +321,9 @@ public final class BodySim {
 		}
 
 		for (Body b : bodies) {
+			if (b.gone) {
+				continue;
+			}
 			b.v.set(b.x).sub(b.prevX).div(h);
 			// dq = q * prevQ^-1
 			b.prevQ.conjugate(q1);
@@ -331,7 +352,9 @@ public final class BodySim {
 			}
 		}
 		for (Joint j : joints) {
-			jointDamping(j, h);
+			if (!j.child.gone) {
+				jointDamping(j, h);
+			}
 		}
 	}
 
@@ -519,7 +542,7 @@ public final class BodySim {
 
 	private void worldCollide(int index) {
 		Body b = bodies[index];
-		if (boxes.size == 0) {
+		if (boxes.size == 0 || b.gone) {
 			return;
 		}
 		double sink = b.sink;
@@ -599,12 +622,12 @@ public final class BodySim {
 						nz = -1.0;
 					}
 				}
-				resolveWorldContact(index, i / 3, px, py, pz, nx, ny, nz, best);
+				resolveWorldContact(index, i / 3, k, px, py, pz, nx, ny, nz, best);
 			}
 		}
 	}
 
-	private void resolveWorldContact(int index, int sample, double px, double py, double pz,
+	private void resolveWorldContact(int index, int sample, int box, double px, double py, double pz,
 			double nx, double ny, double nz, double depth) {
 		Body b = bodies[index];
 		double rx = px - b.x.x;
@@ -640,6 +663,21 @@ public final class BodySim {
 			}
 		}
 
+		// The point's approach speed at the start of the substep, for the bounce
+		// and for whoever asks how hard this body just hit something.
+		double r0x = t2.x - b.prevX.x;
+		double r0y = t2.y - b.prevX.y;
+		double r0z = t2.z - b.prevX.z;
+		double vx = b.prevV.x + b.prevW.y * r0z - b.prevW.z * r0y;
+		double vy = b.prevV.y + b.prevW.z * r0x - b.prevW.x * r0z;
+		double vz = b.prevV.z + b.prevW.x * r0y - b.prevW.y * r0x;
+		double vn = vx * nx + vy * ny + vz * nz;
+		if (-vn > b.impact && !seam(box, px + nx * (depth + SEAM_PROBE), py + ny * (depth + SEAM_PROBE),
+				pz + nz * (depth + SEAM_PROBE))) {
+			b.impact = -vn;
+			b.impactAt.set(px, py, pz);
+			b.impactNormal.set(nx, ny, nz);
+		}
 		if (contactCount < MAX_CONTACTS) {
 			int c = contactCount++;
 			contactBody[c] = index;
@@ -648,15 +686,33 @@ public final class BodySim {
 			contactNormal[c * 3 + 1] = ny;
 			contactNormal[c * 3 + 2] = nz;
 			contactLambda[c] = lambda;
-			// The point's approach speed at the start of the substep, for the bounce.
-			double r0x = t2.x - b.prevX.x;
-			double r0y = t2.y - b.prevX.y;
-			double r0z = t2.z - b.prevX.z;
-			double vx = b.prevV.x + b.prevW.y * r0z - b.prevW.z * r0y;
-			double vy = b.prevV.y + b.prevW.z * r0x - b.prevW.x * r0z;
-			double vz = b.prevV.z + b.prevW.x * r0y - b.prevW.y * r0x;
-			contactVn[c] = vx * nx + vy * ny + vz * nz;
+			contactVn[c] = vn;
 		}
+	}
+
+	/** How far outside a face the seam check looks, blocks. */
+	private static final double SEAM_PROBE = 0.02;
+
+	/**
+	 * Whether a point just outside the face a contact was pushed out through is
+	 * inside another box: then that face is not a surface at all but the seam
+	 * between two blocks of the same floor or wall, which a point sliding along
+	 * a hair under the surface catches on. The push still happens (it always
+	 * has); it is only not counted as the body striking something, or a body
+	 * skidding across flat ground would read as hitting a wall at every block.
+	 */
+	private boolean seam(int box, double x, double y, double z) {
+		double[] d = boxes.data;
+		for (int k = 0; k < boxes.size; k++) {
+			if (k == box) {
+				continue;
+			}
+			int o = k * 6;
+			if (x > d[o] && x < d[o + 3] && y > d[o + 1] && y < d[o + 4] && z > d[o + 2] && z < d[o + 5]) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void contactVelocity(int c, double h) {
@@ -710,6 +766,9 @@ public final class BodySim {
 
 	/** The points of body a pushed out of the box of body b, both of them moving. */
 	private void selfCollide(Body a, Body b) {
+		if (a.gone || b.gone) {
+			return;
+		}
 		double hx = b.hx - selfMargin;
 		double hy = b.hy - selfMargin;
 		double hz = b.hz - selfMargin;

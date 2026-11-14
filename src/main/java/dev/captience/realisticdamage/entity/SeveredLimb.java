@@ -97,6 +97,17 @@ public class SeveredLimb extends Entity {
 	 * off or the part is not a limb.
 	 */
 	public static @Nullable SeveredLimb throwFrom(LivingEntity player, BodyPart part, Vec3 blowDirection, boolean blast) {
+		return throwFrom(player, part, blowDirection, blast, null);
+	}
+
+	/**
+	 * As above, from a place of the caller's choosing (2.0): a dead body the
+	 * server has followed down a cliff is not where its entity is, and the limb
+	 * has to start where the body landed. {@code from} null is the region's own
+	 * place on the standing body.
+	 */
+	public static @Nullable SeveredLimb throwFrom(LivingEntity player, BodyPart part, Vec3 blowDirection, boolean blast,
+			@Nullable Vec3 from) {
 		if (!part.isLimb() || !ServerConfig.get().spawnSeveredLimbs) {
 			return null;
 		}
@@ -107,7 +118,7 @@ public class SeveredLimb extends Entity {
 		}
 		ServerLevel level = (ServerLevel) player.level();
 		SeveredLimb limb = new SeveredLimb(RDEntities.SEVERED_LIMB, level);
-		Vec3 at = BodyHitResolver.regionCenter(player, part);
+		Vec3 at = from != null ? from : BodyHitResolver.regionCenter(player, part);
 		limb.setPos(at.x, at.y, at.z);
 		limb.ownedBy(player, part);
 		limb.setYRot(player.getYRot());

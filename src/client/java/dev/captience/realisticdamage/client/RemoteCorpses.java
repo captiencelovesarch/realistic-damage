@@ -363,6 +363,19 @@ public final class RemoteCorpses {
 		return ragdoll.body.present(dev.captience.realisticdamage.ragdoll.HumanoidRagdoll.HEAD) ? 1 : 0;
 	}
 
+	/**
+	 * Whether this body's ragdoll still has a part in the fall
+	 * ({@code HumanoidRagdoll.HEAD} and so on): 1 yes, 0 no, -1 no humanoid
+	 * ragdoll. For the client gametest (2.0: a limb lost after death).
+	 */
+	public static int ragdollPart(Entity entity, int part) {
+		SimulatedCorpse r = RAGDOLLS.get(entity.getId());
+		if (!(r instanceof RagdollCorpse ragdoll)) {
+			return -1;
+		}
+		return ragdoll.body.present(part) ? 1 : 0;
+	}
+
 	/** How much further than normal the ragdoll's neck may bend, or -1 with no humanoid ragdoll; for the gametests (2.0). */
 	public static double ragdollNeckLooseness(Entity entity) {
 		SimulatedCorpse r = RAGDOLLS.get(entity.getId());

@@ -49,6 +49,13 @@ import net.minecraft.world.phys.Vec3;
  * most (1.6 if not given) before it goes down. With 0 seconds it does not
  * weaken: it catches itself and is dropped once it has stood still.
  *
+ * <p>{@code /rdmg ragdoll drop [height]}: a husk is dropped from that many
+ * blocks up (30 if not given) a little in front of you, and killed in the air
+ * halfway down (2.0: a dead body keeps taking body damage until it comes to
+ * rest). It reaches the ground dead; from high enough the landing takes a
+ * leg. A husk and not a mannequin, because a husk's lost limb is one the
+ * client can draw lying on the ground.
+ *
  * <p>A mannequin that has only just been placed is killed a second later:
  * the death has to reach clients that already know the body is there.
  */
@@ -96,6 +103,10 @@ public final class RagdollTestCommand {
 
 	static LiteralArgumentBuilder<CommandSourceStack> tree() {
 		return literal("ragdoll")
+				.then(literal("drop")
+						.executes(ctx -> drop(ctx, DROP_HEIGHT))
+						.then(argument("height", FloatArgumentType.floatArg(6.0F, 200.0F))
+								.executes(ctx -> drop(ctx, FloatArgumentType.getFloat(ctx, "height")))))
 				.then(literal("shove")
 						.executes(ctx -> shove(ctx, 3.0F, "away", ON_FEET))
 						.then(argument("speed", FloatArgumentType.floatArg(0.0F, 8.0F))
@@ -236,6 +247,46 @@ public final class RagdollTestCommand {
 		mannequin.setYBodyRot(yaw);
 		level.addFreshEntity(mannequin);
 		return mannequin;
+	}
+
+	/** How far up the drop test's body starts when the command does not say, blocks. */
+	private static final float DROP_HEIGHT = 30.0F;
+	/** How far in front of the player it comes down, blocks. */
+	private static final double DROP_AHEAD = 6.0;
+
+	private static int drop(CommandContext<CommandSourceStack> ctx, float height) throws CommandSyntaxException {
+		ServerPlayer player = ctx.getSource().getPlayerOrException();
+		ServerLevel level = player.level();
+		net.minecraft.world.entity.monster.zombie.Husk husk = EntityTypes.HUSK.create(level, EntitySpawnReason.COMMAND);
+		if (husk == null) {
+			ctx.getSource().sendFailure(Component.literal("Could not place a body"));
+			return 0;
+		}
+		Vec3 look = player.getLookAngle();
+		Vec3 flat = new Vec3(look.x, 0.0, look.z);
+		flat = flat.lengthSqr() < 1.0e-6 ? new Vec3(0.0, 0.0, 1.0) : flat.normalize();
+		Vec3 at = player.position().add(flat.scale(DROP_AHEAD)).add(0.0, height, 0.0);
+		float yaw = player.getYRot() + 180.0F;
+		husk.snapTo(at.x, at.y, at.z, yaw, 0.0F);
+		husk.setYHeadRot(yaw);
+		husk.setYBodyRot(yaw);
+		husk.setBaby(false);
+		level.addFreshEntity(husk);
+		// Killed once it has fallen half the way, by vanilla's own fall (0.08 a
+		// tick squared, 2% drag): never sooner than clients can have met it.
+		int ticks = 0;
+		double speed = 0.0;
+		for (double fallen = 0.0; fallen < height * 0.5; ticks++) {
+			speed = (speed + 0.08) * 0.98;
+			fallen += speed;
+		}
+		int wait = Math.max(5, ticks);
+		// No blow, no direction: all that is left to throw it is the fall it is in.
+		Corpses.Script script = new Corpses.Script(DeathKind.BLOW, null, Vec3.ZERO, 0.0, 0.5);
+		PENDING.add(new Pending(level, husk, script, level.getServer().getTickCount() + wait, null, 0.0F, null));
+		ctx.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+				"Dropped a husk from %.0f blocks; it dies in the air after %.1f seconds", height, wait / 20.0)), false);
+		return 1;
 	}
 
 	private static int shove(CommandContext<CommandSourceStack> ctx, float speed, String direction, float onFeet)

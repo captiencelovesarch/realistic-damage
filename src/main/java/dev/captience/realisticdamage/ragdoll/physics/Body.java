@@ -66,6 +66,24 @@ public final class Body {
 	 */
 	public double sink;
 
+	/**
+	 * Off the body for good (a limb lost while the body was still falling, 2.0):
+	 * the simulation leaves it out from here on, and whoever owns it says where
+	 * it is drawn.
+	 */
+	public boolean gone;
+
+	/**
+	 * The hardest this body struck the world this tick (2.0): how fast the
+	 * striking point was closing on the surface, blocks a second, where, and
+	 * the surface's normal. 0 for a tick with no contact; a body lying still
+	 * reads a few hundredths. Only read, never fed back, so the fall itself is
+	 * the same whether anyone looks or not.
+	 */
+	public double impact;
+	public final Vector3d impactAt = new Vector3d();
+	public final Vector3d impactNormal = new Vector3d();
+
 	/** Points on the box that collide with the world, local, packed xyz. */
 	final double[] samples;
 

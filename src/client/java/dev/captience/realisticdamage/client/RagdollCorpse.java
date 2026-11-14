@@ -4,14 +4,12 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.ragdoll.Behaviour;
+import dev.captience.realisticdamage.ragdoll.CorpseLaunch;
 import dev.captience.realisticdamage.ragdoll.Muscles;
 import dev.captience.realisticdamage.ragdoll.Stand;
 import dev.captience.realisticdamage.ragdoll.Stepper;
 import dev.captience.realisticdamage.ragdoll.Stumble;
 import dev.captience.realisticdamage.ragdoll.StumbleStyle;
-import dev.captience.realisticdamage.systems.AdrenalineMath;
-import dev.captience.realisticdamage.systems.LimpMath;
-import dev.captience.realisticdamage.damage.DeathKind;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import dev.captience.realisticdamage.net.CorpsePayload;
 import dev.captience.realisticdamage.net.MovingStartPayload;
@@ -49,30 +47,13 @@ import org.jspecify.annotations.Nullable;
 final class RagdollCorpse extends SimulatedCorpse {
 	/** Seconds per tick. */
 	private static final double DT = 0.05;
-	/** A body pushed slower than this, blocks a second, gets a nudge to go over the way it faced. */
-	private static final double QUIET_SPEED = 0.8;
-	/** A body with no muscle left drops where it stands; this only picks the way it goes. Radians a second. */
-	private static final double DROP_NUDGE = 0.35;
-	/** A body letting go slowly sways before it sinks. */
-	private static final double SINK_NUDGE = 0.5;
-	/** The nudge: radians a second about the feet, at violence 0 and 1. */
-	private static final double TOPPLE_MIN = 0.9;
-	private static final double TOPPLE_MAX = 2.2;
-	/** A last-tick move faster than this, blocks a second, was a teleport, not motion. */
-	private static final double TELEPORT_SPEED = 25.0;
-	/** The fastest inherited travel, blocks a second: a sprint-jump. */
-	private static final double MAX_INHERITED_SPEED = 9.0;
 	/** How much of the walk cycle's limb swing a body keeps; vanilla's legs swing far too fast. */
 	private static final double LIMB_SWING_SHARE = 0.35;
 	/** How long a body keeps vanilla's red death tint, ticks. */
 	private static final int RED_TICKS = 8;
 
 	/** {@code BodyPart} ordinal to ragdoll part: the two enums list the sides in opposite orders. */
-	private static final int[] FROM_BODY_PART = {
-			HumanoidRagdoll.HEAD, HumanoidRagdoll.TORSO,
-			HumanoidRagdoll.LEFT_ARM, HumanoidRagdoll.RIGHT_ARM,
-			HumanoidRagdoll.LEFT_LEG, HumanoidRagdoll.RIGHT_LEG,
-	};
+	private static final int[] FROM_BODY_PART = CorpseLaunch.FROM_BODY_PART;
 
 	final HumanoidRagdoll body;
 	/** The renderer's model scale (vanilla's {@code scale(state, poseStack)}). */
@@ -106,6 +87,51 @@ final class RagdollCorpse extends SimulatedCorpse {
 		this.modelScale = modelScale;
 		this.world = new McPhysicsWorld(level);
 		this.level = level;
+		BodySnapshot snapshot = entity.getAttached(RDAttachments.SNAPSHOT);
+		this.lostSeen = snapshot == null ? 0 : snapshot.destroyedMask();
+		this.brokenSeen = snapshot == null ? 0 : snapshot.brokenMask();
+	}
+
+	/**
+	 * What the body's snapshot said was gone, and broken, when this ragdoll last
+	 * looked ({@code BodyPart} bits). A dead body can still lose a limb or break
+	 * a bone while it falls (2.0: the server follows it down and judges what it
+	 * lands on), and the news arrives as a new snapshot.
+	 */
+	private int lostSeen;
+	private int brokenSeen;
+
+	/**
+	 * Catches the ragdoll up with the body it is: a limb the server has since
+	 * taken off leaves the fall here (the model already hides it, and the
+	 * severed limb is its own entity), and a bone it has since broken goes
+	 * slack. Until 2.0 nothing could change after the ragdoll was built, so
+	 * nothing looked.
+	 */
+	private void followBody() {
+		LivingEntity who = entity.get();
+		if (who == null || who.isRemoved()) {
+			return;
+		}
+		BodySnapshot snapshot = who.getAttached(RDAttachments.SNAPSHOT);
+		if (snapshot == null) {
+			return;
+		}
+		int lost = snapshot.destroyedMask();
+		int broken = snapshot.brokenMask();
+		if (lost == lostSeen && broken == brokenSeen) {
+			return;
+		}
+		for (int bp = 0; bp < FROM_BODY_PART.length; bp++) {
+			int bit = 1 << bp;
+			if ((lost & bit) != 0 && (lostSeen & bit) == 0) {
+				body.detach(FROM_BODY_PART[bp]);
+			} else if ((broken & bit) != 0 && (brokenSeen & bit) == 0) {
+				body.breakLimb(FROM_BODY_PART[bp]);
+			}
+		}
+		lostSeen = lost;
+		brokenSeen = broken;
 	}
 
 	/** A ragdoll for this body, or null when its model is not a humanoid one. */
@@ -132,15 +158,8 @@ final class RagdollCorpse extends SimulatedCorpse {
 		double unit = entity.getScale() * modelScale / 16.0;
 
 		// Lost limbs take no part in the fall.
-		boolean[] present = {true, true, true, true, true, true};
 		BodySnapshot snapshot = entity.getAttached(RDAttachments.SNAPSHOT);
-		if (snapshot != null) {
-			for (int bp = 0; bp < FROM_BODY_PART.length; bp++) {
-				if ((snapshot.destroyedMask() & (1 << bp)) != 0) {
-					present[FROM_BODY_PART[bp]] = false;
-				}
-			}
-		}
+		boolean[] present = CorpseLaunch.present(snapshot);
 
 		float yaw = entity.yBodyRot;
 		Vector3d feet = new Vector3d(entity.getX(), entity.getY(), entity.getZ());
@@ -148,11 +167,7 @@ final class RagdollCorpse extends SimulatedCorpse {
 		// run is a teleport or a correction, not motion.
 		Vector3d seen = new Vector3d(entity.getX() - entity.xo, entity.getY() - entity.yo, entity.getZ() - entity.zo)
 				.div(DT);
-		if (seen.length() > TELEPORT_SPEED) {
-			seen.zero();
-		} else if (seen.length() > MAX_INHERITED_SPEED) {
-			seen.normalize(MAX_INHERITED_SPEED);
-		}
+		CorpseLaunch.inherited(seen);
 		// The stride: never more than the body was actually moving. A watching
 		// client's walk animation for someone else can read full stride while
 		// they stand still (it follows position corrections), and a corpse
@@ -441,93 +456,19 @@ final class RagdollCorpse extends SimulatedCorpse {
 	 */
 	private static void launch(HumanoidRagdoll ragdoll, LivingEntity entity, CorpsePayload payload,
 			Vector3d feet, Vector3d seen, Muscles muscles) {
-		double violence = Mth.clamp(payload.violence(), 0.0F, 1.0F);
-		// What this client already saw it doing is in the inherited motion; the
-		// server's launch (a blast, a knockback this client has not applied yet)
-		// adds whatever is beyond that.
-		Vector3d sent = new Vector3d(payload.vx(), payload.vy(), payload.vz()).mul(20.0);
-		if (sent.lengthSquared() > seen.lengthSquared()) {
-			ragdoll.push(sent.x - seen.x, sent.y - seen.y, sent.z - seen.z);
-		}
-		Vector3d moving = seen.lengthSquared() > sent.lengthSquared() ? seen : sent;
-
-		if (payload.hitPart() >= 0 && payload.hitPart() < FROM_BODY_PART.length && payload.kick() > 0.0F) {
-			double k = payload.kick() * 20.0;
-			ragdoll.kick(FROM_BODY_PART[payload.hitPart()], payload.hx() * k, payload.hy() * k, payload.hz() * k);
-		}
-
-		// Over the way it was pushed, or forward onto its face when nothing
-		// pushed it: head toward dir is a turn about up x dir. A body whose
-		// muscles are gone, or going, needs no shove: it drops under its own
-		// weight, and the turn only says which way.
-		double yaw = Math.toRadians(entity.yBodyRot);
-		Vector3d forward = new Vector3d(-Math.sin(yaw), 0.0, Math.cos(yaw));
-		Vector3d flat = new Vector3d(moving.x, 0.0, moving.z);
-		boolean quiet = flat.length() < QUIET_SPEED && payload.kind() != DeathKind.EXPLOSION;
-		Vector3d dir = flat.length() > 1.0e-3 ? flat.normalize() : forward;
-		double rate;
-		if (muscles.stringsCut) {
-			rate = DROP_NUDGE;
-		} else if (payload.kind() == DeathKind.FADE || payload.kind() == DeathKind.DROWNING) {
-			rate = SINK_NUDGE;
-		} else if (quiet) {
-			rate = TOPPLE_MIN + (TOPPLE_MAX - TOPPLE_MIN) * violence;
-		} else {
-			rate = 0.6;
-		}
-		ragdoll.spin(new Vector3d(dir.z, 0.0, -dir.x).mul(rate), feet);
+		// The same launch the server gives its own copy of the body (2.0).
+		CorpseLaunch.launch(ragdoll, entity.yBodyRot, payload, feet, seen, muscles);
 	}
-
-	/** Which open wound a dying hand goes to, most serious region first; -1 for none. */
-	private static final BodyPart[] WOUND_ORDER = {BodyPart.TORSO, BodyPart.HEAD, BodyPart.RIGHT_LEG,
-			BodyPart.LEFT_LEG, BodyPart.RIGHT_ARM, BodyPart.LEFT_ARM};
 
 	/** What the reflexes need: the kind of death, where it struck, the worst wound, the push. */
 	private static Behaviour.Input behaviourInput(LivingEntity entity, CorpsePayload payload,
 			@Nullable BodySnapshot snapshot, Muscles muscles) {
-		int hit = payload.hitPart() >= 0 && payload.hitPart() < FROM_BODY_PART.length
-				? FROM_BODY_PART[payload.hitPart()] : -1;
-		int wound = -1;
-		if (snapshot != null) {
-			for (BodyPart part : WOUND_ORDER) {
-				if ((snapshot.woundMask() & (1 << part.ordinal())) != 0) {
-					wound = FROM_BODY_PART[part.ordinal()];
-					break;
-				}
-			}
-		}
-		Vector3d push = new Vector3d(payload.hx(), 0.0, payload.hz());
-		if (push.lengthSquared() < 1.0e-6) {
-			push.set(payload.vx(), 0.0, payload.vz());
-		}
-		return new Behaviour.Input(payload.kind(), payload.violence(), hit, wound, muscles, push, entity.getId());
+		return CorpseLaunch.behaviourInput(entity.getId(), payload, snapshot, muscles);
 	}
 
 	/** The muscles a body dies with, its neck included (2.0). */
 	private static Muscles deathMuscles(CorpsePayload payload, @Nullable BodySnapshot snapshot) {
-		Muscles muscles = Muscles.forDeath(musclesInput(payload, snapshot));
-		return snapshot != null && snapshot.neckBroken() ? muscles.withBrokenNeck() : muscles;
-	}
-
-	/** What the body knew about itself as it died, from its synced snapshot, in ragdoll part order. */
-	private static Muscles.Input musclesInput(CorpsePayload payload, @Nullable BodySnapshot snapshot) {
-		int hit = payload.hitPart() >= 0 && payload.hitPart() < FROM_BODY_PART.length
-				? FROM_BODY_PART[payload.hitPart()] : -1;
-		if (snapshot == null) {
-			return Muscles.Input.healthy(payload.kind(), payload.violence(), hit);
-		}
-		boolean[] broken = new boolean[HumanoidRagdoll.PARTS];
-		boolean[] limp = new boolean[HumanoidRagdoll.PARTS];
-		int rungs = LimbStateExtractor.limbRungs(snapshot);
-		for (BodyPart part : BodyPart.values()) {
-			int i = FROM_BODY_PART[part.ordinal()];
-			broken[i] = snapshot.broken(part);
-			limp[i] = LimpMath.rungAt(rungs, part) == LimpMath.RUNG_RUINED;
-		}
-		AdrenalineMath.Phase adrenaline = snapshot.adrenaline();
-		return new Muscles.Input(payload.kind(), payload.violence(), hit, snapshot.consciousness(),
-				snapshot.unconscious(), broken, limp, snapshot.concussionGrade(),
-				adrenaline == AdrenalineMath.Phase.SURGE, adrenaline == AdrenalineMath.Phase.CRASH);
+		return CorpseLaunch.deathMuscles(payload, snapshot);
 	}
 
 	/**
@@ -563,6 +504,7 @@ final class RagdollCorpse extends SimulatedCorpse {
 			orphanAge++;
 		}
 		if (!body.broken()) {
+			followBody();
 			body.tick(world, DT * timeScale);
 		}
 		// The thud: the torso stopping hard against something. Sound and floor

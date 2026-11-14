@@ -160,6 +160,17 @@ public final class DestructionLogic {
 	 */
 	public static @org.jspecify.annotations.Nullable SeveredLimb destroy(LivingEntity player, RealisticDamageData data, BodyPart part,
 			WoundSeverity stump, Vec3 blowDirection, Cause cause) {
+		return destroy(player, data, part, stump, blowDirection, cause, null);
+	}
+
+	/**
+	 * As above, with the loss happening somewhere other than where the entity
+	 * stands (2.0): a dead body the server followed through its fall loses the
+	 * limb where it landed, so the spray and the limb start there. Everything
+	 * else is the same choke point. {@code at} null is the standing body.
+	 */
+	public static @org.jspecify.annotations.Nullable SeveredLimb destroy(LivingEntity player, RealisticDamageData data, BodyPart part,
+			WoundSeverity stump, Vec3 blowDirection, Cause cause, @org.jspecify.annotations.Nullable Vec3 at) {
 		data.part(part).setDestroyed(true);
 		if (part.isCore()) {
 			// A destroyed head or torso is not survivable, and the two read as
@@ -173,11 +184,11 @@ public final class DestructionLogic {
 		boolean bleeds = ServerConfig.get().enableBleeding && MobAnatomy.bleeds(player);
 		if (bleeds) {
 			data.addWound(part, stump);
-			BleedingSystem.spray(player, part, stump, blowDirection, true);
+			BleedingSystem.spray(player, part, stump, blowDirection, true, at);
 		}
 		// The limb itself (1.6.2), thrown along the blow: here, at the choke
 		// point, so no way of losing a limb can forget to leave one behind.
-		SeveredLimb limb = SeveredLimb.throwFrom(player, part, blowDirection, cause == Cause.BLAST);
+		SeveredLimb limb = SeveredLimb.throwFrom(player, part, blowDirection, cause == Cause.BLAST, at);
 		// Last, so the sentence the player reads is this one — and, when it is the
 		// stump wording, it only claims a bleeding stump when one was opened. The
 		// blast wording names a cause rather than a wound, so it needs no such

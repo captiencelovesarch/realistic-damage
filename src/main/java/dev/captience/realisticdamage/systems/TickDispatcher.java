@@ -22,6 +22,8 @@ public final class TickDispatcher {
 			}
 			// Mobs with bodies (1.7): only the injured set, nothing else is touched.
 			MobAnatomy.tick();
+			// Dead bodies still falling (2.0): at most a handful, each until it lies still.
+			dev.captience.realisticdamage.damage.CorpseImpacts.tick(server);
 		});
 	}
 

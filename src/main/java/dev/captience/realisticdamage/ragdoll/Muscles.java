@@ -133,6 +133,23 @@ public final class Muscles {
 		return m;
 	}
 
+	/** What a broken limb keeps of a dead joint's stiffness, and how much further than it should it bends. */
+	public static final double BROKEN_LIMB_FLOOR = 0.4;
+	public static final double BROKEN_LIMB_LOOSENESS = 1.3;
+
+	/**
+	 * These muscles with one more limb broken (2.0: a bone that goes when a body
+	 * already dead hits the ground): nothing holds it, and it bends further than
+	 * it should. The same as a limb that was broken before the death.
+	 */
+	public Muscles withBroken(int part) {
+		Muscles m = copy();
+		m.limb[part] = 0.0;
+		m.limbFloor[part] = BROKEN_LIMB_FLOOR;
+		m.looseness[part] = BROKEN_LIMB_LOOSENESS;
+		return m;
+	}
+
 	private Muscles copy() {
 		Muscles m = new Muscles();
 		System.arraycopy(start, 0, m.start, 0, GROUPS);
@@ -306,8 +323,8 @@ public final class Muscles {
 			if (broken) {
 				// Nothing holds it, and it bends further than it should.
 				m.limb[p] = 0.0;
-				m.limbFloor[p] = 0.4;
-				m.looseness[p] = 1.3;
+				m.limbFloor[p] = BROKEN_LIMB_FLOOR;
+				m.looseness[p] = BROKEN_LIMB_LOOSENESS;
 			} else if (limp) {
 				m.limb[p] = 0.0;
 				m.limbFloor[p] = 0.7;

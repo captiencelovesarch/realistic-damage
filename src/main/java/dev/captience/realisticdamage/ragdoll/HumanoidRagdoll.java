@@ -259,6 +259,80 @@ public final class HumanoidRagdoll {
 		}
 	}
 
+	/**
+	 * Takes a limb (or the head) off a body that is already falling (2.0: a dead
+	 * body that lands hard enough can still lose one). From here on it is as if
+	 * the body had been built without it: the part takes no further part in the
+	 * fall and rides on the torso as it hung at this moment, so the stump drawn
+	 * at its joint does not jump. The torso cannot be taken; a part already gone
+	 * stays gone. Returns whether anything changed.
+	 */
+	public boolean detach(int part) {
+		if (part == TORSO || part < 0 || part >= PARTS || !present[part]) {
+			return false;
+		}
+		present[part] = false;
+		Body t = bodies[TORSO];
+		Body b = bodies[part];
+		riderQ[part] = new Quaterniond(t.q).conjugate().mul(b.q);
+		riderX[part] = new Quaterniond(t.q).conjugate().transform(new Vector3d(b.x).sub(t.x));
+		b.gone = true;
+		b.v.zero();
+		b.w.zero();
+		b.impact = 0.0;
+		// What was resting on it, or asleep with it, has to find its place again.
+		wake();
+		return true;
+	}
+
+	/**
+	 * Lets a limb's bone go on a body that is already falling (2.0): nothing
+	 * holds it any more and it bends further than it should, exactly as a limb
+	 * that was broken before the death ({@link Muscles#forDeath}).
+	 */
+	public void breakLimb(int part) {
+		if (part == TORSO || part == HEAD || part < 0 || part >= PARTS || !present[part]) {
+			return;
+		}
+		setMuscles(muscles.withBroken(part));
+		wake();
+	}
+
+	/**
+	 * How hard a part struck the world in the tick just run: the closing speed
+	 * of whichever of its points hit hardest, blocks a second; 0 for a part that
+	 * touched nothing, is gone, or belongs to a body asleep.
+	 */
+	public double impact(int part) {
+		return present[part] && !asleep ? bodies[part].impact : 0.0;
+	}
+
+	/** The whole body's velocity (its centre of mass) at the start of the tick just run, blocks a second. */
+	private final Vector3d arriving = new Vector3d();
+
+	/**
+	 * How hard a part struck the world in the tick just run, as the body
+	 * arriving and not as a limb flailing: the part's own closing speed, but
+	 * never more than the speed the whole body was closing on that surface at.
+	 * A tumbling body's arm can whip into the floor at three times the speed the
+	 * body is travelling, and which arm does is different on every copy of the
+	 * ragdoll; how fast the body as a whole came down is the same on all of
+	 * them (measured: {@code CorpseAgreementTest}). Blocks a second.
+	 */
+	public double strike(int part) {
+		double own = impact(part);
+		if (own <= 0.0) {
+			return 0.0;
+		}
+		double closing = -arriving.dot(bodies[part].impactNormal);
+		return Math.max(0.0, Math.min(own, closing));
+	}
+
+	/** The whole body's velocity at the start of the tick just run, blocks a second. */
+	public Vector3d arriving() {
+		return new Vector3d(arriving);
+	}
+
 	/** Vanilla's model rotation for a body yaw: Ry(180 - yaw) * Rz(180). */
 	public static Quaterniond modelRotation(float bodyYaw) {
 		return new Quaterniond().rotationY(Math.toRadians(180.0 - bodyYaw)).rotateZ(Math.PI);
@@ -347,6 +421,7 @@ public final class HumanoidRagdoll {
 			for (Body b : bodies) {
 				b.tickX.set(b.x);
 				b.tickQ.set(b.q);
+				b.impact = 0.0;
 			}
 			carryLost();
 			if (behaviour != null && behaviour.wantsWake(this, age)) {
@@ -381,6 +456,16 @@ public final class HumanoidRagdoll {
 			}
 		}
 		applyTone();
+		// How the body as a whole is travelling as this tick begins, for strike().
+		arriving.zero();
+		double mass = 0.0;
+		for (int i = 0; i < PARTS; i++) {
+			if (present[i]) {
+				arriving.fma(bodies[i].mass, bodies[i].v);
+				mass += bodies[i].mass;
+			}
+		}
+		arriving.div(mass);
 		for (int i = 0; i < PARTS; i++) {
 			// A limb its reflexes are moving is not to be smothered as it settles,
 			// nor is a leg being stood on or stepped with.
@@ -570,7 +655,7 @@ public final class HumanoidRagdoll {
 	public @org.jspecify.annotations.Nullable Joint jointOf(int part) {
 		for (int i = 0; i < joints.length; i++) {
 			if (jointPart[i] == part) {
-				return joints[i];
+				return present[part] ? joints[i] : null;
 			}
 		}
 		return null;
@@ -705,6 +790,9 @@ public final class HumanoidRagdoll {
 		double[] twist = new double[1];
 		Quaterniond rel = new Quaterniond();
 		for (Joint j : joints) {
+			if (j.child.gone) {
+				continue;
+			}
 			Joint.decompose(j.relative(rel), swing, twist);
 			sum += Math.abs(swing.x) + Math.abs(swing.z) + Math.abs(twist[0]) * 0.5;
 		}
@@ -720,6 +808,9 @@ public final class HumanoidRagdoll {
 	public double worstSeparation() {
 		double worst = 0.0;
 		for (Joint j : joints) {
+			if (j.child.gone) {
+				continue;
+			}
 			Vector3d a = j.parent.q.transform(j.anchorParent, new Vector3d()).add(j.parent.x);
 			Vector3d b = j.child.q.transform(j.anchorChild, new Vector3d()).add(j.child.x);
 			worst = Math.max(worst, a.distance(b));

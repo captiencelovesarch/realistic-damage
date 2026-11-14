@@ -126,7 +126,10 @@ public final class Corpses {
 				kick = lerp(violence, Balance.CORPSE_KICK_BLAST_MIN, Balance.CORPSE_KICK_BLAST_MAX);
 			}
 		} else {
-			launch = body.getDeltaMovement();
+			// What it was doing when it died. For a player who was really
+			// travelling (falling, gliding) that is what their client last
+			// reported: the server never moves players itself (2.0).
+			launch = CorpseImpacts.travel(body);
 			double stashed = data.peekDeathViolence(body.tickCount);
 			violence = stashed >= 0.0 ? stashed : 0.4;
 			// A snapped neck cuts every string at once (2.0): the body drops where
@@ -175,6 +178,9 @@ public final class Corpses {
 				hitPart == null ? -1 : hitPart.ordinal(),
 				(float) hitDir.x, (float) hitDir.y, (float) hitDir.z, (float) kick);
 		send(body, payload);
+		// And the server follows it down itself, if it died with the energy to
+		// matter: what it lands on can still cost it a limb (2.0).
+		CorpseImpacts.follow(body, payload);
 	}
 
 	private static void scripted(LivingEntity body, Script s) {
@@ -183,11 +189,22 @@ public final class Corpses {
 				? new Vec3(dir.x, 0.0, dir.z).scale(lerp(s.violence(), Balance.CORPSE_BLAST_SPEED_MIN, Balance.CORPSE_BLAST_SPEED_MAX))
 						.add(0.0, lerp(s.violence(), Balance.CORPSE_BLAST_LIFT_MIN, Balance.CORPSE_BLAST_LIFT_MAX), 0.0)
 				: dir.scale(s.kick() * 0.25);
+		// A staged death of a body that was really travelling keeps the travel
+		// (2.0: /rdmg ragdoll drop kills a body in the middle of a fall).
+		Vec3 travel = CorpseImpacts.travel(body);
+		if (travel.length() >= Balance.CORPSE_IMPACT_FOLLOW_SPEED) {
+			launch = launch.add(travel);
+		}
+		if (launch.length() > MAX_LAUNCH) {
+			launch = launch.normalize().scale(MAX_LAUNCH);
+		}
 		HELD.add(body);
-		send(body, new CorpsePayload(body.getId(), s.kind(), (float) s.violence(),
+		CorpsePayload payload = new CorpsePayload(body.getId(), s.kind(), (float) s.violence(),
 				(float) launch.x, (float) launch.y, (float) launch.z,
 				s.part() == null ? -1 : s.part().ordinal(),
-				(float) dir.x, (float) dir.y, (float) dir.z, s.part() == null ? 0.0F : (float) s.kick()));
+				(float) dir.x, (float) dir.y, (float) dir.z, s.part() == null ? 0.0F : (float) s.kick());
+		send(body, payload);
+		CorpseImpacts.follow(body, payload);
 	}
 
 	private static void send(LivingEntity body, CorpsePayload payload) {

@@ -1350,6 +1350,76 @@ public final class Balance {
 	public static final double CORPSE_KICK_BLAST_MIN = 0.20;
 	public static final double CORPSE_KICK_BLAST_MAX = 0.50;
 
+	// --- A dead body that is still falling (2.0) ---
+	//
+	// Death used to end the body's story: nothing after it could hurt it. Now a
+	// body that dies in the air, or dies of the landing itself, is followed by
+	// the server until it comes to rest, and what it strikes on the way can
+	// still break a bone or take a limb off. Tuned so that a death where you
+	// stood never loses anything, a death at the end of a long drop usually
+	// loses a leg, and a blast adds nothing to what LethalBlast already took.
+
+	/**
+	 * A body travelling at least this fast when it died, blocks a tick, is
+	 * followed. A sprint-jump is about 0.36 along the ground and a jump leaves at
+	 * 0.42, so nobody who merely died running is followed; a body three blocks
+	 * into a fall is. A hard lethal blast's launch is over it too, so those
+	 * bodies are followed, and the thresholds below are what keep them whole.
+	 */
+	public static final double CORPSE_IMPACT_FOLLOW_SPEED = 0.55;
+	/**
+	 * ...or one with this much clear air under its feet, blocks: it died still,
+	 * but it is about to fall far enough to matter (killed at the top of a jump
+	 * over a pit).
+	 */
+	public static final double CORPSE_IMPACT_FOLLOW_DROP = 5.0;
+	/**
+	 * How many dead bodies the server follows at once. Each costs a small
+	 * ragdoll simulation every tick until it lies still, so the number is fixed:
+	 * past it, a new death simply is not followed and keeps what it had (a mob
+	 * farm does not get to run forty ragdolls a second).
+	 */
+	public static final int CORPSE_IMPACT_MAX_BODIES = 6;
+	/**
+	 * Ticks between the server's body striking something and the result being
+	 * applied. A watching client's copy of the body starts a tick or two of
+	 * travel behind the server's (it was still gliding to where the server last
+	 * said the body was), so its landing comes that much later; without the wait
+	 * the limb would leave just above the ground. Measured in
+	 * {@code CorpseAgreementTest}: two ticks puts it on or just after the
+	 * landing for every copy.
+	 */
+	public static final int CORPSE_IMPACT_DELAY_TICKS = 2;
+	/**
+	 * A strike slower than this, blocks a second, is not looked at at all: the
+	 * flop of a body going over where it stood tops out near 9.
+	 */
+	public static final double CORPSE_IMPACT_MIN_SPEED = 16.0;
+	/**
+	 * Fall-trauma at which a dead limb's bone breaks. The scale is the living
+	 * landing's ({@link #FALL_TRAUMA_PER_BLOCK}, times what the surface gives
+	 * back, less what armour takes), read off the speed the body struck at
+	 * rather than off a height: see {@code CorpseImpactMath}. An arm at 5.0 is a
+	 * strike of 20.5 blocks a second onto ordinary ground, which a real fall
+	 * reaches after about eight blocks; a leg at 6.0 is 22.5, about nine.
+	 */
+	public static final double CORPSE_IMPACT_BREAK_ARM = 5.0;
+	public static final double CORPSE_IMPACT_BREAK_LEG = 6.0;
+	/**
+	 * Fall-trauma at which a dead body's limb comes off, by how many it has
+	 * already lost this way: the bar rises with each, as {@code LethalBlast}'s
+	 * does. On ordinary ground the first goes at a strike of 29 blocks a second
+	 * (a real fall of sixteen blocks), the second at 33 (twenty-four), the third
+	 * at 36.7 (thirty-one), the last at 39.4 (thirty-six), just under the
+	 * fastest the mod launches a body (40). So a fall that kills a healthy
+	 * player outright (twenty-three blocks unsoftened, thirty-eight softened)
+	 * costs the body one leg or both. The hardest lethal blast there is brings
+	 * a body down at about 10 on flat ground and 15 into a wall
+	 * ({@code CorpseAgreementTest}): under the floor above, and half of the
+	 * first bar.
+	 */
+	public static final double[] CORPSE_IMPACT_SEVER = {10.0, 13.0, 16.0, 18.5};
+
 	// --- Thrown off your feet without dying (active ragdolls phase 4) ---
 	// Violence as DeathMath scores a blow: the raw damage against one and a half
 	// health bars. For a 20-health body: a blast from 7.5, a big hitter from

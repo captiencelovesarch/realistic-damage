@@ -31,6 +31,7 @@
 			"dev.captience.realisticdamage.client.gametest.OwnRagdollClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.BleedOutViewClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.DecapitationClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.CorpseImpactClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.NeckClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.KnockdownClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.StandClientGameTest",
@@ -51,6 +52,7 @@
 		"fabric-gametest": [
 			"dev.captience.realisticdamage.gametest.FoundationGameTest",
 			"dev.captience.realisticdamage.gametest.CorpseGameTest",
+			"dev.captience.realisticdamage.gametest.CorpseImpactGameTest",
 			"dev.captience.realisticdamage.gametest.KnockdownGameTest",
 			"dev.captience.realisticdamage.gametest.MobDownGameTest",
 			"dev.captience.realisticdamage.gametest.DecapitationGameTest",
