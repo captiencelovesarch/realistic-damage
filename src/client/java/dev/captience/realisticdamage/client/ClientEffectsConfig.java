@@ -172,7 +172,7 @@ public final class ClientEffectsConfig {
 	public double bloodBodyIntensity = 1.0;
 	/**
 	 * Brighter, wetter, and more of it. The same split as
-	 * {@link #visceralInjurySounds}, and for the same reason: two players on one
+	 * {@link #soundSetValue}, and for the same reason: two players on one
 	 * server are allowed to disagree about how visceral their game is, because
 	 * none of it is a gameplay signal the other can be denied.
 	 */
@@ -425,11 +425,37 @@ public final class ClientEffectsConfig {
 		return cameraSwayIntensityValue == null ? 0.7 : cameraSwayIntensityValue;
 	}
 	/**
-	 * Which set of injury sounds to play: the muted set that sits inside
-	 * vanilla's palette, or the visceral set that does not. Presentation only,
-	 * so each player picks their own — the server never decides this.
+	 * Which set of injury sounds to play (2.0): Arcade, which is Minecraft's own
+	 * sounds layered and re-pitched, or Grounded, which is the mod's own and
+	 * gruesome. Presentation only, so each player picks their own — the server
+	 * never decides this. Null only in a file from before 2.0's audio; see
+	 * {@link #migrate}.
 	 */
-	public boolean visceralInjurySounds = false;
+	public dev.captience.realisticdamage.net.SoundSet soundSetValue;
+
+	/** Never null after load; use this rather than the field. */
+	public dev.captience.realisticdamage.net.SoundSet soundSet() {
+		return soundSetValue == null ? dev.captience.realisticdamage.net.SoundSet.ARCADE : soundSetValue;
+	}
+
+	/**
+	 * The 1.x switch between the muted and the visceral sounds, which the sound
+	 * set replaced. Only ever read once, from an old file, to carry the choice
+	 * over; null from then on, so it is no longer written.
+	 */
+	public Boolean visceralInjurySounds;
+
+	/**
+	 * Sedation's heavy eyelids (2.0 field kit): the slow blinks while drowsy,
+	 * the drooping lids while stumbling. Boxed and seeded from the vignette,
+	 * its nearest neighbour, so a silenced config stays silent.
+	 */
+	public Double sedationEffectsValue;
+
+	/** Never null after load; use this rather than the field. */
+	public double sedationEffects() {
+		return sedationEffectsValue == null ? 1.0 : sedationEffectsValue;
+	}
 
 	/** Punchy and readable — effects present but never obscuring. */
 	public void applyArcadePreset() {
@@ -447,7 +473,7 @@ public final class ClientEffectsConfig {
 		cameraLagIntensityValue = 0.5;
 		desaturationIntensity = 0.7;
 		distortionIntensity = 0.5;
-		visceralInjurySounds = false;
+		soundSetValue = dev.captience.realisticdamage.net.SoundSet.ARCADE;
 		// Blood is information here, not atmosphere: kept legible but tidied up,
 		// with the lens droplets pulled back hardest because they are the layer
 		// that actually sits between you and the game.
@@ -481,7 +507,7 @@ public final class ClientEffectsConfig {
 		cameraLagIntensityValue = 1.0;
 		desaturationIntensity = 1.0;
 		distortionIntensity = 1.0;
-		visceralInjurySounds = true;
+		soundSetValue = dev.captience.realisticdamage.net.SoundSet.GROUNDED;
 		bloodIntensityValue = 1.0;
 		bloodStainIntensity = 1.0;
 		bloodLensIntensity = 1.0;
@@ -527,6 +553,7 @@ public final class ClientEffectsConfig {
 		lowHealthEffectsValue = 0.0;
 		breathingVolumeValue = 0.0;
 		vrHapticsValue = 0.0;
+		sedationEffectsValue = 0.0;
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -601,6 +628,16 @@ public final class ClientEffectsConfig {
 		}
 		if (vrHapticsValue == null) {
 			vrHapticsValue = Math.min(1.0, impactIntensity);
+		}
+		if (soundSetValue == null) {
+			// Whoever chose the visceral sounds chose the gruesome ones.
+			soundSetValue = Boolean.TRUE.equals(visceralInjurySounds)
+					? dev.captience.realisticdamage.net.SoundSet.GROUNDED
+					: dev.captience.realisticdamage.net.SoundSet.ARCADE;
+		}
+		visceralInjurySounds = null;
+		if (sedationEffectsValue == null) {
+			sedationEffectsValue = Math.min(1.0, vignetteIntensity);
 		}
 		if (!cameraDriftSeeded) {
 			// One-time: a file from before 1.6.2 holds the old zero default. It

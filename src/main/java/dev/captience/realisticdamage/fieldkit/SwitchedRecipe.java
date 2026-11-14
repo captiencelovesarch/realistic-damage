@@ -74,7 +74,17 @@ public final class SwitchedRecipe implements CraftingRecipe {
 
 	@Override
 	public boolean matches(CraftingInput input, Level level) {
-		return half.on(level) && inner.matches(input, level);
+		return half.on(level) && inner.matches(input, level) && !goneOff(input, level);
+	}
+
+	/** A blood bag that has gone off is good for nothing, in the grid as anywhere (phase 4). */
+	private static boolean goneOff(CraftingInput input, Level level) {
+		for (ItemStack stack : input.items()) {
+			if (dev.captience.realisticdamage.fieldkit.medicine.BloodBagItem.spoiled(stack, level)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override

@@ -1,0 +1,16 @@
+{
+	"type": "realisticdamage:switched",
+	"switch": "medicine",
+	"recipe": {
+		"type": "minecraft:crafting_shapeless",
+		"category": "misc",
+		"ingredients": [
+			"#minecraft:wool",
+			"minecraft:string"
+		],
+		"result": {
+			"id": "realisticdamage:sling",
+			"count": 1
+		}
+	}
+}

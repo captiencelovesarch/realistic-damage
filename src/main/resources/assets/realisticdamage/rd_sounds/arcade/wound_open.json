@@ -1,0 +1,10 @@
+{
+	"subtitle": "realisticdamage.subtitle.wound_open",
+	"variants": [
+		{ "layers": [
+			{ "sound": "minecraft:item/trident/pierce1", "pitch": 1.15, "volume": 0.7 },
+			{ "sound": "minecraft:block/netherwart/break5" },
+			{ "sound": "minecraft:mob/slime/small3", "pitch": 0.9, "volume": 0.4 }
+		] }
+	]
+}

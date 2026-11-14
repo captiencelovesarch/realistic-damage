@@ -102,6 +102,13 @@ public class KnockdownClientGameTest implements FabricClientGameTest {
 			boolean wentDown = false;
 			boolean gotUp = false;
 			boolean done = false;
+			double farthest = 0.0;
+			double lowBox = 99.0;
+			boolean pickable = false;
+			// Smooth: no physics tick in which the torso moves farther than a body
+			// flies in one (the old hard pull back to the entity jerked it).
+			context.runOnClient(client -> LiveRagdolls.biggestStep(true));
+			long reportsBefore = context.computeOnClient(client -> LiveRagdolls.reports());
 			for (int t = 0; t < 240 && !done; t++) {
 				context.waitTicks(1);
 				int stage = context.computeOnClient(client -> {
@@ -110,6 +117,15 @@ public class KnockdownClientGameTest implements FabricClientGameTest {
 				});
 				if (stage == 0 && !wentDown) {
 					wentDown = true;
+				}
+				if (stage == 0) {
+					// Once it has come to rest the mob is put where it lies, and its box lies down with it.
+					farthest = Math.max(farthest, context.computeOnClient(client ->
+							LiveRagdolls.apart(client.level.getEntity(id[0]))));
+					lowBox = Math.min(lowBox, context.computeOnClient(client ->
+							(double) client.level.getEntity(id[0]).getBbHeight()));
+					// Where it lies, settled, is where the crosshair finds it (to drag it, to hit it).
+					pickable = context.computeOnClient(client -> LiveRagdolls.torsoPickable(client.level.getEntity(id[0])));
 				}
 				if (stage == 1 && !gotUp) {
 					gotUp = true;
@@ -127,7 +143,24 @@ public class KnockdownClientGameTest implements FabricClientGameTest {
 			}
 			context.waitTicks(5);
 			context.takeScreenshot("rd_knock_03_zombie_standing");
-			System.out.println("[rd] zombie knockdown: down " + wentDown + ", got up " + gotUp + ", done " + done);
+			System.out.println("[rd] zombie knockdown: down " + wentDown + ", got up " + gotUp + ", done " + done
+					+ ", ragdoll led its entity by up to " + String.format("%.2f", farthest) + ", box as low as "
+					+ String.format("%.2f", lowBox));
+			double biggestStep = context.computeOnClient(client -> LiveRagdolls.biggestStep(false));
+			System.out.println("[rd] knocked-down torso's biggest step in a tick: " + String.format("%.2f", biggestStep));
+			if (biggestStep > 1.0) {
+				throw new AssertionError("the flung ragdoll jumped " + biggestStep + " blocks in one tick: choppy");
+			}
+			if (reportsBefore == context.computeOnClient(client -> LiveRagdolls.reports())) {
+				throw new AssertionError("the zombie's ragdoll came to rest and nobody told the server where");
+			}
+			if (!pickable) {
+				throw new AssertionError("the settled zombie's body lay outside where the crosshair picks it: "
+						+ "the server did not put the mob where its ragdoll came to rest");
+			}
+			if (lowBox > 0.6) {
+				throw new AssertionError("the knocked-down zombie's hitbox never lay down: " + lowBox + " tall");
+			}
 			if (!wentDown) {
 				throw new AssertionError("a blast the zombie lived through did not ragdoll it");
 			}

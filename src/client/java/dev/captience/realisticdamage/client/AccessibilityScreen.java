@@ -196,7 +196,9 @@ public class AccessibilityScreen extends OptionsSubScreen {
 		this.list.addSmall(
 				slider("realisticdamage.config.low_health",
 						config::lowHealthEffects, value -> config.lowHealthEffectsValue = value),
-				null);
+				// Sedation's eyelids (2.0 field kit): something that happens to you.
+				slider("realisticdamage.config.sedation_effects",
+						config::sedationEffects, value -> config.sedationEffectsValue = value));
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.blood"));
 		// The master first and on its own row: everything under it is a share of
@@ -269,13 +271,15 @@ public class AccessibilityScreen extends OptionsSubScreen {
 		this.list.addSmall(
 				slider("realisticdamage.config.injury_sounds",
 						() -> config.injurySoundVolume, value -> config.injurySoundVolume = value),
-				CycleButton.booleanBuilder(
-								Component.translatable("realisticdamage.config.sound_style.visceral"),
-								Component.translatable("realisticdamage.config.sound_style.muted"),
-								config.visceralInjurySounds)
+				CycleButton.<dev.captience.realisticdamage.net.SoundSet>builder(
+								set -> Component.translatable("realisticdamage.config.sound_set." + set.id()),
+								config.soundSet())
+						.withValues(java.util.List.of(dev.captience.realisticdamage.net.SoundSet.values()))
+						.withTooltip(set -> net.minecraft.client.gui.components.Tooltip.create(
+								Component.translatable("realisticdamage.config.sound_set." + set.id() + ".tooltip")))
 						.create(0, 0, 150, 20,
-								Component.translatable("realisticdamage.config.sound_style"),
-								(button, value) -> config.visceralInjurySounds = value));
+								Component.translatable("realisticdamage.config.sound_set"),
+								(button, value) -> config.soundSetValue = value));
 		this.list.addSmall(
 				CycleButton.onOffBuilder(config.screams)
 						.create(0, 0, 150, 20, Component.translatable("realisticdamage.config.screams"),

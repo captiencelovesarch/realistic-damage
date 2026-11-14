@@ -46,6 +46,13 @@ public class RealisticDamage implements ModInitializer {
 				.register(dev.captience.realisticdamage.net.MovingStartPayload.TYPE,
 						dev.captience.realisticdamage.net.MovingStartPayload.CODEC);
 		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.serverboundPlay()
+				.register(dev.captience.realisticdamage.net.RagdollRestPayload.TYPE,
+						dev.captience.realisticdamage.net.RagdollRestPayload.CODEC);
+		net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.RagdollRestPayload.TYPE,
+				(payload, context) -> dev.captience.realisticdamage.systems.RagdollRest
+						.receive(context.player(), payload));
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.serverboundPlay()
 				.register(dev.captience.realisticdamage.net.PressurePayload.TYPE,
 						dev.captience.realisticdamage.net.PressurePayload.CODEC);
 		net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.registerGlobalReceiver(
@@ -119,6 +126,9 @@ public class RealisticDamage implements ModInitializer {
 	private static void registerInjurySounds() {
 		for (dev.captience.realisticdamage.net.InjurySound sound
 				: dev.captience.realisticdamage.net.InjurySound.values()) {
+			if (!sound.hasSoundEvents()) {
+				continue;   // 2.0 audio: a recipe on the client, nothing in the registry
+			}
 			for (boolean visceral : new boolean[] {false, true}) {
 				String path = sound.assetPath(visceral);
 				if (INJURY_SOUNDS.containsKey(path)) {

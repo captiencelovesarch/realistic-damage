@@ -518,8 +518,7 @@ public final class RemoteCorpses {
 		if (live != null) {
 			// Knocked down (phase 4): the ragdoll, or part of the way back up from it.
 			HumanoidRenderState humanoid = (HumanoidRenderState) state;
-			RagdollCorpse.Frame frame = live.ragdoll.frame(partialTicks, new Vec3(state.x, state.y, state.z),
-					state.bodyRot, live.blend(partialTicks));
+			RagdollCorpse.Frame frame = live.frame(partialTicks, new Vec3(state.x, state.y, state.z), state.bodyRot);
 			humanoid.swimAmount = 0.0F;
 			humanoid.isFallFlying = false;
 			humanoid.isVisuallySwimming = false;

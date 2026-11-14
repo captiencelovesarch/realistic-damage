@@ -135,7 +135,7 @@ public final class BodyHitResolver {
 		}
 
 		Pose pose = target.getPose();
-		if (pose == Pose.SWIMMING || pose == Pose.FALL_FLYING || pose == Pose.SPIN_ATTACK) {
+		if (pose == Pose.SWIMMING || pose == Pose.FALL_FLYING || pose == Pose.SPIN_ATTACK || lyingMob(target)) {
 			// Body lies along the facing axis; the 0.6-cube box only covers the
 			// core, so band along the horizontal instead of Y. Degrade gracefully.
 			double along = point.subtract(center).dot(forward);
@@ -169,6 +169,15 @@ public final class BodyHitResolver {
 			return BodyPart.LEFT_ARM;
 		}
 		return BodyPart.TORSO;
+	}
+
+	/** A mob down on the floor, in its lying box (DownedHitboxMixin): banded along the body, like a crawler. */
+	private static boolean lyingMob(LivingEntity target) {
+		if (target instanceof net.minecraft.world.entity.player.Player) {
+			return false;
+		}
+		var data = target.getAttached(dev.captience.realisticdamage.RDAttachments.DATA);
+		return data != null && (data.unconscious() || data.knockedDown());
 	}
 
 	/**

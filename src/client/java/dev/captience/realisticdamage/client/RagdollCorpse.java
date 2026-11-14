@@ -694,30 +694,111 @@ final class RagdollCorpse extends SimulatedCorpse {
 	}
 
 	/**
-	 * This frame, part of the way back to standing (phase 4: getting up):
-	 * {@code blend} 1 is the ragdoll, 0 the pose vanilla gives the living body
-	 * at {@code feet} facing {@code bodyYaw}. The whole body turns about the
-	 * hips between the two, so it reads as sitting up and rising rather than a
-	 * plank swinging up about its feet; the parts blend in {@link Frame#pose}.
+	 * This frame of getting up (see {@link GetUp}): the body between two of its
+	 * poses, the ragdoll as it lay, a key pose, or vanilla's own standing pose
+	 * at {@code feet} facing {@code bodyYaw}. The torso turns about the hips
+	 * and the hips move from where they lay to over the feet; the limbs blend
+	 * in {@link Frame#pose}.
 	 */
-	Frame frame(float partialTicks, Vec3 feet, float bodyYaw, float blend) {
+	Frame getUpFrame(float partialTicks, Vec3 feet, float bodyYaw, GetUp.Plan plan, double progress) {
 		Frame ragdoll = frame(partialTicks);
-		if (blend >= 1.0F) {
-			return ragdoll;
-		}
 		double unit = body.unit;
-		Quaterniond torsoQ = body.orientation(HumanoidRagdoll.TORSO, partialTicks, new Quaterniond());
-		Vector3d torsoPivot = body.pivot(HumanoidRagdoll.TORSO, partialTicks, new Vector3d());
-		Quaterniond standing = HumanoidRagdoll.modelRotation(bodyYaw);
+		GetUp.Route route = plan.route();
+		GetUp.Stage stage = GetUp.stage(route, progress);
+		Quaterniond lying = body.orientation(HumanoidRagdoll.TORSO, partialTicks, new Quaterniond());
 		Vector3d hipLocal = new Vector3d(0.0, 12.0 * unit, 0.0);
-		Vector3d hipRagdoll = torsoQ.transform(new Vector3d(hipLocal)).add(torsoPivot);
-		Vector3d hipStanding = new Vector3d(feet.x, feet.y + (HIP_FROM_FEET_PX) * unit, feet.z);
-		Quaterniond turn = new Quaterniond(standing).slerp(torsoQ, blend);
-		Vector3d hip = new Vector3d(hipStanding).lerp(hipRagdoll, blend);
+		Vector3d lyingHip = lying.transform(new Vector3d(hipLocal)).add(body.pivot(HumanoidRagdoll.TORSO, partialTicks,
+				new Vector3d()));
+		// Over the feet by the time it is rising: the hips come from where they lay.
+		double over = Mth.clamp(progress / route.at()[route.at().length - 1], 0.0, 1.0);
+		over = over * over * (3.0 - 2.0 * over);
+		double hx = Mth.lerp(over, lyingHip.x, feet.x);
+		double hz = Mth.lerp(over, lyingHip.z, feet.z);
+
+		Quaterniond fromTurn = turnAt(route, stage.from(), plan, bodyYaw, lying);
+		Quaterniond toTurn = turnAt(route, stage.to(), plan, bodyYaw, lying);
+		Quaterniond turn = new Quaterniond(fromTurn).slerp(toTurn, stage.t());
+		double fromY = hipYAt(route, stage.from(), feet, unit, lyingHip);
+		double toY = hipYAt(route, stage.to(), feet, unit, lyingHip);
+		Vector3d hip = new Vector3d(hx, Mth.lerp(stage.t(), fromY, toY), hz);
 		Vector3d root = hip.sub(turn.transform(new Vector3d(hipLocal)));
 		Quaternionf rotation = new Quaternionf((float) turn.x, (float) turn.y, (float) turn.z, (float) turn.w).rotateZ(Mth.PI);
-		return new Frame(new Vec3(root.x, root.y, root.z), rotation, modelScale, ragdoll.parts(), blend,
-				new java.util.IdentityHashMap<>());
+		float[] fromParts = partsAt(route, stage.from(), ragdoll.parts());
+		float[] toParts = partsAt(route, stage.to(), ragdoll.parts());
+		lastGetUp = new GetUpPose(new Vector3d(root), new Quaterniond(turn), fromParts, toParts, (float) stage.t());
+		return new Frame(new Vec3(root.x, root.y, root.z), rotation, modelScale, fromParts, (float) (1.0 - progress),
+				new java.util.IdentityHashMap<>(), toParts, (float) stage.t());
+	}
+
+	/**
+	 * Your own eyes in the getting-up pose this frame (first person): the
+	 * head's, and over the last stretch into standing, your own eyes'.
+	 */
+	Vec3 getUpEye(float partialTicks, Vec3 feet, float bodyYaw, GetUp.Plan plan, double progress, Vec3 standingEye) {
+		getUpFrame(partialTicks, feet, bodyYaw, plan, progress);
+		GetUpPose pose = lastGetUp;
+		Quaterniond from = headTurn(pose.from());
+		Quaterniond to = headTurn(pose.to());
+		Vector3d e = GetUp.eye(pose.neck(), pose.turn(), from.slerp(to, pose.t()), body.unit);
+		Vec3 eye = new Vec3(e.x, e.y, e.z);
+		return pose.to() == null ? eye.lerp(standingEye, pose.t()) : eye;
+	}
+
+	private static Quaterniond headTurn(float @Nullable [] parts) {
+		if (parts == null) {
+			return new Quaterniond();
+		}
+		int o = HumanoidRagdoll.HEAD * 6;
+		return new Quaterniond().rotationZYX(parts[o + 5], parts[o + 4], parts[o + 3]);
+	}
+
+	/** The last get-up frame worked out, for your own first-person eyes (RagdollView). */
+	record GetUpPose(Vector3d neck, Quaterniond turn, float @Nullable [] from, float @Nullable [] to, float t) {}
+
+	@Nullable GetUpPose lastGetUp;
+
+	/** The torso's world turn at pose {@code index}: -1 the ragdoll's, past the keys vanilla's standing one. */
+	private static Quaterniond turnAt(GetUp.Route route, int index, GetUp.Plan plan, float bodyYaw, Quaterniond lying) {
+		if (index < 0) {
+			return new Quaterniond(lying);
+		}
+		if (index >= route.keys().length) {
+			return HumanoidRagdoll.modelRotation(bodyYaw);
+		}
+		return GetUp.keyTurn(route, index, plan.yaw(), bodyYaw);
+	}
+
+	private static double hipYAt(GetUp.Route route, int index, Vec3 feet, double unit, Vector3d lyingHip) {
+		if (index < 0) {
+			return lyingHip.y;
+		}
+		double px = index >= route.keys().length ? HIP_FROM_FEET_PX : route.keys()[index].hipPx();
+		return feet.y + px * unit;
+	}
+
+	/**
+	 * A pose's parts in the frame's terms: the ragdoll's own; a key's angles,
+	 * with NaN for the pivots so vanilla's are used; or null for vanilla's
+	 * standing pose outright.
+	 */
+	private static float @Nullable [] partsAt(GetUp.Route route, int index, float[] ragdoll) {
+		if (index < 0) {
+			return ragdoll;
+		}
+		if (index >= route.keys().length) {
+			return null;
+		}
+		float[] rot = route.keys()[index].rot();
+		float[] parts = new float[HumanoidRagdoll.PARTS * 6];
+		for (int i = 0; i < HumanoidRagdoll.PARTS; i++) {
+			parts[i * 6] = Float.NaN;
+			parts[i * 6 + 1] = Float.NaN;
+			parts[i * 6 + 2] = Float.NaN;
+			parts[i * 6 + 3] = rot[i * 3];
+			parts[i * 6 + 4] = rot[i * 3 + 1];
+			parts[i * 6 + 5] = rot[i * 3 + 2];
+		}
+		return parts;
 	}
 
 	/** The hip pivot of a standing humanoid model, pixels above its feet (vanilla's 24.016 drop, less the 12 of the torso). */
@@ -728,7 +809,13 @@ final class RagdollCorpse extends SimulatedCorpse {
 	 * position), how the model root turns, and each part's offset and angles.
 	 */
 	record Frame(Vec3 root, Quaternionf rotation, float modelScale, float[] parts, float blend,
-			java.util.@Nullable IdentityHashMap<Object, float[]> vanilla) implements RemoteCorpses.Frame {
+			java.util.@Nullable IdentityHashMap<Object, float[]> vanilla, float @Nullable [] toward, float t)
+			implements RemoteCorpses.Frame {
+		Frame(Vec3 root, Quaternionf rotation, float modelScale, float[] parts, float blend,
+				java.util.@Nullable IdentityHashMap<Object, float[]> vanilla) {
+			this(root, rotation, modelScale, parts, blend, vanilla, null, 0.0F);
+		}
+
 		@Override
 		public void applyRotation(PoseStack poseStack) {
 			// After this, vanilla does Rz(180), its renderer scale and a 1.501
@@ -751,28 +838,47 @@ final class RagdollCorpse extends SimulatedCorpse {
 				}
 				return;
 			}
-			// Getting up: part of the way between where vanilla poses the living
-			// body and where the ragdoll lies. Vanilla's pose is read once per
-			// model per frame, before the first blend writes over it (this runs
-			// more than once a frame for the same model).
+			// Getting up: part of the way between two poses (GetUp). Vanilla's pose
+			// is read once per model per frame, before the first blend writes over
+			// it (this runs more than once a frame for the same model): it is the
+			// standing pose, and every key pose's pivots.
 			float[] v = vanilla.computeIfAbsent(model, m -> capture(parts));
+			float[] from = resolve(this.parts, v);
+			float[] to = resolve(toward, v);
 			org.joml.Quaternionf a = new org.joml.Quaternionf();
 			org.joml.Quaternionf b = new org.joml.Quaternionf();
 			Vector3f euler = new Vector3f();
 			for (int i = 0; i < parts.length; i++) {
 				int o = i * 6;
-				float rx = i == HumanoidRagdoll.TORSO ? 0.0F : this.parts[o];
-				float ry = i == HumanoidRagdoll.TORSO ? 0.0F : this.parts[o + 1];
-				float rz = i == HumanoidRagdoll.TORSO ? 0.0F : this.parts[o + 2];
-				a.rotationZYX(v[o + 5], v[o + 4], v[o + 3]);
-				b.rotationZYX(this.parts[o + 5], this.parts[o + 4], this.parts[o + 3]);
 				if (i == HumanoidRagdoll.TORSO) {
-					b.identity();
+					// The torso is the root, turned by the frame: its part stays put.
+					parts[i].setPos(0.0F, 0.0F, 0.0F);
+					parts[i].setRotation(0.0F, 0.0F, 0.0F);
+					continue;
 				}
-				a.slerp(b, blend).getEulerAnglesZYX(euler);
-				parts[i].setPos(Mth.lerp(blend, v[o], rx), Mth.lerp(blend, v[o + 1], ry), Mth.lerp(blend, v[o + 2], rz));
+				a.rotationZYX(from[o + 5], from[o + 4], from[o + 3]);
+				b.rotationZYX(to[o + 5], to[o + 4], to[o + 3]);
+				a.slerp(b, t).getEulerAnglesZYX(euler);
+				parts[i].setPos(Mth.lerp(t, from[o], to[o]), Mth.lerp(t, from[o + 1], to[o + 1]),
+						Mth.lerp(t, from[o + 2], to[o + 2]));
 				parts[i].setRotation(euler.x, euler.y, euler.z);
 			}
+		}
+
+		/** A pose's parts made whole: null is vanilla's; a key's missing pivots are vanilla's. */
+		private static float[] resolve(float @Nullable [] pose, float[] v) {
+			if (pose == null) {
+				return v;
+			}
+			float[] out = pose.clone();
+			for (int i = 0; i < out.length; i += 6) {
+				if (Float.isNaN(out[i])) {
+					out[i] = v[i];
+					out[i + 1] = v[i + 1];
+					out[i + 2] = v[i + 2];
+				}
+			}
+			return out;
 		}
 
 		private static float[] capture(ModelPart[] parts) {

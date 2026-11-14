@@ -1,0 +1,13 @@
+{
+	"subtitle": "realisticdamage.subtitle.decapitation",
+	"variants": [
+		{ "layers": [
+			{ "sound": "realisticdamage:grounded/decapitation", "far": "realisticdamage:grounded/decapitation_far" }
+		] }
+	],
+	"dry": [
+		{ "layers": [
+			{ "sound": "realisticdamage:grounded/decapitation_dry", "far": "realisticdamage:grounded/decapitation_dry_far" }
+		] }
+	]
+}

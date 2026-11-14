@@ -1,0 +1,8 @@
+{
+	"subtitle": "realisticdamage.subtitle.collapse",
+	"variants": [
+		{ "layers": [
+			{ "sound": "realisticdamage:grounded/collapse", "far": "realisticdamage:grounded/collapse_far" }
+		] }
+	]
+}

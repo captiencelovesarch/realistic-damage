@@ -1,0 +1,12 @@
+{
+	"subtitle": "realisticdamage.subtitle.collapse",
+	"variants": [
+		{ "layers": [
+			{ "sound": "minecraft:damage/fallbig", "pitch": 0.7, "volume": 0.8 },
+			{ "sound": "minecraft:item/armor/equip_leather1", "pitch": 0.7 },
+			{ "sound": "minecraft:damage/fallsmall", "pitch": 0.6, "volume": 0.9, "delay": 5 },
+			{ "sound": "minecraft:step/cloth1", "pitch": 0.6, "delay": 5 },
+			{ "sound": "minecraft:item/armor/equip_leather4", "pitch": 0.6, "volume": 0.8, "delay": 7 }
+		] }
+	]
+}

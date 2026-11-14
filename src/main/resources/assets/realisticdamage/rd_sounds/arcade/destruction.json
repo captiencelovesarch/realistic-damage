@@ -1,0 +1,19 @@
+{
+	"subtitle": "realisticdamage.subtitle.destruction",
+	"gain": 0.5,
+	"variants": [
+		{ "layers": [
+			{ "sound": "minecraft:mob/goat/horn_break2", "pitch": 0.8, "volume": 0.9 },
+			{ "sound": "minecraft:block/bone_block/break1", "pitch": 0.9, "volume": 0.8 },
+			{ "sound": "minecraft:block/mud/break4", "pitch": 0.8, "volume": 0.8 },
+			{ "sound": "minecraft:mob/slime/small2", "pitch": 0.7, "volume": 0.55, "delay": 1 },
+			{ "sound": "minecraft:block/mud/break6", "pitch": 0.65, "volume": 0.6, "delay": 2 }
+		] }
+	],
+	"dry": [
+		{ "layers": [
+			{ "sound": "minecraft:mob/goat/horn_break2", "pitch": 0.8, "volume": 0.9 },
+			{ "sound": "minecraft:block/bone_block/break1", "pitch": 0.9, "volume": 0.8 }
+		] }
+	]
+}

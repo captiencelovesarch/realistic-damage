@@ -1,0 +1,17 @@
+{
+	"type": "realisticdamage:switched",
+	"switch": "medicine",
+	"recipe": {
+		"type": "minecraft:crafting_shapeless",
+		"category": "misc",
+		"ingredients": [
+			"minecraft:tinted_glass",
+			"minecraft:tinted_glass",
+			"minecraft:leather"
+		],
+		"result": {
+			"id": "realisticdamage:tinted_goggles",
+			"count": 1
+		}
+	}
+}

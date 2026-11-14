@@ -33,6 +33,11 @@ abstract class EffectGateMixin {
 			cir.setReturnValue(false);
 			return;
 		}
+		// Bosses and the mindless can't be put to sleep (2.0, phase 3).
+		if (effect.is(BrewedEffects.SEDATION) && dev.captience.realisticdamage.fieldkit.brew.Sedation.refuses(self)) {
+			cir.setReturnValue(false);
+			return;
+		}
 		// The heart is still recovering from its last surge (2.0, phase 3).
 		if (effect.is(BrewedEffects.ADRENALINE) && BrewedEffects.refusesAdrenaline(self)) {
 			if (self instanceof Player player) {

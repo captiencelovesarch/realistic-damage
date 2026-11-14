@@ -5,6 +5,7 @@ import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.net.InjurySound;
 import dev.captience.realisticdamage.net.InjurySoundPayload;
+import dev.captience.realisticdamage.net.SoundMaterial;
 import dev.captience.realisticdamage.systems.CeilingMath;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.chat.Component;
@@ -177,9 +178,18 @@ public final class Notifier {
 	 * hears it non-positionally instead of as a noise coming from their feet.
 	 */
 	public static void injurySound(LivingEntity victim, InjurySound sound) {
+		injurySound(victim, sound, 1.0F);
+	}
+
+	/**
+	 * @param strength how bad, 0 to 1 (2.0). The client plays the same event
+	 *                 lighter or heavier; full strength is the sound as designed.
+	 */
+	public static void injurySound(LivingEntity victim, InjurySound sound, float strength) {
+		SoundMaterial material = material(victim);
 		if (victim instanceof ServerPlayer player && canHear(player)) {
 			ServerPlayNetworking.send(player, new InjurySoundPayload(
-					sound, true, player.getX(), player.getY(), player.getZ()));
+					sound, true, player.getX(), player.getY(), player.getZ(), strength, material));
 		}
 		// Everyone nearby hears it from where it happened — a zombie's leg going
 		// (1.7) is a cue across the cave exactly as a teammate's is.
@@ -187,7 +197,35 @@ public final class Notifier {
 				victim.getBoundingBox().inflate(Balance.INJURY_SOUND_RADIUS),
 				candidate -> candidate != victim && canHear(candidate))) {
 			ServerPlayNetworking.send(other, new InjurySoundPayload(
-					sound, false, victim.getX(), victim.getY(), victim.getZ()));
+					sound, false, victim.getX(), victim.getY(), victim.getZ(), strength, material));
 		}
+	}
+
+	/** A body with nothing in it to spill sounds like bone and nothing else. */
+	public static SoundMaterial material(LivingEntity body) {
+		return dev.captience.realisticdamage.systems.MobAnatomy.bleeds(body) ? SoundMaterial.FLESH : SoundMaterial.DRY;
+	}
+
+	/**
+	 * Plays one event to one player on demand, for {@code /rdmg sound} (2.0), so
+	 * a playtest of the audio does not need a real broken leg.
+	 *
+	 * @param set null for the player's own sound set
+	 * @param far as if it happened to someone six blocks in front of them,
+	 *            instead of to their own body
+	 * @return false if this player's client cannot hear the mod at all
+	 */
+	public static boolean soundTest(ServerPlayer player, InjurySound sound,
+			dev.captience.realisticdamage.net.@Nullable SoundSet set, float strength, boolean far,
+			SoundMaterial material) {
+		if (!canHear(player)) {
+			return false;
+		}
+		net.minecraft.world.phys.Vec3 at = far
+				? player.getEyePosition().add(player.getLookAngle().multiply(6.0, 0.0, 6.0))
+				: player.position();
+		ServerPlayNetworking.send(player, new InjurySoundPayload(sound, !far, at.x, at.y, at.z,
+				strength, material, InjurySoundPayload.forcing(set)));
+		return true;
 	}
 }

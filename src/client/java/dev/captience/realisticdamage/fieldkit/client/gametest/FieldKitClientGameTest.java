@@ -7,7 +7,13 @@ import dev.captience.realisticdamage.client.AccessibilityScreen;
 import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.fieldkit.Half;
 import dev.captience.realisticdamage.fieldkit.RulesView;
+import dev.captience.realisticdamage.fieldkit.brew.Sedation;
+import dev.captience.realisticdamage.fieldkit.brew.SedationMath.Stage;
+import dev.captience.realisticdamage.fieldkit.client.HeavyEyelids;
 import dev.captience.realisticdamage.fieldkit.client.LocalRules;
+import dev.captience.realisticdamage.fieldkit.client.NumbHud;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
 import dev.captience.realisticdamage.fieldkit.client.Welcome;
 import dev.captience.realisticdamage.fieldkit.client.WelcomeScreen;
 import dev.captience.realisticdamage.fieldkit.client.WorldRulesScreen;
@@ -196,6 +202,10 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 			context.setScreen(() -> null);
 			context.waitTicks(3);
 			creativeTabAndIcons(context, singleplayer);
+			sedationAndNumbing(context, singleplayer);
+			bleedingKit(context, singleplayer);
+			bonesAndSenses(context, singleplayer);
+			foodAndDrink(context, singleplayer);
 		}
 		context.waitTicks(5);
 		boolean cleared = context.computeOnClient(client -> !RulesView.received());
@@ -220,7 +230,8 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 		CreativeModeTab tab = context.computeOnClient(client ->
 				net.minecraft.core.registries.BuiltInRegistries.CREATIVE_MODE_TAB.getValue(FieldKitTab.KEY));
 		singleplayer.getServer().runCommand("rdmg config enableWeapons true");
-		context.waitFor(client -> RulesView.on(Half.WEAPONS), 60);
+		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
+		context.waitFor(client -> RulesView.on(Half.WEAPONS) && !RulesView.on(Half.MEDICINE), 60);
 		singleplayer.getServer().runCommand("gamemode creative @a");
 		singleplayer.getServer().runCommand("effect give @a realisticdamage:haemorrhage 120");
 		singleplayer.getServer().runCommand("effect give @a realisticdamage:adrenaline 20");
@@ -237,9 +248,15 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 		int shown = context.computeOnClient(client ->
 				((CreativeModeInventoryScreen) client.gui.screen()).getMenu().items.size());
 		int expected = context.computeOnClient(client -> FieldKitTab.contents().size());
-		if (!selected || shown != expected || expected < Kit.potions().size() * 4) {
-			throw new AssertionError("Weapons on: the Field kit tab must hold every form of every brew, selected="
-					+ selected + " shown=" + shown + " expected=" + expected);
+		long weaponsForms = context.computeOnClient(client -> Kit.potions().stream()
+				.flatMap(potion -> Kit.potionForms(potion).stream())
+				.filter(stack -> Kit.halves(stack).contains(Half.WEAPONS)).count());
+		boolean noMedicine = context.computeOnClient(client -> FieldKitTab.contents().stream()
+				.noneMatch(stack -> Kit.halves(stack).contains(Half.MEDICINE)));
+		if (!selected || shown != expected || expected != weaponsForms || !noMedicine) {
+			throw new AssertionError("Weapons on, Medicine off: the Field kit tab must hold every form of every"
+					+ " Weapons brew and nothing else, selected=" + selected + " shown=" + shown + " expected="
+					+ expected + " weapons forms=" + weaponsForms + " no medicine=" + noMedicine);
 		}
 		context.takeScreenshot("rd_fieldkit_06_creative_tab");
 
@@ -284,6 +301,227 @@ public class FieldKitClientGameTest implements FabricClientGameTest {
 		singleplayer.getServer().runCommand("effect clear @a");
 		singleplayer.getServer().runCommand("rdmg config enableWeapons false");
 		context.waitTicks(3);
+	}
+
+	/**
+	 * Sedation from behind your own eyes, and Numbing on your body diagram (2.0,
+	 * phase 3, round 2). The level is set on the server directly (the test's
+	 * server runs in this process) so each stage can be held still for its
+	 * screenshot; everything after that — the stage reaching the client, the
+	 * lids, the blackout, the numb diagram — is the real path.
+	 */
+	private void sedationAndNumbing(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runCommand("rdmg config enableWeapons true");
+		singleplayer.getServer().runCommand("rdmg config enableMedicine true");
+		context.waitFor(client -> RulesView.on(Half.WEAPONS) && RulesView.on(Half.MEDICINE), 60);
+		singleplayer.getServer().runCommand("gamemode survival @a");
+		context.setScreen(() -> null);
+		int framesBefore = context.computeOnClient(client -> HeavyEyelids.frames());
+
+		sedate(singleplayer, 0.3);
+		context.waitFor(client -> HeavyEyelids.stage() == Stage.DROWSY, 60);
+		context.waitFor(client -> HeavyEyelids.shown() > 0.6, 240);
+		context.takeScreenshot("rd_fieldkit_09_drowsy_blink");
+
+		sedate(singleplayer, 0.6);
+		context.waitFor(client -> HeavyEyelids.stage() == Stage.STUMBLING, 60);
+		context.waitTicks(20);
+		double droop = context.computeOnClient(client -> HeavyEyelids.shown());
+		if (droop < 0.25) {
+			throw new AssertionError("stumbling, the lids must hang part-closed between blinks, got " + droop);
+		}
+		context.takeScreenshot("rd_fieldkit_10_stumbling");
+
+		sedate(singleplayer, 1.0);
+		context.waitFor(client -> HeavyEyelids.stage() == Stage.OUT
+				&& dev.captience.realisticdamage.client.ClientState.snapshot() != null
+				&& dev.captience.realisticdamage.client.ClientState.snapshot().unconscious(), 100);
+		context.waitTicks(20);
+		context.takeScreenshot("rd_fieldkit_11_out");
+		int framesAfter = context.computeOnClient(client -> HeavyEyelids.frames());
+		if (framesAfter <= framesBefore) {
+			throw new AssertionError("the eyelids never drew");
+		}
+
+		// Milk: the drug is gone at once and the lids lift; the blackout it
+		// caused is the ordinary one and lifts the ordinary way.
+		singleplayer.getServer().runCommand("effect clear @a");
+		context.waitFor(client -> HeavyEyelids.stage() == Stage.NONE, 60);
+		String name = context.computeOnClient(client -> client.player.getName().getString());
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		context.waitTicks(20);
+
+		// Numb with a broken leg: the diagram shows frost, not the break.
+		int regionsBefore = context.computeOnClient(client -> NumbHud.regions());
+		singleplayer.getServer().runCommand("rdmg break " + name + " left_leg");
+		singleplayer.getServer().runCommand("effect give @a realisticdamage:numbing 60");
+		context.waitFor(client -> client.player.hasEffect(dev.captience.realisticdamage.fieldkit.brew.BrewedEffects.NUMBING),
+				60);
+		context.waitTicks(20);
+		int regionsAfter = context.computeOnClient(client -> NumbHud.regions());
+		if (regionsAfter <= regionsBefore) {
+			throw new AssertionError("numb, the body diagram must be drawn as frost");
+		}
+		context.takeScreenshot("rd_fieldkit_12_numb_hud");
+
+		singleplayer.getServer().runCommand("effect clear @a");
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runCommand("rdmg config enableWeapons false");
+		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
+		context.waitTicks(5);
+	}
+
+	/**
+	 * The bleeding kit from the player's chair (2.0, phase 4): hold the real use
+	 * key with a bandage on a bleeding arm until it lands, and see a tourniquet
+	 * the server put on reach this client.
+	 */
+	private void bleedingKit(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runCommand("rdmg config enableMedicine true");
+		context.waitFor(client -> RulesView.on(Half.MEDICINE), 60);
+		String name = context.computeOnClient(client -> client.player.getName().getString());
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runCommand("rdmg bleed " + name + " left_arm minor");
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with realisticdamage:bandage 2");
+		context.setScreen(() -> null);
+		context.waitTicks(10);
+
+		context.getInput().holdKey(options -> options.keyUse);
+		context.waitTicks(dev.captience.realisticdamage.config.Balance.BANDAGE_USE_TICKS / 2);
+		context.takeScreenshot("rd_fieldkit_13_bandaging");
+		context.waitTicks(dev.captience.realisticdamage.config.Balance.BANDAGE_USE_TICKS / 2 + 15);
+		context.getInput().releaseKey(options -> options.keyUse);
+		context.waitFor(client -> {
+			dev.captience.realisticdamage.fieldkit.medicine.Dressings.State state =
+					client.player.getAttached(dev.captience.realisticdamage.fieldkit.medicine.Dressings.STATE);
+			return state != null && state.bandages.containsKey(dev.captience.realisticdamage.body.BodyPart.LEFT_ARM);
+		}, 60);
+		int left = context.computeOnClient(client -> client.player.getMainHandItem().getCount());
+		if (left != 1) {
+			throw new AssertionError("holding use with a bandage on a bleeding arm should use one up, " + left + " left");
+		}
+
+		singleplayer.getServer().runCommand("rdmg bleed " + name + " left_leg critical");
+		singleplayer.getServer().runOnServer(server -> dev.captience.realisticdamage.fieldkit.medicine.Dressings.tourniquet(
+				server.getPlayerList().getPlayers().getFirst(), dev.captience.realisticdamage.body.BodyPart.LEFT_LEG));
+		context.waitFor(client -> {
+			dev.captience.realisticdamage.fieldkit.medicine.Dressings.State state =
+					client.player.getAttached(dev.captience.realisticdamage.fieldkit.medicine.Dressings.STATE);
+			return state != null && state.tourniquets.containsKey(dev.captience.realisticdamage.body.BodyPart.LEFT_LEG);
+		}, 60);
+		context.takeScreenshot("rd_fieldkit_14_dressed");
+
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runOnServer(server -> dev.captience.realisticdamage.fieldkit.medicine.Medicine.loosen(
+				server.getPlayerList().getPlayers().getFirst(), server.getPlayerList().getPlayers().getFirst()));
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with air");
+		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
+		context.waitTicks(5);
+	}
+
+	/**
+	 * Bones, head and senses from the player's chair (2.0, phase 4 round 2):
+	 * hold the real use key with a stethoscope and hear your own heart; wear
+	 * tinted goggles and see the world darken; see a sling the server put on a
+	 * broken arm reach this client.
+	 */
+	private void bonesAndSenses(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runCommand("rdmg config enableMedicine true");
+		context.waitFor(client -> RulesView.on(Half.MEDICINE), 60);
+		String name = context.computeOnClient(client -> client.player.getName().getString());
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with realisticdamage:stethoscope");
+		context.setScreen(() -> null);
+		context.waitTicks(10);
+
+		int before = context.computeOnClient(client -> dev.captience.realisticdamage.fieldkit.client.StethoscopeEar.beatsHeard);
+		context.getInput().holdKey(options -> options.keyUse);
+		context.waitTicks(100);
+		context.getInput().releaseKey(options -> options.keyUse);
+		int heard = context.computeOnClient(client -> dev.captience.realisticdamage.fieldkit.client.StethoscopeEar.beatsHeard)
+				- before;
+		if (heard < 2) {
+			throw new AssertionError("five seconds on your own chest should hear a calm heart a few times, heard " + heard);
+		}
+
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with air");
+		singleplayer.getServer().runCommand("item replace entity " + name + " armor.head with realisticdamage:tinted_goggles");
+		context.waitFor(client -> dev.captience.realisticdamage.fieldkit.medicine.Goggles.worn(client.player), 60);
+		context.waitTicks(5);
+		context.takeScreenshot("rd_fieldkit_15_goggles");
+		singleplayer.getServer().runCommand("item replace entity " + name + " armor.head with air");
+
+		singleplayer.getServer().runCommand("rdmg break " + name + " right_arm");
+		singleplayer.getServer().runOnServer(server -> dev.captience.realisticdamage.fieldkit.medicine.Dressings.sling(
+				server.getPlayerList().getPlayers().getFirst(), dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM));
+		context.waitFor(client -> dev.captience.realisticdamage.fieldkit.medicine.Dressings.slung(client.player,
+				dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM), 60);
+
+		singleplayer.getServer().runOnServer(server -> dev.captience.realisticdamage.fieldkit.medicine.Dressings.unsling(
+				server.getPlayerList().getPlayers().getFirst(), dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM));
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
+		context.waitTicks(5);
+	}
+
+	/**
+	 * Phase 4, round 3: drinking for real, with the use key. Spirits double the
+	 * world through the core's afterimage; coffee comes back as its bottle and
+	 * leaves you Caffeinated.
+	 */
+	private void foodAndDrink(ClientGameTestContext context, TestSingleplayerContext singleplayer) {
+		singleplayer.getServer().runCommand("rdmg config enableMedicine true");
+		context.waitFor(client -> RulesView.on(Half.MEDICINE), 60);
+		String name = context.computeOnClient(client -> client.player.getName().getString());
+		singleplayer.getServer().runCommand("rdmg heal " + name);
+		singleplayer.getServer().runCommand("effect clear " + name);
+		singleplayer.getServer().runCommand("item replace entity " + name
+				+ " weapon.mainhand with minecraft:potion[potion_contents={potion:\"realisticdamage:spirits\"}]");
+		context.setScreen(() -> null);
+		context.waitTicks(10);
+		context.getInput().holdKey(options -> options.keyUse);
+		context.waitFor(client -> client.player.hasEffect(dev.captience.realisticdamage.fieldkit.medicine.Provisions.TIPSY),
+				80);
+		context.getInput().releaseKey(options -> options.keyUse);
+		context.waitTicks(5);
+		double floor = dev.captience.realisticdamage.config.Balance.SPIRITS_AFTERIMAGE
+				* dev.captience.realisticdamage.client.ClientEffectsConfig.get().afterimageIntensity;
+		double doubled = context.computeOnClient(client -> dev.captience.realisticdamage.client.Afterimage.strength());
+		if (doubled < floor - 0.01) {
+			throw new AssertionError("tipsy, the world should double at " + floor + ", got " + doubled);
+		}
+		singleplayer.getServer().runCommand("effect clear " + name);
+		context.waitFor(client -> dev.captience.realisticdamage.client.Afterimage.strength() < 0.05, 60);
+
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with realisticdamage:coffee");
+		context.waitTicks(5);
+		context.getInput().holdKey(options -> options.keyUse);
+		context.waitFor(client -> client.player.hasEffect(
+				dev.captience.realisticdamage.fieldkit.medicine.Provisions.CAFFEINATED), 80);
+		context.getInput().releaseKey(options -> options.keyUse);
+		context.waitFor(client -> client.player.getMainHandItem().is(net.minecraft.world.item.Items.GLASS_BOTTLE), 20);
+
+		singleplayer.getServer().runCommand("effect clear " + name);
+		singleplayer.getServer().runCommand("item replace entity " + name + " weapon.mainhand with air");
+		singleplayer.getServer().runCommand("rdmg config enableMedicine false");
+		// The world is left straight after this stage: let the switch's own
+		// sync (every 10 ticks) land first, so the leaving is all that's tested.
+		context.waitFor(client -> !RulesView.on(Half.MEDICINE), 60);
+		context.waitTicks(5);
+	}
+
+	/** Holds the local player at a Sedation level (doses over body size), on the in-process server. */
+	private static void sedate(TestSingleplayerContext singleplayer, double level) {
+		singleplayer.getServer().runOnServer(server -> {
+			ServerPlayer player = server.getPlayerList().getPlayers().getFirst();
+			if (!player.hasEffect(dev.captience.realisticdamage.fieldkit.brew.BrewedEffects.SEDATION)) {
+				player.addEffect(new MobEffectInstance(dev.captience.realisticdamage.fieldkit.brew.BrewedEffects.SEDATION,
+						100));
+			}
+			Sedation.State state = Sedation.peek(player);
+			state.pending = 0.0;
+			state.level = level;
+		});
 	}
 
 	// --- World rules, on a server ---

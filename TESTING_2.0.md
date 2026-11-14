@@ -1,5 +1,36 @@
 # Realistic Damage 2.0: what to test
 
+**One jar, one place (Nov 14 2026).** Everything in progress on 2.0 is in
+`realistic-damage-2.0.0-alpha.4.jar`: heads and necks, the field kit through
+items.10 with getting up in stages, and the new injury sounds. It is in the
+Prism instance **"Realistic Damage (dev)"**, the only place dev jars go from
+now on. That instance has Vivecraft in it, so it is also the VR instance: VR
+is switched on from the main menu button. **"Realistic Damage (public)"**
+holds the public version (1.7.0-alpha.13) and nothing else. The old "items"
+and "vr" instances are kept whole in
+`~/.local/share/PrismLauncher/instances-archived/`.
+
+## Getting up, in stages (Nov 12 2026)
+
+The jar is `realistic-damage-2.0.0-items.8.getup.jar`: items.8 plus the new
+get-up, in "Realistic Damage items" (items.8 parked in `mods/replaced-jars/`).
+The preview animations were sent in the chat (`build/preview/getup_face_*.gif`).
+
+- [ ] **1. Face down.** Knock a zombie flat so it lands on its front (a blast
+  from behind it): it pushes up on straight arms, sits back on its heels,
+  plants a foot and comes up off one knee, then stands. Not a plank swinging
+  up about its feet.
+- [ ] **2. Face up.** One that lands on its back sits up leaning on its hands,
+  rocks forward into a squat with its feet planted, and rises.
+- [ ] **3. It turns as it rises,** not on the ground: it gets up facing the way
+  its head (face down) or feet (face up) pointed, and turns to where it looks
+  only in the last part.
+- [ ] **4. You, in first person.** Get knocked down (fall, blast): the view
+  rises with your head through the same stages.
+- [ ] **5. You, in third person (F5),** and a friend watching you: the same.
+- [ ] **6. Knocked down again on the way up:** it drops straight back into the
+  ragdoll.
+
 The jar is `realistic-damage-2.0.0-alpha.3.jar`. It's **everything in one**:
 heads and necks (alpha.1 and alpha.2, below) plus the field kit (items.1 and
 items.2, checklist in [TESTING_FIELDKIT.md](TESTING_FIELDKIT.md)) plus the

@@ -23,7 +23,9 @@
 		"TotemDeathProtectionMixin",
 		"SeveredSkullDropMixin",
 		"ShallowWaterMixin",
-		"MobLookWhiplashMixin"
+		"MobLookWhiplashMixin",
+		"DownedHitboxMixin",
+		"LyingPickMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

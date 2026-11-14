@@ -128,6 +128,12 @@ public final class Decapitation {
 		}
 		SeveredHead head = SeveredHead.throwFrom(body, blowDirection, blast, by);
 		RDAttachments.pushSnapshot(body);
+		// The edge, the neck and what comes out of it (2.0 audio). Not for a
+		// blast: that head goes inside an explosion, and the explosion is the sound.
+		if (!blast) {
+			dev.captience.realisticdamage.util.Notifier.injurySound(body,
+					dev.captience.realisticdamage.net.InjurySound.DECAPITATION);
+		}
 		return head;
 	}
 }

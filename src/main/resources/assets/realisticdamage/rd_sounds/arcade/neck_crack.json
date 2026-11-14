@@ -1,0 +1,8 @@
+{
+	"subtitle": "realisticdamage.subtitle.neck_crack",
+	"variants": [
+		{ "layers": [
+			{ "sound": "realisticdamage:neck_crack_muted" }
+		] }
+	]
+}

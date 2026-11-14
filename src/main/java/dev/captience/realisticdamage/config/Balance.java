@@ -1521,4 +1521,127 @@ public final class Balance {
 	public static final double ADRENALINE_BLEED_FACTOR = 1.3;
 	/** The heart races at least this hard (Cardio's health distress, 0-1) while it lasts. */
 	public static final double ADRENALINE_HEART_DISTRESS = 0.6;
+
+	// Sedation (Weapons): a dose builds into a level; level over body size is the stage.
+	/** The drinkable potion's length, ticks. A tipped arrow carries an eighth of it. */
+	public static final int SEDATION_TICKS = 800;
+	/** An application this long or longer is one whole dose: a tipped arrow's share of the potion. */
+	public static final int SEDATION_DOSE_TICKS = 100;
+	/** How long a dose takes to take hold, ticks (the eyelids get heavy, then you go). */
+	public static final int SEDATION_ABSORB_TICKS = 200;
+	/**
+	 * Once a dose has taken hold the body clears it by half-lives, like a real
+	 * drug: half of what is in it every this many ticks. So one arrow has a
+	 * player down for about 12 s and a strong one about 30 s, where a fixed
+	 * clearing rate kept two doses on the floor for over two minutes (items.6).
+	 */
+	public static final int SEDATION_HALF_LIFE_TICKS = 200;
+	/** Below this much (per unit of body size) what is left is gone, and the effect ends. */
+	public static final double SEDATION_CLEAR_FLOOR = 0.05;
+	/**
+	 * A body that has stopped breathing barely clears it: a dose per this many
+	 * ticks, the old steady rate, so an overdose still runs the hypoxia debt
+	 * all the way up unless milk clears it first.
+	 */
+	public static final int SEDATION_OVERDOSE_CLEAR_TICKS = 2400;
+	/** Stage bars, in doses per unit of body size (a zombie or a player is 1, a ravager 5). */
+	public static final double SEDATION_DROWSY = 0.25;
+	public static final double SEDATION_STUMBLING = 0.5;
+	public static final double SEDATION_OUT = 0.85;
+	public static final double SEDATION_OVERDOSE = 2.5;
+	/**
+	 * The highest consciousness each stage allows. Drowsy sits among the first
+	 * symptoms; stumbling sits just above the wake bar and just under the
+	 * microsleep one, so a body can wake into it and still nod off; out is zero.
+	 */
+	public static final double SEDATION_DROWSY_CAP = 60.0;
+	public static final double SEDATION_STUMBLING_CAP = 21.0;
+	/** Movement lost while drowsy and while stumbling. */
+	public static final double SEDATION_DROWSY_SLOW = 0.15;
+	public static final double SEDATION_STUMBLING_SLOW = 0.30;
+	/** While stumbling, any blow this violent puts the body down (a sober one needs {@link #KNOCKDOWN_BLOW_VIOLENCE}). */
+	public static final double SEDATION_STUMBLING_KNOCKDOWN = 0.02;
+	/** Overdosed and out of breath for the whole hypoxia debt: this much health a second, times body size. */
+	public static final double SEDATION_OVERDOSE_DAMAGE_PER_SEC = 1.0;
+
+	// Numbing (Medicine): no pain, every injury still there.
+	public static final int NUMBING_TICKS = 1200;
+	public static final int NUMBING_LONG_TICKS = 2400;
+	/** Condition a broken leg loses per second of sprinting on it while numb. */
+	public static final double NUMB_SPRINT_LEG_COST = 1.0;
+	/** Condition a broken arm loses per swing while numb. */
+	public static final double NUMB_SWING_ARM_COST = 0.5;
+
+	// --- The field kit's medicine (2.0, phase 4): bleeding ---
+	/** How far a medic can reach a patient, blocks. */
+	public static final double TREATMENT_REACH = 3.5;
+	/** A bandage: about three seconds with both hands. */
+	public static final int BANDAGE_USE_TICKS = 60;
+	/** What a bandage lets through of a minor and a moderate wound. Arterial ones it cannot hold at all. */
+	public static final double BANDAGE_MINOR_FACTOR = 0.25;
+	public static final double BANDAGE_MODERATE_FACTOR = 0.4;
+	/** A moderate wound soaks a bandage through in this long, and it needs changing. */
+	public static final int BANDAGE_SOAK_TICKS = 900;
+	/** A tourniquet: two seconds to get it on. */
+	public static final int TOURNIQUET_USE_TICKS = 40;
+	/** On this long and the limb starts to go cold; this long and it is dead. */
+	public static final int TOURNIQUET_WARN_TICKS = 4800;
+	public static final int TOURNIQUET_LIMIT_TICKS = 6000;
+	/** Needle and thread: ten seconds of stitching, and a few wounds per needle. */
+	public static final int NEEDLE_USE_TICKS = 200;
+	public static final int NEEDLE_USES = 4;
+	/** Cauterizing: consciousness lost to the pain, at once. Enough to drop a body that was already fading. */
+	public static final double CAUTERIZE_SHOCK = 45.0;
+	/** A blood bag: drawn from a donor, given to a patient. */
+	public static final double BLOOD_BAG_DRAW = 25.0;
+	public static final double BLOOD_BAG_GIVE = 25.0;
+	/** A donor with less than this to give is turned away. */
+	public static final double BLOOD_BAG_MIN_DONOR = 50.0;
+	public static final int BLOOD_BAG_USE_TICKS = 100;
+	/** How long a bag of blood keeps, ticks: three days. */
+	public static final long BLOOD_BAG_KEEPS_TICKS = 72000L;
+
+	// --- Field kit, phase 4 round 2: bones, head and senses (2.0) ---
+
+	/** A splint: four seconds to bind on. A broken limb under one costs this share of its penalty. */
+	public static final int SPLINT_USE_TICKS = 80;
+	public static final double SPLINT_PENALTY_FACTOR = 0.5;
+	/** A sling: three seconds to tie. A slung broken arm takes this much more from every heal. */
+	public static final int SLING_USE_TICKS = 60;
+	public static final double SLING_HEAL_FACTOR = 2.0;
+	/** Smelling salts: a second under the nose. They bring a body up to this far over waking. */
+	public static final int SALTS_USE_TICKS = 20;
+	public static final double SALTS_WAKE_MARGIN = 5.0;
+	/** The stethoscope's own volume: a heart at rest is loud enough to hear through it. */
+	public static final double STETHOSCOPE_VOLUME = 0.85;
+	/** Tinted goggles: how dark the view goes (alpha of the tint, 0 to 255). */
+	public static final int GOGGLES_TINT_ALPHA = 92;
+
+	// --- Field kit, phase 4 round 3: food and drink (2.0) ---
+
+	/** A bottle of coffee keeps you up for three minutes. */
+	public static final int COFFEE_TICKS = 3600;
+	/**
+	 * Sedation in a caffeinated body counts for this much less, as if the body
+	 * were this much bigger: one arrow leaves it stumbling instead of out.
+	 */
+	public static final double COFFEE_SEDATION_RESIST = 1.5;
+	/** A heart on coffee beats harder: open wounds bleed this much more. */
+	public static final double COFFEE_BLEED_FACTOR = 1.15;
+	/** Your own heart on coffee runs as if under this much distress (Adrenaline's is 0.6). */
+	public static final double COFFEE_HEART_DISTRESS = 0.3;
+	/** A bottle of spirits: two minutes tipsy. */
+	public static final int SPIRITS_TICKS = 2400;
+	/** Tipsy, a limp and a sore arm slow you by this share of what they would. */
+	public static final double SPIRITS_PAIN_FACTOR = 0.5;
+	/** Tipsy, open wounds bleed this much more. */
+	public static final double SPIRITS_BLEED_FACTOR = 1.1;
+	/** Tipsy, the world doubles as it moves: the afterimage at least this strong (before the slider). */
+	public static final double SPIRITS_AFTERIMAGE = 0.35;
+	/** A blood sausage: Blood back on top of what its food gives. */
+	public static final double BLOOD_SAUSAGE_BLOOD = 20.0;
+	/** An iron tonic: Blood comes back this much faster, for three minutes, or eight from the long brew. */
+	public static final double IRON_TONIC_REGEN_FACTOR = 2.0;
+	public static final int IRON_TONIC_TICKS = 3600;
+	public static final int IRON_TONIC_LONG_TICKS = 9600;
 }

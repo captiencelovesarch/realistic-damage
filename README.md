@@ -106,18 +106,81 @@ in loot, trades or the creative tab, anything already in a chest does nothing an
 why, and its effects wear off at once. Flip it back and it all returns. The items arrive
 over the 2.0 alphas; the **Field kit** creative tab shows whatever exists so far.
 
-**Brews so far** (both Weapons): start from an awkward potion. Redstone makes them last
-longer, glowstone makes Haemorrhage stronger, and gunpowder and dragon's breath make
-splash and lingering potions as usual. Eight arrows round one drinkable potion make eight
-tipped arrows, no dragon's breath needed. Milk clears them, but what they already did
-stays done.
+**The brews** (phase 3): start from an awkward potion. Redstone makes them last longer,
+glowstone makes them stronger where there's a level to raise, and gunpowder and dragon's
+breath make splash and lingering potions as usual. Eight arrows round one drinkable potion
+make eight tipped arrows, no dragon's breath needed. Milk clears them, but what they already
+did stays done.
 
-- **Haemorrhage** (sweet berries): the blood stops clotting. A lighter hit opens a bleed,
-  wounds open a step worse, they bleed past the usual cap, and a hand pressed on them holds
-  back half as much. An arrow of it opens a bleed where it lands, on anything that bleeds.
-- **Adrenaline** (glow berries): the last-two-hearts surge, now, for as long as it lasts,
-  then the usual crash. It heals nothing, your racing heart makes open wounds bleed harder,
-  and a second dose is refused until your heart has recovered from the last surge.
+- **Haemorrhage** (Weapons; sweet berries): the blood stops clotting. A lighter hit opens a
+  bleed, wounds open a step worse, they bleed past the usual cap, and a hand pressed on them
+  holds back half as much. An arrow of it opens a bleed where it lands, on anything that
+  bleeds.
+- **Sedation** (Weapons; poppy): every dose builds. Your eyelids get heavy and you slow down,
+  then you stumble and nod off, then you're out, and enough of it stops your breathing. One
+  arrow drops a zombie or a player; a ravager takes five. It wears off with time. Drunk, it's
+  the **Sleeping Draught**: you sleep where you stand and wake healed like a night in a bed,
+  lying on the floor where everything hunts first. Sneak-use an unconscious mob with an
+  empty hand to drag it. Bosses and golems shrug it off.
+- **Adrenaline** (Weapons; glow berries): the last-two-hearts surge, now, for as long as it
+  lasts, then the usual crash. It heals nothing, your racing heart makes open wounds bleed
+  harder, and a second dose is refused until your heart has recovered from the last surge.
+- **Numbing** (Medicine; packed ice): for a minute you feel nothing. No limp, no flinch, no
+  pain blur, and your body diagram goes pale because you can't feel what's wrong. Every
+  injury is still there: sprinting on a broken leg wears it down, and so does swinging a
+  broken arm.
+
+**The bleeding kit** (Medicine, phase 4). Hold use to treat yourself, or right-click
+someone with it and hold to treat them; each lands on the worst wound it can help.
+
+- **Bandage** (2 paper + string makes 3; about 3 s): slows a minor or moderate wound. A
+  moderate one soaks it through in under a minute and it needs changing; a spurting
+  (arterial) wound it can't hold at all.
+- **Tourniquet** (leather + stick + string; 2 s): stops a limb's bleed dead, but the limb
+  is Disabled while it's on, and after five minutes it dies. Sneak and use with an empty
+  hand to take it off (in the air for your own, on someone for theirs).
+- **Cauterizing:** sneak and use flint and steel or a fire charge in the air (or on
+  someone). The worst bleed stops at once, the pain can knock you out, and it leaves a
+  burn.
+- **Needle and Thread** (iron nugget + string; 10 s, four wounds): closes the worst wound
+  for good. Getting hurt, either of you, spoils the stitching.
+- **Blood Bag:** sneak and use a glass bottle in the air to bank your own blood, or on a
+  mob or someone who's out cold; use the bag (5 s) to give the blood back. It keeps three
+  days.
+
+**Bones, head and senses** (Medicine, phase 4). The same hold-to-use.
+
+- **Splint** (2 sticks + string; 4 s): goes on the worst broken arm or leg and halves what
+  the break costs you (the limp, the slow swing, the stalled bow). It stays on until the
+  bone has knit. With long-term injuries on, a limb that knits in a splint keeps its full
+  strength.
+- **Sling** (any wool + string; 3 s): holds a broken arm still. Its hand can't use
+  anything, and if it's your main arm you can't swing or dig either. In exchange it heals
+  twice as fast. It comes back to you when the arm has knit; sneak and use with an empty
+  hand to take it out sooner.
+- **Smelling Salts** (glass bottle + bone meal; 1 s): bring round someone who was knocked
+  out or fainted. Not someone out from blood loss, from lack of air, or from Sedation.
+- **Stethoscope** (copper ingot + string): hold use on someone, or in the air for
+  yourself, and hear their heart: fast, weak or skipping. Only you hear it, and it's only
+  sound.
+- **Tinted Goggles** (2 tinted glass + leather): worn on the head instead of a helmet
+  (they're no protection). Bright light stops making a concussion worse, and the world
+  looks darker through them.
+
+**Food and drink** (Medicine, phase 4).
+
+- **Coffee** (cocoa beans + water bottle + sugar; drunk, the bottle comes back):
+  Caffeinated for 3 minutes. Sedation takes you a stage less far (one dart leaves you
+  stumbling, not out), and you don't nod off in microsleeps. Your heart runs faster, so
+  open wounds bleed more.
+- **Spirits** (brew a potato into a water bottle): Tipsy for 2 minutes. A limp and a sore
+  arm slow you half as much, the world doubles as it moves, and wounds bleed a little more.
+- **Blood Sausage** (raw porkchop + blood bag makes a raw one, and the bag's bottle comes
+  back; cook it like pork): a cooked porkchop's worth of food, and 20 more Blood than any
+  other food that size. A bag that has gone off makes nothing.
+- **Iron Tonic** (brew an iron nugget into an awkward potion; redstone makes it last 8
+  minutes): Blood comes back twice as fast for 3 minutes. Like all Blood coming back, it
+  waits until you've stopped bleeding.
 
 ## Playing with it
 
