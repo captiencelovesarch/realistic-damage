@@ -1,0 +1,16 @@
+{
+	"type": "realisticdamage:switched",
+	"switch": "medicine",
+	"recipe": {
+		"type": "minecraft:crafting_shapeless",
+		"category": "misc",
+		"ingredients": [
+			"minecraft:copper_ingot",
+			"minecraft:string"
+		],
+		"result": {
+			"id": "realisticdamage:stethoscope",
+			"count": 1
+		}
+	}
+}

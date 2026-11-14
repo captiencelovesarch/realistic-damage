@@ -1,0 +1,25 @@
+{
+	"type": "realisticdamage:switched",
+	"switch": "medicine",
+	"recipe": {
+		"type": "minecraft:crafting_shapeless",
+		"category": "misc",
+		"ingredients": [
+			"minecraft:cocoa_beans",
+			{
+				"fabric:type": "fabric:components",
+				"base": "minecraft:potion",
+				"components": {
+					"minecraft:potion_contents": {
+						"potion": "minecraft:water"
+					}
+				}
+			},
+			"minecraft:sugar"
+		],
+		"result": {
+			"id": "realisticdamage:coffee",
+			"count": 1
+		}
+	}
+}

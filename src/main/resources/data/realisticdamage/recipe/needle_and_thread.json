@@ -1,0 +1,10 @@
+{
+	"type": "realisticdamage:switched",
+	"switch": "medicine",
+	"recipe": {
+		"type": "minecraft:crafting_shapeless",
+		"category": "misc",
+		"ingredients": ["minecraft:iron_nugget", "minecraft:string"],
+		"result": { "id": "realisticdamage:needle_and_thread" }
+	}
+}

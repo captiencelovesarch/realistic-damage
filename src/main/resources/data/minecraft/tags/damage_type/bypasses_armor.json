@@ -5,6 +5,7 @@
 		"realisticdamage:skull_crushed",
 		"realisticdamage:chest_crushed",
 		"realisticdamage:decapitated",
-		"realisticdamage:neck_broken"
+		"realisticdamage:neck_broken",
+		"realisticdamage:sedative_overdose"
 	]
 }

@@ -1,0 +1,17 @@
+{
+	"type": "realisticdamage:switched",
+	"switch": "medicine",
+	"recipe": {
+		"type": "minecraft:crafting_shapeless",
+		"category": "misc",
+		"ingredients": [
+			"minecraft:stick",
+			"minecraft:stick",
+			"minecraft:string"
+		],
+		"result": {
+			"id": "realisticdamage:splint",
+			"count": 1
+		}
+	}
+}

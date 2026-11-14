@@ -30,6 +30,25 @@ import net.minecraft.network.chat.Component;
  * first-launch question.
  */
 public final class FieldKitClient implements ClientModInitializer {
+	/**
+	 * The worn gear (items.7) on every body that can wear it: players, every
+	 * humanoid mob, and the illager and villager shapes.
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static void registerGearLayer() {
+		net.fabricmc.fabric.api.client.rendering.v1.LivingEntityRenderLayerRegistrationCallback.EVENT
+				.register((entityType, renderer, helper, context) -> {
+					boolean wears = renderer instanceof net.minecraft.client.renderer.entity.player.AvatarRenderer<?>
+							|| renderer instanceof net.minecraft.client.renderer.entity.HumanoidMobRenderer<?, ?, ?>
+							|| renderer.getModel() instanceof net.minecraft.client.model.monster.illager.IllagerModel<?>
+							|| renderer.getModel() instanceof net.minecraft.client.model.npc.VillagerModel
+							|| renderer.getModel() instanceof net.minecraft.client.model.monster.witch.WitchModel;
+					if (wears) {
+						helper.register(new GearLayer((net.minecraft.client.renderer.entity.RenderLayerParent) renderer));
+					}
+				});
+	}
+
 	@Override
 	public void onInitializeClient() {
 		ClientPlayNetworking.registerGlobalReceiver(RulesPayload.TYPE, (payload, context) -> {
@@ -41,18 +60,75 @@ public final class FieldKitClient implements ClientModInitializer {
 				refreshCreativeTabs();
 			}
 		});
-		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(() -> {
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			// At once, not queued: leaving a world drops the client's queued
+			// tasks (Minecraft.disconnect -> dropAllTasks), and a clear queued
+			// from a disconnect that runs inside a task went with them, leaving
+			// the old server's switches in place.
 			RulesView.clear();
+			HeavyEyelids.reset();
 			// No creative screen outlives the world, and the next world brings its
-			// own registries: let vanilla build the tabs afresh when it next needs them.
-			CreativeTabsAccessor.realisticdamage$setCachedParameters(null);
-		}));
+			// own registries: let vanilla build the tabs afresh when it next needs
+			// them. Queued, so no open creative screen draws in between; if it's
+			// dropped, vanilla rebuilds them anyway for the new registries.
+			client.execute(() -> CreativeTabsAccessor.realisticdamage$setCachedParameters(null));
+		});
 		ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
 			Optional<Half> off = Kit.offHalf(stack, RulesView::on);
 			off.ifPresent(half -> lines.add(Component.translatable("realisticdamage.fieldkit.off.tooltip",
 					half.title()).withStyle(ChatFormatting.RED)));
 		});
 		ClientTickEvents.END_CLIENT_TICK.register(Welcome::tick);
+		ClientTickEvents.END_CLIENT_TICK.register(FieldKitClient::loosenTick);
+		registerGearLayer();
+		// The stethoscope (phase 4, round 2): after the core's heart has ticked.
+		ClientTickEvents.END_CLIENT_TICK.register(StethoscopeEar::tick);
+		// A blood bag says how long it keeps, from the world's clock (phase 4).
+		ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
+			if (!stack.is(dev.captience.realisticdamage.fieldkit.medicine.Medicine.BLOOD_BAG)) {
+				return;
+			}
+			net.minecraft.client.multiplayer.ClientLevel level = net.minecraft.client.Minecraft.getInstance().level;
+			Long drawn = stack.get(dev.captience.realisticdamage.fieldkit.medicine.Medicine.DRAWN_AT);
+			if (level == null || drawn == null) {
+				return;
+			}
+			long age = level.getGameTime() - drawn;
+			long keeps = dev.captience.realisticdamage.config.Balance.BLOOD_BAG_KEEPS_TICKS;
+			lines.add(age > keeps
+					? Component.translatable("realisticdamage.fieldkit.blood_bag.spoiled.tooltip")
+							.withStyle(ChatFormatting.DARK_RED)
+					: Component.translatable("realisticdamage.fieldkit.blood_bag.keeps",
+							Math.max(1L, (keeps - age + 23999L) / 24000L)).withStyle(ChatFormatting.GRAY));
+		});
+		// Sedation's eyelids (2.0, phase 3): the stage arrives, the lids follow.
+		ClientPlayNetworking.registerGlobalReceiver(dev.captience.realisticdamage.fieldkit.brew.SedationPayload.TYPE,
+				(payload, context) -> HeavyEyelids.setStage(payload.stage()));
+		net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.attachElementAfter(
+				net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.MISC_OVERLAYS,
+				dev.captience.realisticdamage.RealisticDamage.id("sedation_eyelids"), HeavyEyelids::render);
+		net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.attachElementAfter(
+				net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.MISC_OVERLAYS,
+				dev.captience.realisticdamage.RealisticDamage.id("tinted_goggles"), GogglesView::render);
+	}
+
+	private static boolean useWasDown;
+
+	/**
+	 * Sneak and press use in the air with an empty hand: take your tourniquet
+	 * off (phase 4). One request per press; the server knows whether there is
+	 * one. Pressing on a wound is a held empty hand too, and goes on as before.
+	 */
+	private static void loosenTick(Minecraft client) {
+		boolean down = client.options.keyUse.isDown();
+		if (down && !useWasDown && client.player != null && client.gui.screen() == null
+				&& client.player.isShiftKeyDown() && client.player.getMainHandItem().isEmpty()
+				&& (client.hitResult == null || client.hitResult.getType() == net.minecraft.world.phys.HitResult.Type.MISS)
+				&& RulesView.on(Half.MEDICINE)
+				&& ClientPlayNetworking.canSend(dev.captience.realisticdamage.fieldkit.medicine.LoosenPayload.TYPE)) {
+			ClientPlayNetworking.send(dev.captience.realisticdamage.fieldkit.medicine.LoosenPayload.INSTANCE);
+		}
+		useWasDown = down;
 	}
 
 	/**

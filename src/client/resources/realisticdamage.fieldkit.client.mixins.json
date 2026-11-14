@@ -4,7 +4,15 @@
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 		"CreativeScreenInvoker",
-		"HeartRaceMixin"
+		"DressedBloodMixin",
+		"GogglesGlareMixin",
+		"HeartRaceMixin",
+		"NumbHudMixin",
+		"GearRenderStateMixin",
+		"GearExtractMixin",
+		"SlingPoseMixin",
+		"SlingFirstPersonMixin",
+		"TipsyAfterimageMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

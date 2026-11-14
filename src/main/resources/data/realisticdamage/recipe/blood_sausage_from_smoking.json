@@ -1,0 +1,9 @@
+{
+	"type": "minecraft:smoking",
+	"category": "food",
+	"experience": 0.35,
+	"ingredient": "realisticdamage:raw_blood_sausage",
+	"result": {
+		"id": "realisticdamage:blood_sausage"
+	}
+}

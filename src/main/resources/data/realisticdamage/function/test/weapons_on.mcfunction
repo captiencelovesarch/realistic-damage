@@ -1,0 +1,1 @@
+rdmg config enableWeapons true

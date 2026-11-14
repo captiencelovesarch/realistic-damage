@@ -104,10 +104,15 @@ public final class RescueSystem {
 		RealisticDamageData rescuerData = RDAttachments.get(rescuer);
 
 		if (rescuer.isShiftKeyDown()) {
-			if (rescuerData.dragging() != null) {
-				releaseDrag(rescuer, rescuerData);
-			} else {
-				beginDrag(rescuer, rescuerData, target, targetData);
+			// One click, one toggle: the off hand's copy of the same click
+			// would let go again at once (OneClick).
+			if (!dev.captience.realisticdamage.util.OneClick.handled(rescuer)) {
+				if (rescuerData.dragging() != null) {
+					releaseDrag(rescuer, rescuerData);
+				} else {
+					beginDrag(rescuer, rescuerData, target, targetData);
+				}
+				dev.captience.realisticdamage.util.OneClick.mark(rescuer);
 			}
 			return InteractionResult.SUCCESS_SERVER;
 		}

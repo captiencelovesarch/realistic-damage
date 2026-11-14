@@ -60,6 +60,80 @@ public class MobDownGameTest {
 		helper.succeed();
 	}
 
+	/**
+	 * A mob on the floor has its hitbox on the floor too (items.6): low and
+	 * wide while it is out, standing again once it is up. The standing column
+	 * over a body lying on the ground was what arrows hit and hands missed.
+	 */
+	@GameTest(environment = "realisticdamage:isolated")
+	public void aDownZombieLiesInALowBox(GameTestHelper helper) {
+		Zombie zombie = helper.spawn(EntityTypes.ZOMBIE, AT);
+		Villager villager = helper.spawn(EntityTypes.VILLAGER, new BlockPos(3, 1, 1));
+		try {
+			zombie.setNoAi(true);
+			double standing = zombie.getBbHeight();
+			out(zombie);
+			zombie.tick();
+			double lying = zombie.getBbHeight();
+			double wide = zombie.getBbWidth();
+			helper.assertTrue(lying < 0.6 && Math.abs(wide - 0.6) < 1.0e-4,
+					"an unconscious zombie's box is still standing, or got wider: " + wide + " x " + lying);
+			helper.assertTrue(zombie.getPickRadius() > 0.3F,
+					"a zombie lying down can't be picked out along its body: " + zombie.getPickRadius());
+			RDAttachments.get(villager).knockDown(40);
+			villager.tick();
+			helper.assertTrue(villager.getBbHeight() < 0.6, "a knocked-down villager's box is still standing");
+			RealisticDamageData data = RDAttachments.get(zombie);
+			data.setUnconscious(false);
+			data.setConsciousness(100.0);
+			zombie.tick();
+			helper.assertTrue(Math.abs(zombie.getBbHeight() - standing) < 1.0e-4 && zombie.getPickRadius() == 0.0F,
+					"a zombie back on its feet has its box back: " + zombie.getBbHeight() + " of " + standing);
+		} finally {
+			zombie.discard();
+			villager.discard();
+		}
+		helper.succeed();
+	}
+
+	/**
+	 * The ragdoll is the body (items.8): where the nearest watcher's ragdoll
+	 * comes to rest, the server puts the downed mob. Not a mob on its feet,
+	 * not one moved farther than a ragdoll could have thrown it, and not
+	 * into a wall.
+	 */
+	@GameTest(environment = "realisticdamage:isolated")
+	public void aDownedMobIsPutWhereItsRagdollLies(GameTestHelper helper) {
+		Zombie zombie = helper.spawn(EntityTypes.ZOMBIE, new BlockPos(2, 1, 2));
+		TestPlayer watcher = TestPlayer.spawn(helper.getLevel(), helper.absoluteVec(new net.minecraft.world.phys.Vec3(2.5, 1.0, 6.5)),
+				0.0F, "rd-ragdoll-watcher");
+		try {
+			zombie.setNoAi(true);
+			net.minecraft.world.phys.Vec3 at = zombie.position();
+			net.minecraft.world.phys.Vec3 lying = at.add(1.5, 0.2, 0.5);
+			boolean standing = dev.captience.realisticdamage.systems.RagdollRest.place(helper.getLevel(), zombie, watcher, lying);
+			helper.assertTrue(!standing, "a mob on its feet was moved to a ragdoll");
+			out(zombie);
+			zombie.tick();
+			boolean far = dev.captience.realisticdamage.systems.RagdollRest.place(helper.getLevel(), zombie, watcher,
+					at.add(12.0, 0.2, 0.0));
+			helper.assertTrue(!far, "a report twelve blocks off was believed");
+			helper.setBlock(new BlockPos(5, 1, 2), net.minecraft.world.level.block.Blocks.STONE);
+			helper.setBlock(new BlockPos(5, 2, 2), net.minecraft.world.level.block.Blocks.STONE);
+			helper.setBlock(new BlockPos(5, 3, 2), net.minecraft.world.level.block.Blocks.STONE);
+			boolean wall = dev.captience.realisticdamage.systems.RagdollRest.place(helper.getLevel(), zombie, watcher,
+					helper.absoluteVec(new net.minecraft.world.phys.Vec3(5.5, 1.2, 2.5)));
+			helper.assertTrue(!wall, "a body was put inside stone");
+			boolean moved = dev.captience.realisticdamage.systems.RagdollRest.place(helper.getLevel(), zombie, watcher, lying);
+			helper.assertTrue(moved && zombie.position().distanceTo(lying.subtract(0.0, 0.2, 0.0)) < 0.05,
+					"the downed zombie was not put where its ragdoll lies: " + zombie.position() + " for " + lying);
+		} finally {
+			zombie.discard();
+			watcher.connection.disconnect(net.minecraft.network.chat.Component.literal("done"));
+		}
+		helper.succeed();
+	}
+
 	@GameTest(environment = "realisticdamage:isolated")
 	public void aKnockedDownZombieStrikesAtNothing(GameTestHelper helper) {
 		Zombie zombie = helper.spawn(EntityTypes.ZOMBIE, AT);

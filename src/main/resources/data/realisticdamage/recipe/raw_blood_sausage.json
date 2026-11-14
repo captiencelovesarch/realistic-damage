@@ -1,0 +1,16 @@
+{
+	"type": "realisticdamage:switched",
+	"switch": "medicine",
+	"recipe": {
+		"type": "minecraft:crafting_shapeless",
+		"category": "misc",
+		"ingredients": [
+			"minecraft:porkchop",
+			"realisticdamage:blood_bag"
+		],
+		"result": {
+			"id": "realisticdamage:raw_blood_sausage",
+			"count": 1
+		}
+	}
+}

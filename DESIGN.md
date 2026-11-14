@@ -778,9 +778,94 @@ does not know the field kit exists. All numbers are thresholds and factors in
 | Effect | Where it acts |
 |---|---|
 | Haemorrhage | `TraumaPipeline.createWounds`: the hit is judged against ×0.6 thresholds (×0.45 at II), and the wound opens a step worse before armour takes its step back. `BleedingSystem.tick`: the stack may run to ×1.5 the cap (×2 at II), and hand pressure keeps half its effect. `Arrow.doPostHurtEffects`: a Moderate wound where the arrow struck, on anything that bleeds |
+| Sedation | `LivingEntity.addEffect` counts every application as a dose into a saved `Sedation.State` (pending, level). The effect's tick absorbs and clears it, keeps the effect as long as the drug, re-tracks a mob so its body ticks, and runs the sleeping draught's wake and the overdose damage. `ConsciousnessSystem.tick` HEAD holds consciousness under the stage's cap; `starved` is true while overdosed; `Knockdowns.afterHit`'s blow bar drops while stumbling; `PotionContents.onConsume` marks a drunk dose. Refused by bosses and the mindless. The stage (never the dose) goes to the player for the eyelids |
+| Numbing | `ImpairmentSystem.tick`: the walking and arm penalties from pain read 0. `Flinches.afterHit` and `TraumaPipeline.sendImpact` do nothing. The effect's tick wears a broken leg down while sprinting; an attack wears a broken arm. Client: `BodyHud` draws your own body as frost with no marks or icons |
 | Adrenaline | `onEffectStarted` starts the body's own surge (`AdrenalineMath`) for the effect's duration and spends its refractory; removal (running out, milk, a switch) ends it into the crash; `canBeAffected` refuses a dose during the refractory. `BleedingSystem.tick`: ×1.3 bleeding while it lasts. Client: Cardio is fed at least 0.6 health distress, so the heart and the arterial spurts quicken without the low-health vignette |
 
 Tipped arrows from drinkable potions are a special recipe
 (`realisticdamage:field_kit_tipped_arrow`) that only takes field kit potions and asks the
 potion's own half, so one recipe serves both switches.
 
+### Medicine, round 1: the bleeding kit (phase 4)
+
+A treatment is vanilla's hold-to-use (`TreatmentItem`): `use` treats yourself,
+`interactLivingEntity` someone else; `Treatments` remembers the patient while the
+key is held and loses it if they leave reach, and an interruptible treatment (the
+needle) is spoiled by an `AFTER_DAMAGE` on either of them. The server decides
+whether there is anything to treat when it starts and again when it lands.
+
+What sits on a wound lives in a saved, all-synced attachment (`Dressings`):
+bandages and tourniquets by region. `Dressings.factor(state, part, severity)` is
+the one rule both the server's bleed rate (`FieldKitBleedMixin`) and a client's
+drawing of the blood (`DressedBloodMixin` on `BloodEmitter.emitFor`) read. A
+tourniquet holds its limb at condition 0 and keeps what it took to give back.
+The attached state's maps are never changed in place: Fabric encodes a sync later,
+on the network thread, and a bandage put on under it broke the packet and dropped
+the player. Everything that comes on or off goes through `Dressings.change`, on a
+copy that is then set; only counters and flags tick in place. The
+uses of vanilla items (a glass bottle to draw blood, flint and steel or a fire
+charge to cauterize) are `UseItemCallback`/`UseEntityCallback` handlers that only
+act on a sneak with Medicine on, and only on a willing body (`Consent`).
+
+
+
+### Medicine, round 2: bones, head and senses (phase 4)
+
+Splints and slings live in the same synced `Dressings` state as bandages, with
+a third map, `owed`: the ceiling band a limb had before its break lowered it
+(`SplintCeilingMixin` wraps `CeilingLogic`'s `lowerCeilingTo`). `Dressings.tickBody`
+takes a splint or sling off once its bone has knit; a splinted limb with a debt
+gets `restoreCeiling()` then `lowerCeilingTo(prior)`. The core's own "mended"
+line is held back for a dressed limb (`SplintMendMixin`), so there's one line.
+
+The splint's halving is three `ImpairmentMath` call sites (`SplintPenaltyMixin`):
+the per-leg penalty (a private helper with no body, so the body being ticked is
+stashed at the head of `ImpairmentSystem.tick`), the main arm in `tick`, and
+both arms in `twoHandedPenalty`. The sling is the core's grip (`SlingGripMixin` on
+`gripBlocked`, which every use refusal, the per-tick stop and the grip line go
+through) plus field kit attack and dig refusals in a first phase, ahead of the
+core's strain listener. Its faster healing is the `heal` argument in
+`HealingSystem.trackBrokenHeal`.
+
+Smelling salts decide from `SaltsRule` (blood, air, Sedation stage) and wake
+through the core: consciousness to `WAKE_THRESHOLD` + 5 and the minimum ticks
+out, so the next `ConsciousnessSystem.tick` runs its private `wake()`.
+
+The stethoscope is client-side (`StethoscopeEar`): the server only starts the
+use. Your own heart is `ClientState`'s; anyone else's is a `Cardio` run from
+their synced snapshot, the way `BloodEmitter` times a stranger's artery.
+
+Treatments used on a body are routed in a `UseEntityCallback` phase after the
+default one: the core's grip and drag listeners run first, and the entity's own
+`interact` (trades, saddles) never sees the click.
+### Medicine, round 3: food and drink (phase 4)
+
+`Provisions` holds the four. Coffee and the blood sausages are items; spirits
+and the iron tonic are potions (water + potato, awkward + iron nugget), so the
+brewing stand, splash and lingering forms and the creative tab come from
+vanilla and `Kit`, as for phase 3. Each drink's effect (Caffeinated, Tipsy,
+Iron Tonic) is a bare `FieldKitEffect` the hooks ask about; the numbers are
+`ProvisionsMath`, apart from the items so the unit tests can load them.
+
+Coffee: `Sedation.scale` multiplies the body's size by `COFFEE_SEDATION_RESIST`
+while caffeinated, so every stage reading (the consciousness cap, the slowing,
+the salts, the client's eyelids) sees the same lighter stage.
+`CoffeeMicrosleepMixin` cancels `ConsciousnessSystem.tickMicrosleep` while
+caffeinated and not mid-blink, unwinding its phase as a well mind does.
+
+Bleeding: `FieldKitBleedMixin` multiplies the rate by `ProvisionsMath.bleedFactor`
+after Adrenaline's. Your own heart: `HeartRaceMixin` gives Cardio a distress
+floor of 0.3 on coffee (Adrenaline's is 0.6).
+
+Spirits' weaker numbing is `NumbingPainMixin` again: the walking and arm
+penalties times `SPIRITS_PAIN_FACTOR` instead of zero. Flinches and the hit
+blur stay; you still feel it. The doubled view is `TipsyAfterimageMixin`, a
+floor on the concussion's input to `Afterimage.frame`, so it rides the same
+slider and the same VR path.
+
+The blood sausage adds `BLOOD_SAUSAGE_BLOOD` in `finishUsingItem`, after the
+core's own food Blood. The blood bag has a glass-bottle crafting remainder, and
+`SwitchedRecipe` refuses any grid holding a bag that has gone off. Coffee's
+recipe matches only a water bottle, through Fabric's `fabric:components`
+ingredient. The iron tonic doubles the first `restoreBlood` in
+`HealingSystem.tick`, the passive one that waits for the bleeding to stop.
