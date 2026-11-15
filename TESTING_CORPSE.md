@@ -1,12 +1,14 @@
 # Realistic Damage 2.0, dead bodies that still get hurt: what to test
 
-Built on its own branch (`claude/2-0-corpse-damage-df6c3a`, off `2.0`), with its
-own version name: `2.0.0-corpse.N`. Newest round on top.
+Built on its own branch (`claude/2-0-corpse-damage-df6c3a`), on top of `2.0` at
+2.0.0-alpha.4 (the field kit and the new sounds), so the jar has everything
+alpha.4 has plus this. Version names: `2.0.0-alpha.4.corpse.N`. Newest round on top.
 
 ## corpse.1: a dead body keeps taking body damage until it comes to rest
 
-The jar is `build/libs/realistic-damage-2.0.0-corpse.1.jar`. It is **not in any
-Prism instance yet** (the "Realistic Damage" instance holds the audio test jar).
+The jar is `build/libs/realistic-damage-2.0.0-alpha.4.corpse.1.jar` in the
+worktree. It is **not in a Prism instance yet**: it belongs in "Realistic Damage
+(dev)", in place of the alpha.4 jar there.
 
 **What changed, in one paragraph.** Until now nothing could happen to a body
 after it died, except the blast that killed it. Now, when a body dies while it
