@@ -6,9 +6,9 @@ alpha.4 has plus this. Version names: `2.0.0-alpha.4.corpse.N`. Newest round on 
 
 ## corpse.1: a dead body keeps taking body damage until it comes to rest
 
-The jar is `build/libs/realistic-damage-2.0.0-alpha.4.corpse.1.jar` in the
-worktree. It is **not in a Prism instance yet**: it belongs in "Realistic Damage
-(dev)", in place of the alpha.4 jar there.
+The jar is `realistic-damage-2.0.0-alpha.4.corpse.1.jar`, in the "Realistic
+Damage (dev)" Prism instance since Nov 14 2026 (the alpha.4 jar it replaced is
+parked in `mods/replaced-jars/`).
 
 **What changed, in one paragraph.** Until now nothing could happen to a body
 after it died, except the blast that killed it. Now, when a body dies while it
