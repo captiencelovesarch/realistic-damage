@@ -263,6 +263,17 @@ public final class ServerConfig {
 	 */
 	public boolean enableMedicine = false;
 
+	/**
+	 * Blood stays on the weapon that drew it (2.0): a held thing that opens a
+	 * wound, lands in one or kills is marked, dries from red to brown and keeps
+	 * the mark until rain or standing water rinses it off. Written onto the
+	 * item itself, which is why it is a rule of the world and not a client
+	 * effect: a server that would rather its players' swords were never
+	 * touched can say so. Off, nothing new is marked; marks already made stay
+	 * until washed.
+	 */
+	public boolean enableBloodiedItems = true;
+
 	public void applyArcadePreset() {
 		enableLimbDestruction = true;
 	}

@@ -352,8 +352,8 @@ public class BrokenNeckGameTest {
 					"rdmg whiplash " + zombie.getStringUUID() + " 0.5");
 			helper.assertTrue(RDAttachments.get(zombie).whiplashed(), "/rdmg whiplash did nothing");
 			server.getCommands().performPrefixedCommand(server.createCommandSourceStack(),
-					"rdmg breakneck " + zombie.getStringUUID());
-			helper.assertTrue(diedOfIt(zombie), "/rdmg breakneck did not kill through the neck");
+					"rdmg break " + zombie.getStringUUID() + " head");
+			helper.assertTrue(diedOfIt(zombie), "/rdmg break ... head did not kill through the neck");
 		} finally {
 			zombie.discard();
 		}

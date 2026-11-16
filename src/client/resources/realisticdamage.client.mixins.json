@@ -4,6 +4,13 @@
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 		"LevelExtractorMixin",
+		"InventoryBodyMixin",
+		"ItemModelResolverMixin",
+		"ItemStackRenderStateMixin",
+		"ItemSubmitMixin",
+		"ItemFeatureRendererMixin",
+		"BloodiedHandMixin",
+		"BloodiedMiningMixin",
 		"LivingEntityPoofMixin",
 		"EntityRendererCullMixin",
 		"DebugRendererMixin",

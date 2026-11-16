@@ -1,5 +1,82 @@
 # Realistic Damage 2.0: what to test
 
+## Bloodied weapons, blood on your screen, tidier commands (Nov 16 2026)
+
+The jar is `realistic-damage-2.0.0-alpha.4.fixes.1.jar`, in "Realistic Damage
+(dev)" (the corpse.1 jar is parked in `mods/replaced-jars/`). It is corpse.1
+plus the four things below. Pictures: `previews/bloodied_items_sheet.png`
+(every kind of mark on real items).
+
+**Bloodied weapons.** Anything that doesn't stack (swords, axes, tools, a
+bucket) keeps the blood of what it hits.
+
+- [ ] **1. One zombie, one sword.** Cut a zombie a few times: dark streaks grow
+  along the blade, in first person, in F5, and on the sword's icon in the
+  hotbar and inventory. The sword must NOT dip down and come back up when the
+  blood lands.
+- [ ] **2. Whose blood.** Then hit an enderman (purple), a slime (green), a
+  spider (blue), a friend or a villager (red). Each leaves its own colour in
+  its own place, and where two wet ones overlap they run together.
+- [ ] **3. How you hit.** Sword and axe leave streaks along the blade; a
+  trident or spear soaks the tip; a mace leaves a splat on the head (it needs
+  the target already bleeding, or the kill). A killing blow and taking a limb
+  off soak it.
+- [ ] **4. Drying.** Stop fighting and watch it for half a minute: it browns
+  from the thin edges in, the thick middles last. While it is wet and heavy it
+  drips onto the floor.
+- [ ] **5. Washing.** Stand in water or in rain holding it: gone in a few
+  seconds (dried blood takes twice as long). Mining with a pickaxe in the
+  rain must not reset the block's cracks.
+- [ ] **6. It stays on the item.** Drop it, put it in a chest or an item
+  frame, relog: still bloody. The tooltip says how bloody ("Bloodied",
+  "Caked in dried blood").
+- [ ] **7. Your own arm.** `/rdmg bleed @s right_arm severe`, hold a clean
+  pickaxe for ten seconds: your blood runs onto the grip end only.
+- [ ] **8. Mobs too.** A zombie or vindicator with a weapon that wounds you
+  ends up with your blood on it, and drops it that way.
+- [ ] **9. Off switch.** World rules > Injuries > "Bloodied Weapons" off:
+  nothing new is marked. (Your Blood slider at 0 hides it without removing it.)
+
+**Blood on your screen from others.** No rule puts it there: it is real drops
+landing on you. The spray when a wound opens flies back along the blow, and
+every further hit into a body that is already bleeding now throws a few drops
+back at whoever is close.
+
+- [ ] **10.** Fight a zombie at arm's length: drops land on your screen in the
+  zombie's dark red. Fight an enderman: purple. From three blocks back with a
+  bow: nothing.
+- [ ] **11.** Is it too much or too little? Say which, it is two numbers.
+
+**Your body, in the inventory's own box.** The side panel is gone. The box
+that held your little turning model now holds a paper doll of your skin with
+your injuries on it (`previews/body_in_inventory_in_game.png`).
+
+- [ ] **13.** Open the inventory unhurt: your skin, front on, nothing else.
+- [ ] **14.** Get hurt (`/rdmg bleed @s torso severe`, `/rdmg break @s left_arm`,
+  `/rdmg destroy @s right_leg`): blood on the torso that grows while it bleeds,
+  the arm greyed with a crack, the leg a stump over a faint ghost, and a frame
+  round each hurt region in its state's colour. Icons down the left edge say
+  what kinds of trouble there are.
+- [ ] **15.** Hover each region: an ordinary tooltip with its name, its state
+  and what is wrong. With "Exact Numbers" on it adds the condition figures and
+  your blood and consciousness, in words.
+- [ ] **16.** The small button in the box's bottom right corner: click for the
+  x-ray (Minecraft's own skeleton, a broken bone is parted, a lost one stops
+  short), again for your ordinary model, again for the body. It remembers.
+- [ ] **17.** Open the recipe book: the body moves with the window and nothing
+  overlaps, at any GUI scale.
+- [ ] **18.** A slim (Alex) skin, and a skin with a jacket or hat layer: do the
+  arms and the second layer look right?
+
+**Commands.** One grammar: the verb, who, which part, how much. Who can be you
+(`@s`), a name, or any selector, and mobs work everywhere.
+
+- [ ] **12.** `/rdmg break @s head` (was `breakneck`), `/rdmg break @s left_leg`,
+  `/rdmg set @s blood 40` (was `setblood`), `/rdmg set @s left_arm 2` (was
+  `setpart`), `/rdmg set @s consciousness 30`, `/rdmg damage @s torso 3` (was
+  `damagepart`), `/rdmg bleed @e[type=zombie,limit=1,sort=nearest] torso severe`.
+  The old spellings are gone.
+
 **One jar, one place (Nov 14 2026).** Everything in progress on 2.0 is in
 `realistic-damage-2.0.0-alpha.4.jar`: heads and necks, the field kit through
 items.10 with getting up in stages, and the new injury sounds. It is in the
@@ -71,8 +148,8 @@ knocked flat hard (a big blast, a heavy hit, a big landing). It lasts 30 to
 a wince, a flash of blur and red at the edges.
 
 **Shortcuts:** `/rdmg whiplash` gives you the worst whiplash
-(`/rdmg whiplash @s 0.3` for a mild one). `/rdmg breakneck` snaps your own
-neck. Both take a target too, for example
+(`/rdmg whiplash @s 0.3` for a mild one). `/rdmg break @s head` snaps your own
+neck. Both take any target, for example
 `@e[type=zombie,limit=1,sort=nearest]`. You need to be in survival.
 
 - [ ] **1. Stiff neck.** `/rdmg whiplash`, then look around slowly: it should

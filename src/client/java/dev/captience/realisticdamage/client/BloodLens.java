@@ -29,6 +29,11 @@ public final class BloodLens {
 	private static final int[] variant = new int[Balance.LENS_CAPACITY];
 	private static final double[] age = new double[Balance.LENS_CAPACITY];
 	private static final boolean[] alive = new boolean[Balance.LENS_CAPACITY];
+	/** Whose blood each droplet is (2.0): a zombie's lands dark, an enderman's purple. */
+	private static final BloodTint[] tint = new BloodTint[Balance.LENS_CAPACITY];
+	/** Fractional droplets owed from blood that struck the body below the face. */
+	private static double splashCarry;
+	private static long splashed;
 	private static int next;
 	private static long counter;
 	private static double carry;
@@ -49,6 +54,10 @@ public final class BloodLens {
 	}
 
 	private static void add() {
+		add(BloodTint.RED, 1.0);
+	}
+
+	private static void add(BloodTint colour, double scale) {
 		long seed = counter++;
 		int slot = next;
 		next = (next + 1) % Balance.LENS_CAPACITY;
@@ -56,7 +65,8 @@ public final class BloodLens {
 		// Biased to the upper half: blood arrives on the lens from above, and a
 		// droplet that starts near the bottom has no room to run before it dries.
 		originY[slot] = BloodFlow.jitter(seed, 2) * 0.55;
-		size[slot] = 0.05 + BloodFlow.jitter(seed, 3) * 0.075;
+		size[slot] = (0.05 + BloodFlow.jitter(seed, 3) * 0.075) * scale;
+		tint[slot] = colour;
 		variant[slot] = (int) (BloodFlow.jitter(seed, 4) * 4.0) & 3;
 		age[slot] = 0.0;
 		alive[slot] = true;
@@ -96,7 +106,9 @@ public final class BloodLens {
 			int y = (int) ((originY[i] + Balance.LENS_RUN_DISTANCE * eased) * height);
 
 			double wetness = Math.clamp(1.0 - progress * 1.25, 0.0, 1.0);
-			int rgb = BloodPalette.packed(wetness);
+			float[] c = BloodPalette.colour(wetness, tint[i] == null ? BloodTint.RED : tint[i]);
+			int rgb = ((int) (c[0] * 255.0F + 0.5F) << 16) | ((int) (c[1] * 255.0F + 0.5F) << 8)
+					| (int) (c[2] * 255.0F + 0.5F);
 			float alpha = (float) (fade(progress) * strength);
 			if (alpha <= 0.01F) {
 				continue;
@@ -139,7 +151,53 @@ public final class BloodLens {
 		}
 	}
 
+	/**
+	 * Somebody else's blood reached you (2.0): a drop thrown out of another
+	 * body struck yours. One that lands at the height of your face is on the
+	 * lens, in its own colour and sized by how much blood the drop was; one
+	 * that lands on your chest is mostly on your chest, and every second one
+	 * splashes up. Below the waist nothing reaches your eyes.
+	 *
+	 * <p>This is the whole of it: there is no rule that hitting something
+	 * puts blood on the screen. The spray a wound throws is real drops flying
+	 * back along the blow, so standing close to what you cut, in front of an
+	 * artery, or under something bleeding is what gets you wet, and standing
+	 * back does not.
+	 *
+	 * @param height where on the body it landed, 0 feet to 1 crown
+	 * @param scale  the drop's size, 0 to 1
+	 */
+	public static void splashFromAnother(BloodTint colour, double height, double scale) {
+		ClientEffectsConfig config = ClientEffectsConfig.get();
+		if (config.bloodIntensity() * config.bloodLensIntensity <= 0.0) {
+			return;
+		}
+		double share = height > FACE_FROM ? 1.0 : height > CHEST_FROM ? CHEST_SHARE : 0.0;
+		if (share <= 0.0) {
+			return;
+		}
+		splashCarry += share;
+		while (splashCarry >= 1.0) {
+			splashCarry -= 1.0;
+			add(colour, 0.7 + 0.6 * Math.clamp(scale, 0.0, 1.0));
+			splashed++;
+		}
+	}
+
+	/** Above this share of the body's height a drop has hit the face. */
+	private static final double FACE_FROM = 0.75;
+	/** Above this, the chest and arms. */
+	private static final double CHEST_FROM = 0.40;
+	/** How much of a drop on the chest counts toward one on the lens. */
+	private static final double CHEST_SHARE = 0.5;
+
+	/** Droplets put on the lens by other bodies' blood this session; read by the client gametest. */
+	public static long splashedByOthers() {
+		return splashed;
+	}
+
 	public static void reset() {
+		splashCarry = 0.0;
 		java.util.Arrays.fill(alive, false);
 		next = 0;
 		carry = 0.0;

@@ -83,7 +83,22 @@ public class RealisticDamageClient implements ClientModInitializer {
 				lines.add(net.minecraft.network.chat.Component.translatable("item.realisticdamage.severed")
 						.withStyle(net.minecraft.ChatFormatting.GRAY));
 			}
+			// Blood on the item (2.0), in a word: how much, and whether it has dried.
+			var blood = dev.captience.realisticdamage.damage.BloodiedItem.read(stack);
+			if (!blood.isEmpty() && ClientEffectsConfig.get().bloodIntensity() > 0.0) {
+				boolean wet = BloodiedItems.wet(stack);
+				int stage = dev.captience.realisticdamage.systems.BloodiedMath.stage(
+						dev.captience.realisticdamage.systems.BloodiedMath.total(blood));
+				lines.add(Math.min(1, lines.size()), net.minecraft.network.chat.Component.translatable(
+						"realisticdamage.item.blood." + (wet ? "" : "dried.") + stage)
+						.withStyle(wet ? net.minecraft.ChatFormatting.DARK_RED : net.minecraft.ChatFormatting.GRAY));
+			}
 		});
+		// The pictures of blood on items are painted per sprite; new resources, new sprites.
+		net.fabricmc.fabric.api.resource.v1.ResourceLoader.get(net.minecraft.server.packs.PackType.CLIENT_RESOURCES)
+				.registerReloadListener(dev.captience.realisticdamage.RealisticDamage.id("item_blood"),
+						(net.minecraft.server.packs.resources.ResourceManagerReloadListener) manager ->
+								net.minecraft.client.Minecraft.getInstance().execute(BloodiedItems::reset));
 
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.ImpactPayload.TYPE,
@@ -162,6 +177,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			// Blood last, and in this order: the emitter reads the heart that
 			// ClientState.tick just advanced, and the lens is fed by the emitter.
 			BloodEmitter.tick();
+			BloodiedDrips.tick();
 			BloodBody.tick();
 			BloodStains.tick();
 			BloodLens.tick();
@@ -179,6 +195,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			StumbleInput.reset();
 			TriageHud.reset();
 			BloodEmitter.reset();
+			BloodiedDrips.reset();
 			BloodBody.reset();
 			BloodStains.reset();
 			BloodLens.reset();

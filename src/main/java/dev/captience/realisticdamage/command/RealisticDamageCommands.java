@@ -2,6 +2,7 @@ package dev.captience.realisticdamage.command;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -29,6 +30,7 @@ import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.ServerConfig;
 import dev.captience.realisticdamage.damage.BodyHitResolver;
 import dev.captience.realisticdamage.systems.CeilingMath;
+import dev.captience.realisticdamage.systems.MobAnatomy;
 import dev.captience.realisticdamage.systems.PreyMath;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.permission.v1.PermissionPredicates;
@@ -38,6 +40,8 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -59,109 +63,156 @@ public final class RealisticDamageCommands {
 		});
 	}
 
+	/**
+	 * One grammar for every verb that touches a body (2.0): the verb, then who,
+	 * then which part, then how much. {@code /rdmg break captience head},
+	 * {@code /rdmg set captience blood 40}, {@code /rdmg bleed @e[type=zombie] torso severe}.
+	 * "Who" is any selector: players always, and every mob the mod keeps a body
+	 * for. The glued-together verbs this replaced (breakneck, setpart,
+	 * damagepart, setblood, setconsciousness) are gone rather than kept as
+	 * aliases, because a second spelling in the tab list is the clutter the
+	 * rewrite was for.
+	 */
 	private static LiteralArgumentBuilder<CommandSourceStack> tree(String name) {
 		return literal(name)
 				.requires(PermissionPredicates.require(RealisticDamage.id("command/debug"), PermissionLevel.GAMEMASTERS))
 				.then(literal("heal")
-						.executes(ctx -> heal(ctx, ctx.getSource().getPlayerOrException()))
-						.then(argument("player", EntityArgument.player())
-								.executes(ctx -> heal(ctx, EntityArgument.getPlayer(ctx, "player")))))
+						.executes(ctx -> heal(ctx, self(ctx)))
+						.then(targets().executes(ctx -> heal(ctx, bodies(ctx)))))
 				.then(literal("info")
 						.executes(ctx -> info(ctx, ctx.getSource().getPlayerOrException()))
-						.then(argument("player", EntityArgument.player())
-								.executes(ctx -> info(ctx, EntityArgument.getPlayer(ctx, "player")))))
-				.then(literal("setpart")
-						.then(argument("player", EntityArgument.player())
-								.then(partArg()
+						.then(argument("target", EntityArgument.entity())
+								.executes(ctx -> info(ctx, body(ctx)))))
+				.then(literal("set")
+						.then(targets()
+								.then(wordArg("what", Stream.concat(Arrays.stream(BodyPart.values()).map(BodyPart::id),
+										Stream.of("blood", "consciousness")).toList())
 										.then(argument("value", DoubleArgumentType.doubleArg(0.0))
-												.executes(RealisticDamageCommands::setPart)))))
-				.then(literal("damagepart")
-						.then(argument("player", EntityArgument.player())
+												.executes(RealisticDamageCommands::set)))))
+				.then(literal("damage")
+						.then(targets()
 								.then(partArg()
 										.then(argument("amount", DoubleArgumentType.doubleArg(0.0))
 												.executes(RealisticDamageCommands::damagePart)))))
-				.then(literal("setblood")
-						.then(argument("player", EntityArgument.player())
-								.then(argument("value", DoubleArgumentType.doubleArg(0.0, 100.0))
-										.executes(RealisticDamageCommands::setBlood))))
-				.then(literal("setconsciousness")
-						.then(argument("player", EntityArgument.player())
-								.then(argument("value", DoubleArgumentType.doubleArg(0.0, 100.0))
-										.executes(RealisticDamageCommands::setConsciousness))))
+				// Arms and legs fracture; the head's break is the neck (2.0).
 				.then(literal("break")
-						.then(argument("player", EntityArgument.player())
-								.then(partArg().executes(RealisticDamageCommands::breakPart))))
-				.then(literal("bleed")
-						.then(argument("player", EntityArgument.player())
-								.then(partArg()
-										.then(argument("severity", StringArgumentType.word())
-												.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
-														Arrays.stream(WoundSeverity.values())
-																.map(s -> s.name().toLowerCase(Locale.ROOT)),
-														builder))
-												.executes(RealisticDamageCommands::bleed)))))
-				.then(literal("concussion")
-						.then(argument("player", EntityArgument.player())
-								.executes(RealisticDamageCommands::concussion)
-								.then(argument("grade", StringArgumentType.word())
-										.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
-												new String[] {"mild", "moderate", "severe", "none"}, builder))
-										.executes(RealisticDamageCommands::concussion))))
+						.then(targets()
+								.then(wordArg("part", Arrays.stream(BodyPart.values())
+										.filter(part -> part != BodyPart.TORSO).map(BodyPart::id).toList())
+										.executes(RealisticDamageCommands::breakPart))))
 				.then(literal("destroy")
-						.then(argument("player", EntityArgument.player())
+						.then(targets()
 								.then(partArg().executes(RealisticDamageCommands::destroyPart))))
 				// 2.0: takes the head off a player or any mob with a body, for testing.
 				.then(literal("behead")
-						.executes(ctx -> behead(ctx, java.util.List.of(ctx.getSource().getPlayerOrException())))
-						.then(argument("targets", EntityArgument.entities())
-								.executes(ctx -> behead(ctx, EntityArgument.getEntities(ctx, "targets")))))
-				// 2.0: snaps a neck, or wrenches one, for testing.
-				.then(literal("breakneck")
-						.executes(ctx -> breakNeck(ctx, java.util.List.of(ctx.getSource().getPlayerOrException())))
-						.then(argument("targets", EntityArgument.entities())
-								.executes(ctx -> breakNeck(ctx, EntityArgument.getEntities(ctx, "targets")))))
+						.executes(ctx -> behead(ctx, self(ctx)))
+						.then(targets().executes(ctx -> behead(ctx, EntityArgument.getEntities(ctx, "targets")))))
+				.then(literal("bleed")
+						.then(targets()
+								.then(partArg()
+										.then(wordArg("severity", Arrays.stream(WoundSeverity.values())
+												.map(s -> s.name().toLowerCase(Locale.ROOT)).toList())
+												.executes(RealisticDamageCommands::bleed)))))
 				.then(literal("whiplash")
-						.executes(ctx -> whiplash(ctx, java.util.List.of(ctx.getSource().getPlayerOrException()), 1.0))
-						.then(argument("targets", EntityArgument.entities())
+						.executes(ctx -> whiplash(ctx, self(ctx), 1.0))
+						.then(targets()
 								.executes(ctx -> whiplash(ctx, EntityArgument.getEntities(ctx, "targets"), 1.0))
 								.then(argument("severity", DoubleArgumentType.doubleArg(0.0, 1.0))
 										.executes(ctx -> whiplash(ctx, EntityArgument.getEntities(ctx, "targets"),
 												DoubleArgumentType.getDouble(ctx, "severity"))))))
-				.then(literal("ceiling")
-						.then(argument("player", EntityArgument.player())
-								.then(argument("part", StringArgumentType.word())
-										.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
-												Stream.concat(Stream.of("all"),
-														Arrays.stream(BodyPart.values()).map(BodyPart::id)), builder))
-										.then(argument("band", StringArgumentType.word())
-												.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
-														Stream.of("max", "hurt", "injured", "critical"), builder))
-												.executes(RealisticDamageCommands::ceiling)))))
-				.then(literal("scar")
-						.then(argument("player", EntityArgument.player())
-								.then(partArg()
-										.then(argument("level", StringArgumentType.word())
-												.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
-														Arrays.stream(ScarLevel.values())
-																.map(l -> l.name().toLowerCase(Locale.ROOT)),
-														builder))
-												.executes(RealisticDamageCommands::scar)))))
+				.then(literal("concussion")
+						.then(targets()
+								.executes(RealisticDamageCommands::concussion)
+								.then(wordArg("grade", List.of("mild", "moderate", "severe", "none"))
+										.executes(RealisticDamageCommands::concussion))))
+				.then(literal("burn")
+						.then(targets().executes(RealisticDamageCommands::burn)))
 				.then(literal("blast")
-						.then(argument("player", EntityArgument.player())
-								.then(partArg()
+						.then(targets()
+								.then(wordArg("part", Arrays.stream(BodyPart.values())
+										.filter(BodyPart::isLimb).map(BodyPart::id).toList())
 										.executes(ctx -> blast(ctx, 3.0F))
 										.then(argument("radius", FloatArgumentType.floatArg(0.5F, 16.0F))
 												.executes(ctx -> blast(ctx, FloatArgumentType.getFloat(ctx, "radius")))))))
+				// History belongs to players: a mob has one life and no record of it.
+				.then(literal("ceiling")
+						.then(argument("targets", EntityArgument.players())
+								.then(wordArg("part", Stream.concat(Stream.of("all"),
+										Arrays.stream(BodyPart.values()).map(BodyPart::id)).toList())
+										.then(wordArg("band", List.of("max", "hurt", "injured", "critical"))
+												.executes(RealisticDamageCommands::ceiling)))))
+				.then(literal("scar")
+						.then(argument("targets", EntityArgument.players())
+								.then(partArg()
+										.then(wordArg("level", Arrays.stream(ScarLevel.values())
+												.map(l -> l.name().toLowerCase(Locale.ROOT)).toList())
+												.executes(RealisticDamageCommands::scar)))))
 				.then(literal("preset")
 						.then(literal("arcade").executes(ctx -> preset(ctx, true)))
 						.then(literal("grounded").executes(ctx -> preset(ctx, false))))
 				.then(configTree())
 				.then(soundTree())
-				.then(literal("burn")
-						.then(argument("player", EntityArgument.player())
-								.executes(RealisticDamageCommands::burn)))
 				.then(RagdollTestCommand.tree());
 
+	}
+
+	private static RequiredArgumentBuilder<CommandSourceStack, net.minecraft.commands.arguments.selector.EntitySelector> targets() {
+		return argument("targets", EntityArgument.entities());
+	}
+
+	/** Whoever ran the command, for the verbs that default to yourself. */
+	private static List<LivingEntity> self(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+		return List.of(ctx.getSource().getPlayerOrException());
+	}
+
+	/** Whether the mod keeps a body for this: every player, and every mob with anatomy. */
+	private static boolean hasBody(Entity entity) {
+		return entity instanceof LivingEntity living && living.isAlive()
+				&& (living instanceof ServerPlayer || MobAnatomy.isMobWithBody(living));
+	}
+
+	/**
+	 * The bodies among the targets. A selector that matched only things without
+	 * one (an item, a boat, a mob outside the anatomy tag) is a failure with
+	 * its own sentence, so "nothing happened" is never the whole answer.
+	 */
+	private static List<LivingEntity> bodies(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+		List<LivingEntity> out = new ArrayList<>();
+		for (Entity entity : EntityArgument.getEntities(ctx, "targets")) {
+			if (hasBody(entity)) {
+				out.add((LivingEntity) entity);
+			}
+		}
+		if (out.isEmpty()) {
+			ctx.getSource().sendFailure(Component.literal(
+					"None of those has a body: it takes a player, or a mob Realistic Damage gives anatomy to"));
+		}
+		return out;
+	}
+
+	private static LivingEntity body(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+		Entity entity = EntityArgument.getEntity(ctx, "target");
+		if (!hasBody(entity)) {
+			throw new com.mojang.brigadier.exceptions.SimpleCommandExceptionType(Component.literal(
+					"That has no body: it takes a player, or a mob Realistic Damage gives anatomy to")).create();
+		}
+		return (LivingEntity) entity;
+	}
+
+	/** Publishes a changed body, and starts a mob's body ticking if it was not. */
+	private static void changed(LivingEntity body) {
+		MobAnatomy.track(body);
+		RDAttachments.pushSnapshot(body);
+	}
+
+	/** "captience", or "3 bodies" when the selector caught several. */
+	private static String who(List<LivingEntity> bodies) {
+		return bodies.size() == 1 ? bodies.get(0).getName().getString() : bodies.size() + " bodies";
+	}
+
+	/** "left leg" for {@code left_leg}: what a sentence calls the part. */
+	private static String said(BodyPart part) {
+		return part.id().replace('_', ' ');
 	}
 
 	/**
@@ -247,9 +298,7 @@ public final class RealisticDamageCommands {
 	}
 
 	private static RequiredArgumentBuilder<CommandSourceStack, String> partArg() {
-		return argument("part", StringArgumentType.word())
-				.suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
-						Arrays.stream(BodyPart.values()).map(BodyPart::id), builder));
+		return wordArg("part", Arrays.stream(BodyPart.values()).map(BodyPart::id).toList());
 	}
 
 	private static BodyPart parsePart(CommandContext<CommandSourceStack> ctx) {
@@ -262,14 +311,19 @@ public final class RealisticDamageCommands {
 		return part;
 	}
 
-	private static int heal(CommandContext<CommandSourceStack> ctx, ServerPlayer player) {
-		RDAttachments.get(player).reset();
-		RDAttachments.pushSnapshot(player);
-		ctx.getSource().sendSuccess(() -> Component.literal("Fully restored Realistic Damage state of " + player.getName().getString()), true);
-		return 1;
+	private static int heal(CommandContext<CommandSourceStack> ctx, List<LivingEntity> bodies) {
+		for (LivingEntity body : bodies) {
+			RDAttachments.get(body).reset();
+			changed(body);
+		}
+		if (bodies.isEmpty()) {
+			return 0;
+		}
+		ctx.getSource().sendSuccess(() -> Component.literal("Fully restored " + who(bodies)), true);
+		return bodies.size();
 	}
 
-	private static int info(CommandContext<CommandSourceStack> ctx, ServerPlayer player) {
+	private static int info(CommandContext<CommandSourceStack> ctx, LivingEntity player) {
 		RealisticDamageData data = RDAttachments.get(player);
 		StringJoiner out = new StringJoiner("\n");
 		out.add("Realistic Damage — " + player.getName().getString());
@@ -340,11 +394,11 @@ public final class RealisticDamageCommands {
 
 	/** Takes the head off each target that can lose one, as an edge on a ruined head would. */
 	private static int behead(CommandContext<CommandSourceStack> ctx,
-			java.util.Collection<? extends net.minecraft.world.entity.Entity> targets) {
+			java.util.Collection<? extends Entity> targets) {
 		int done = 0;
-		for (net.minecraft.world.entity.Entity target : targets) {
-			if (!(target instanceof net.minecraft.world.entity.LivingEntity body) || !body.isAlive()
-					|| !dev.captience.realisticdamage.systems.MobAnatomy.participates(body)) {
+		for (Entity target : targets) {
+			if (!(target instanceof LivingEntity body) || !body.isAlive()
+					|| !MobAnatomy.participates(body)) {
 				continue;
 			}
 			var data = RDAttachments.get(body);
@@ -352,8 +406,8 @@ public final class RealisticDamageCommands {
 				continue;
 			}
 			data.part(BodyPart.HEAD).setCondition(0.0);
-			net.minecraft.world.entity.Entity by = ctx.getSource().getEntity();
-			net.minecraft.world.phys.Vec3 blow = by == null ? net.minecraft.world.phys.Vec3.ZERO
+			Entity by = ctx.getSource().getEntity();
+			Vec3 blow = by == null ? Vec3.ZERO
 					: body.position().subtract(by.position()).multiply(1.0, 0.0, 1.0);
 			dev.captience.realisticdamage.damage.Decapitation.decapitate(body, data,
 					blow.lengthSqr() < 1.0e-6 ? blow : blow.normalize(), by == body ? null : by);
@@ -370,20 +424,18 @@ public final class RealisticDamageCommands {
 	}
 
 	/** Snaps the neck of each target that has one, as a head-first landing would. */
-	private static int breakNeck(CommandContext<CommandSourceStack> ctx,
-			java.util.Collection<? extends net.minecraft.world.entity.Entity> targets) {
+	private static int breakNeck(CommandContext<CommandSourceStack> ctx, List<LivingEntity> bodies) {
 		int done = 0;
-		for (net.minecraft.world.entity.Entity target : targets) {
-			if (target instanceof net.minecraft.world.entity.LivingEntity body && body.isAlive()
-					&& dev.captience.realisticdamage.damage.BrokenNeck.can(body)) {
-				net.minecraft.world.entity.Entity by = ctx.getSource().getEntity();
+		for (LivingEntity body : bodies) {
+			if (dev.captience.realisticdamage.damage.BrokenNeck.can(body)) {
+				Entity by = ctx.getSource().getEntity();
 				dev.captience.realisticdamage.damage.BrokenNeck.snap(body, RDAttachments.get(body), by == body ? null : by);
 				done++;
 			}
 		}
 		final int count = done;
 		if (count == 0) {
-			ctx.getSource().sendFailure(Component.literal("No neck to break: the target needs a body and a head, "
+			ctx.getSource().sendFailure(Component.literal("No neck to break: the target needs a head, "
 					+ "and can't be a boss or in creative"));
 			return 0;
 		}
@@ -393,10 +445,10 @@ public final class RealisticDamageCommands {
 
 	/** Gives each target whiplash of this severity (0 mild to 1 all but broken). */
 	private static int whiplash(CommandContext<CommandSourceStack> ctx,
-			java.util.Collection<? extends net.minecraft.world.entity.Entity> targets, double severity) {
+			java.util.Collection<? extends Entity> targets, double severity) {
 		int done = 0;
-		for (net.minecraft.world.entity.Entity target : targets) {
-			if (target instanceof net.minecraft.world.entity.LivingEntity body && body.isAlive()
+		for (Entity target : targets) {
+			if (target instanceof LivingEntity body && body.isAlive()
 					&& dev.captience.realisticdamage.damage.BrokenNeck.can(body)) {
 				var data = RDAttachments.get(body);
 				// Forced: the command replaces whatever is there, milder or not.
@@ -417,76 +469,110 @@ public final class RealisticDamageCommands {
 		return count;
 	}
 
-	private static int setPart(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
-		BodyPart part = parsePart(ctx);
-		if (part == null) {
+	/**
+	 * {@code set <targets> <what> <value>}: a region's condition, or one of the
+	 * two hidden meters. One verb where there were three (setpart, setblood,
+	 * setconsciousness), because the thing being set is an argument and not
+	 * part of the verb.
+	 */
+	private static int set(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+		List<LivingEntity> bodies = bodies(ctx);
+		if (bodies.isEmpty()) {
 			return 0;
 		}
+		String what = StringArgumentType.getString(ctx, "what").toLowerCase(Locale.ROOT);
 		double value = DoubleArgumentType.getDouble(ctx, "value");
-		RDAttachments.get(player).part(part).setCondition(value);
-		RDAttachments.pushSnapshot(player);
-		ctx.getSource().sendSuccess(() -> Component.literal(player.getName().getString() + " " + part.id()
-				+ " condition set to " + RDAttachments.get(player).part(part).condition()), true);
-		return 1;
+		BodyPart part = BodyPart.byId(what);
+		boolean blood = what.equals("blood");
+		if (part == null && !blood && !what.equals("consciousness")) {
+			ctx.getSource().sendFailure(Component.literal("Unknown thing to set '" + what + "' (use: "
+					+ String.join(", ", Arrays.stream(BodyPart.values()).map(BodyPart::id).toList())
+					+ ", blood, consciousness)"));
+			return 0;
+		}
+		if (part == null && value > 100.0) {
+			ctx.getSource().sendFailure(Component.literal(
+					(blood ? "Blood" : "Consciousness") + " runs from 0 to 100"));
+			return 0;
+		}
+		for (LivingEntity body : bodies) {
+			RealisticDamageData data = RDAttachments.get(body);
+			if (part != null) {
+				data.part(part).setCondition(value);
+			} else if (blood) {
+				data.setBlood(value);
+			} else {
+				data.setConsciousness(value);
+			}
+			changed(body);
+		}
+		// Read back off the first body, so a clamped request shows what was set.
+		RealisticDamageData first = RDAttachments.get(bodies.get(0));
+		String line;
+		if (part != null) {
+			line = String.format(Locale.ROOT, "%s of %s set to %.2f", said(part), who(bodies),
+					first.part(part).condition());
+		} else if (blood) {
+			line = String.format(Locale.ROOT, "Blood of %s set to %.1f", who(bodies), first.blood());
+		} else {
+			line = String.format(Locale.ROOT, "Consciousness of %s set to %.1f (cap %.0f)", who(bodies),
+					first.consciousness(), first.consciousnessCap());
+		}
+		ctx.getSource().sendSuccess(() -> Component.literal(line.substring(0, 1).toUpperCase(Locale.ROOT)
+				+ line.substring(1)), true);
+		return bodies.size();
 	}
 
 	private static int damagePart(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		List<LivingEntity> bodies = bodies(ctx);
 		BodyPart part = parsePart(ctx);
-		if (part == null) {
+		if (part == null || bodies.isEmpty()) {
 			return 0;
 		}
 		double amount = DoubleArgumentType.getDouble(ctx, "amount");
-		double dealt = RDAttachments.get(player).part(part).damage(amount);
-		RDAttachments.pushSnapshot(player);
+		double dealt = 0.0;
+		for (LivingEntity body : bodies) {
+			dealt = RDAttachments.get(body).part(part).damage(amount);
+			changed(body);
+		}
+		final double last = dealt;
 		ctx.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-				"Dealt %.2f condition damage to %s of %s (now %s)", dealt, part.id(),
-				player.getName().getString(), RDAttachments.get(player).part(part).state())), true);
-		return 1;
+				"Dealt %.2f condition damage to the %s of %s (now %s)", last, said(part), who(bodies),
+				RDAttachments.get(bodies.get(bodies.size() - 1)).part(part).state())), true);
+		return bodies.size();
 	}
 
-	private static int setBlood(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
-		double value = DoubleArgumentType.getDouble(ctx, "value");
-		RDAttachments.get(player).setBlood(value);
-		RDAttachments.pushSnapshot(player);
-		ctx.getSource().sendSuccess(() -> Component.literal(player.getName().getString() + " blood set to " + value), true);
-		return 1;
-	}
-
-	private static int setConsciousness(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
-		double value = DoubleArgumentType.getDouble(ctx, "value");
-		RealisticDamageData data = RDAttachments.get(player);
-		data.setConsciousness(value);
-		RDAttachments.pushSnapshot(player);
-		ctx.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-				"%s consciousness set to %.1f (cap %.0f)", player.getName().getString(),
-				data.consciousness(), data.consciousnessCap())), true);
-		return 1;
-	}
-
+	/**
+	 * {@code break <targets> <part>}: an arm or a leg fractures, and the head's
+	 * break is the neck (2.0; this took over from the separate breakneck verb).
+	 * The torso has nothing in it the mod breaks.
+	 */
 	private static int breakPart(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		List<LivingEntity> bodies = bodies(ctx);
 		BodyPart part = parsePart(ctx);
-		if (part == null) {
+		if (part == null || bodies.isEmpty()) {
 			return 0;
+		}
+		if (part == BodyPart.HEAD) {
+			return breakNeck(ctx, bodies);
 		}
 		if (!part.isLimb()) {
-			ctx.getSource().sendFailure(Component.literal("Only arms and legs can be Broken in 1.0"));
+			ctx.getSource().sendFailure(Component.literal(
+					"Arms and legs break, and the head's break is the neck; the torso has nothing to break"));
 			return 0;
 		}
-		RDAttachments.get(player).part(part).setBroken(true);
-		RDAttachments.pushSnapshot(player);
-		ctx.getSource().sendSuccess(() -> Component.literal("Broke " + part.id() + " of " + player.getName().getString()), true);
-		return 1;
+		for (LivingEntity body : bodies) {
+			RDAttachments.get(body).part(part).setBroken(true);
+			changed(body);
+		}
+		ctx.getSource().sendSuccess(() -> Component.literal("Broke the " + said(part) + " of " + who(bodies)), true);
+		return bodies.size();
 	}
 
 	private static int bleed(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		List<LivingEntity> bodies = bodies(ctx);
 		BodyPart part = parsePart(ctx);
-		if (part == null) {
+		if (part == null || bodies.isEmpty()) {
 			return 0;
 		}
 		String severityName = StringArgumentType.getString(ctx, "severity");
@@ -494,26 +580,27 @@ public final class RealisticDamageCommands {
 		try {
 			severity = WoundSeverity.valueOf(severityName.toUpperCase(Locale.ROOT));
 		} catch (IllegalArgumentException e) {
-			ctx.getSource().sendFailure(Component.literal("Unknown severity '" + severityName + "'"));
+			ctx.getSource().sendFailure(Component.literal("Unknown severity '" + severityName + "' (use: "
+					+ String.join(", ", Arrays.stream(WoundSeverity.values())
+							.map(s -> s.name().toLowerCase(Locale.ROOT)).toList()) + ")"));
 			return 0;
 		}
-		RealisticDamageData data = RDAttachments.get(player);
-		data.addWound(part, severity);
-		RDAttachments.pushSnapshot(player);
+		for (LivingEntity body : bodies) {
+			RDAttachments.get(body).addWound(part, severity);
+			changed(body);
+		}
 		ctx.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-				"Added %s wound to %s of %s (effective %.2f blood/s)", severity.name().toLowerCase(Locale.ROOT),
-				part.id(), player.getName().getString(), data.effectiveBleedRate())), true);
-		return 1;
+				"Opened a %s wound on the %s of %s (effective %.2f blood/s)", severity.name().toLowerCase(Locale.ROOT),
+				said(part), who(bodies), RDAttachments.get(bodies.get(0)).effectiveBleedRate())), true);
+		return bodies.size();
 	}
 
 	private static int concussion(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
-		String grade;
-		try {
-			grade = StringArgumentType.getString(ctx, "grade").toLowerCase(Locale.ROOT);
-		} catch (IllegalArgumentException absent) {
-			grade = "moderate";
+		List<LivingEntity> bodies = bodies(ctx);
+		if (bodies.isEmpty()) {
+			return 0;
 		}
+		String grade = word(ctx, "grade", "moderate");
 		double severity = switch (grade) {
 			case "mild" -> 20.0;
 			case "moderate" -> dev.captience.realisticdamage.config.Balance.CONCUSSION_DEFAULT_SEVERITY;
@@ -525,26 +612,29 @@ public final class RealisticDamageCommands {
 			ctx.getSource().sendFailure(Component.literal("Grade must be mild, moderate, severe or none"));
 			return 0;
 		}
-		RDAttachments.get(player).setConcussionSeverity(severity);
-		RDAttachments.pushSnapshot(player);
-		String said = grade;
+		for (LivingEntity body : bodies) {
+			RDAttachments.get(body).setConcussionSeverity(severity);
+			changed(body);
+		}
 		ctx.getSource().sendSuccess(() -> Component.literal(severity > 0.0
-				? "Concussed " + player.getName().getString() + " (" + said + ")"
-				: "Cleared " + player.getName().getString() + "'s concussion"), true);
-		return 1;
+				? "Concussed " + who(bodies) + " (" + grade + ")"
+				: "Cleared the concussion of " + who(bodies)), true);
+		return bodies.size();
 	}
 
 	private static int destroyPart(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		List<LivingEntity> bodies = bodies(ctx);
 		BodyPart part = parsePart(ctx);
-		if (part == null) {
+		if (part == null || bodies.isEmpty()) {
 			return 0;
 		}
-		dev.captience.realisticdamage.damage.DestructionLogic.destroy(player, RDAttachments.get(player), part);
-		RDAttachments.pushSnapshot(player);
+		for (LivingEntity body : bodies) {
+			dev.captience.realisticdamage.damage.DestructionLogic.destroy(body, RDAttachments.get(body), part);
+			changed(body);
+		}
 		ctx.getSource().sendSuccess(() -> Component.literal(
-				"Destroyed " + part.id() + " of " + player.getName().getString()), true);
-		return 1;
+				"Destroyed the " + said(part) + " of " + who(bodies)), true);
+		return bodies.size();
 	}
 
 	/**
@@ -562,30 +652,32 @@ public final class RealisticDamageCommands {
 	 * finish-off path, which can kill through a totem that has just fired.
 	 */
 	private static int blast(CommandContext<CommandSourceStack> ctx, float radius) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		List<LivingEntity> bodies = bodies(ctx);
 		BodyPart part = parsePart(ctx);
-		if (part == null) {
+		if (part == null || bodies.isEmpty()) {
 			return 0;
 		}
 		if (!part.isLimb()) {
 			ctx.getSource().sendFailure(Component.literal("Only arms and legs come off in a blast"));
 			return 0;
 		}
-		Vec3 region = BodyHitResolver.regionCenter(player, part);
-		Vec3 forward = Vec3.directionFromRotation(0.0F, player.yBodyRot);
-		Vec3 right = forward.yRot((float) (-Math.PI / 2.0));
-		Vec3 outward = part == BodyPart.LEFT_ARM || part == BodyPart.LEFT_LEG ? right.scale(-1.0) : right;
-		Vec3 at = region.add(outward.scale(0.9));
-		player.level().explode(null, at.x, at.y, at.z, radius, Level.ExplosionInteraction.NONE);
-		RDAttachments.pushSnapshot(player);
+		for (LivingEntity body : bodies) {
+			Vec3 region = BodyHitResolver.regionCenter(body, part);
+			Vec3 forward = Vec3.directionFromRotation(0.0F, body.yBodyRot);
+			Vec3 right = forward.yRot((float) (-Math.PI / 2.0));
+			Vec3 outward = part == BodyPart.LEFT_ARM || part == BodyPart.LEFT_LEG ? right.scale(-1.0) : right;
+			Vec3 at = region.add(outward.scale(0.9));
+			body.level().explode(null, at.x, at.y, at.z, radius, Level.ExplosionInteraction.NONE);
+			changed(body);
+		}
 		ctx.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-				"Blast r=%.1f beside %s of %s", radius, part.id(), player.getName().getString())), true);
-		return 1;
+				"Blast r=%.1f beside the %s of %s", radius, said(part), who(bodies))), true);
+		return bodies.size();
 	}
 
 	/** Sets or clears a long-term ceiling. Bypasses the toggle, the way /rdmg destroy bypasses limb destruction. */
 	private static int ceiling(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		java.util.Collection<ServerPlayer> players = EntityArgument.getPlayers(ctx, "targets");
 		String partId = StringArgumentType.getString(ctx, "part").toLowerCase(Locale.ROOT);
 		String word = StringArgumentType.getString(ctx, "band").toLowerCase(Locale.ROOT);
 		int band = switch (word) {
@@ -612,26 +704,28 @@ public final class RealisticDamageCommands {
 			}
 			parts = List.of(part);
 		}
-		RealisticDamageData data = RDAttachments.get(player);
-		for (BodyPart part : parts) {
-			if (band == 0) {
-				data.part(part).restoreCeiling();
-			} else {
-				data.part(part).lowerCeilingTo(band);   // floored per part: 'critical' on the head lands at Hurt
+		for (ServerPlayer player : players) {
+			RealisticDamageData data = RDAttachments.get(player);
+			for (BodyPart part : parts) {
+				if (band == 0) {
+					data.part(part).restoreCeiling();
+				} else {
+					data.part(part).lowerCeilingTo(band);   // floored per part: 'critical' on the head lands at Hurt
+				}
 			}
+			RDAttachments.pushSnapshot(player);
+			// Reports what was actually set, so a floored request (head 'critical' ->
+			// Hurt) is visible rather than silently different from what was typed.
+			StringJoiner out = new StringJoiner(", ");
+			for (BodyPart part : parts) {
+				int set = data.part(part).ceilingBand();
+				out.add(part.id() + " " + (set == 0 ? "max"
+						: CeilingMath.pinnedState(set).name().toLowerCase(Locale.ROOT)));
+			}
+			ctx.getSource().sendSuccess(() -> Component.literal(
+					player.getName().getString() + " ceilings: " + out), true);
 		}
-		RDAttachments.pushSnapshot(player);
-		// Reports what was actually set, so a floored request (head 'critical' ->
-		// Hurt) is visible rather than silently different from what was typed.
-		StringJoiner out = new StringJoiner(", ");
-		for (BodyPart part : parts) {
-			int set = data.part(part).ceilingBand();
-			out.add(part.id() + " " + (set == 0 ? "max"
-					: CeilingMath.pinnedState(set).name().toLowerCase(Locale.ROOT)));
-		}
-		ctx.getSource().sendSuccess(() -> Component.literal(
-				player.getName().getString() + " ceilings: " + out), true);
-		return parts.size();
+		return parts.size() * players.size();
 	}
 
 	/**
@@ -640,7 +734,7 @@ public final class RealisticDamageCommands {
 	 * can only ever be worth a screenshot.
 	 */
 	private static int scar(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+		java.util.Collection<ServerPlayer> players = EntityArgument.getPlayers(ctx, "targets");
 		BodyPart part = parsePart(ctx);
 		if (part == null) {
 			return 0;
@@ -654,12 +748,15 @@ public final class RealisticDamageCommands {
 					"Unknown scar level '" + name + "' (none, broken, destroyed)"));
 			return 0;
 		}
-		// setScar, not markScar: the debug verb is the one path allowed to lower one.
-		RDAttachments.get(player).part(part).setScar(level);
-		RDAttachments.pushSnapshot(player);
-		ctx.getSource().sendSuccess(() -> Component.literal("Scar on " + part.id() + " of "
-				+ player.getName().getString() + " set to " + name.toLowerCase(Locale.ROOT)), true);
-		return 1;
+		for (ServerPlayer player : players) {
+			// setScar, not markScar: the debug verb is the one path allowed to lower one.
+			RDAttachments.get(player).part(part).setScar(level);
+			RDAttachments.pushSnapshot(player);
+		}
+		ctx.getSource().sendSuccess(() -> Component.literal("Scar on the " + said(part) + " of "
+				+ (players.size() == 1 ? players.iterator().next().getName().getString() : players.size() + " players")
+				+ " set to " + name.toLowerCase(Locale.ROOT)), true);
+		return players.size();
 	}
 
 	// --- /rdmg config (1.6) ---
@@ -805,10 +902,15 @@ public final class RealisticDamageCommands {
 	}
 
 	private static int burn(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-		ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
-		RDAttachments.get(player).setBurned(true);
-		RDAttachments.pushSnapshot(player);
-		ctx.getSource().sendSuccess(() -> Component.literal("Applied Burned to " + player.getName().getString()), true);
-		return 1;
+		List<LivingEntity> bodies = bodies(ctx);
+		if (bodies.isEmpty()) {
+			return 0;
+		}
+		for (LivingEntity body : bodies) {
+			RDAttachments.get(body).setBurned(true);
+			changed(body);
+		}
+		ctx.getSource().sendSuccess(() -> Component.literal("Burned " + who(bodies)), true);
+		return bodies.size();
 	}
 }

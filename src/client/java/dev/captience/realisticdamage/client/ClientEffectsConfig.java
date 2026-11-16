@@ -31,6 +31,15 @@ public final class ClientEffectsConfig {
 	 */
 	public boolean showNumericStats = false;
 	/**
+	 * What the inventory's player box shows (2.0): "body" (the paper doll of
+	 * your skin with your injuries on it), "xray" (the same on the skeleton)
+	 * or "model" (vanilla's turning model, left alone). Changed with the small
+	 * button in the corner of the box itself, which is why it is not on the
+	 * settings screen. A word rather than an enum so an old file, or one from
+	 * a newer version with a view this one lacks, still loads.
+	 */
+	public String inventoryBodyView = "body";
+	/**
 	 * Marks on the body panel and the HUD for regions that have been broken or
 	 * lost before (1.6). Information, not atmosphere — kept out of the presets
 	 * and out of {@link #disableAllEffects()} like the injury icons, because it

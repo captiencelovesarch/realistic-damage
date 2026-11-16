@@ -469,6 +469,57 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 			}
 			context.takeScreenshot("rd_16_capped");
 
+			// A body with one of everything that is not about to kill it, for the
+			// pictures of the three views: a broken arm, a cut that seeps, a leg
+			// gone, a scar.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.part(BodyPart.LEFT_ARM).setCondition(3.0);
+				data.part(BodyPart.LEFT_ARM).setBroken(true);
+				data.part(BodyPart.TORSO).setCondition(7.0);
+				data.addWound(BodyPart.TORSO, WoundSeverity.MINOR);
+				data.part(BodyPart.RIGHT_LEG).setDestroyed(true);
+				data.part(BodyPart.HEAD).setCondition(8.0);
+			});
+			context.waitTicks(30);
+			context.takeScreenshot("rd_17_body_in_the_box");
+			hover(context, BodyPart.LEFT_ARM);
+			context.takeScreenshot("rd_17_body_hover");
+			// The corner button changes what the box shows: the body, the x-ray
+			// on Minecraft's own skeleton, vanilla's model, and round again. A
+			// real click on the real button, and the choice is kept.
+			for (BodyInspector.View expected : new BodyInspector.View[] {BodyInspector.View.XRAY,
+					BodyInspector.View.MODEL, BodyInspector.View.BODY}) {
+				int[] button = context.computeOnClient(client -> BodyInspector.viewButton());
+				if (button == null) {
+					throw new AssertionError("the view button was not drawn");
+				}
+				setCursor(context, button[0], button[1]);
+				context.waitTicks(2);
+				context.getInput().pressMouse(0);
+				context.waitTicks(3);
+				BodyInspector.View drawn = context.computeOnClient(client -> BodyInspector.viewDrawn());
+				if (drawn != expected) {
+					throw new AssertionError("clicking the view button gave " + drawn + ", expected " + expected);
+				}
+				String kept = context.computeOnClient(client -> ClientEffectsConfig.get().inventoryBodyView);
+				if (!kept.equals(expected.id())) {
+					throw new AssertionError("the chosen view was not kept: " + kept);
+				}
+				if (expected == BodyInspector.View.XRAY) {
+					hover(context, BodyPart.LEFT_ARM);
+					if (context.computeOnClient(client -> BodyInspector.hoveredPart()) != BodyPart.LEFT_ARM) {
+						throw new AssertionError("the x-ray lost the hover on the left arm");
+					}
+				}
+				if (expected == BodyInspector.View.MODEL
+						&& context.computeOnClient(client -> BodyInspector.regionCenter(BodyPart.HEAD)) != null) {
+					throw new AssertionError("the model view still claims to have drawn regions");
+				}
+				context.takeScreenshot("rd_18_view_" + expected.id());
+			}
+
+
 			// Below the ceiling: 8 of 16 under a 12 ceiling. This is the state that
 			// still deserves the player's attention, and the fade must come back on
 			// for it — otherwise "capped bodies do not raise the HUD" would have
@@ -519,111 +570,79 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * The panel has to move when the <em>window</em> does, which is the half of
-	 * this that 1.1 never asserted (1.6 playtest fix).
+	 * The body is in the inventory's own player box (2.0), so it goes where the
+	 * window goes and there is nothing for it to collide with.
 	 *
-	 * <p>1.1 pinned that the body does not move when the numbers are switched on,
-	 * and that assertion is right and still above. But the panel derived the
-	 * inventory's position from the screen width, and the recipe book moves the
-	 * inventory 77px right without the screen width changing a pixel — so the
-	 * panel heard about none of it and sat opaquely on the book's search box and
-	 * category tabs, passing clicks through to recipes the player could not see.
-	 * The right assertion had been written on the wrong axis.
-	 *
-	 * <p>Both ends of the range, because the answer is different at each: wide
-	 * enough and the panel steps left of the whole cluster, too narrow and it
-	 * stands aside altogether. The narrow case is the default 854x480 window at
-	 * GUI scale 2, which is why it is not an edge case worth skipping.
+	 * <p>This used to be the hardest thing the panel did. It sat in the strip
+	 * left of the inventory, which is exactly where the recipe book opens, and
+	 * had to measure round the book and its tabs and stand aside altogether
+	 * whenever nothing fitted, which on the automatic GUI scale was whenever
+	 * the book was open. What is asserted now is the property that replaced all
+	 * of that: with the book open or shut, in a wide window or the default one,
+	 * the body is drawn, it is inside the inventory window, and every region is
+	 * under the cursor that points at it.
 	 */
 	private void assertThePanelFollowsTheWindow(ClientGameTestContext context) {
 		int restoreScale = context.computeOnClient(client -> client.options.guiScale().get());
-		// GUI scale is pinned rather than left on auto, and the wide case cannot
-		// be reached without pinning it. Vanilla's auto scale is the largest that
-		// keeps 320x240 on screen, so it holds the scaled width under about 480
-		// however large the monitor — 1920x1080 lands on 480, and 503 is where
-		// the body and the open recipe book both fit. So the only player who ever
-		// sees both is one who turned the scale down by hand. 1280x720 at scale 2
-		// is 640 scaled pixels, which is that player.
 		setGuiScale(context, 2);
 		context.getInput().resizeWindow(1280, 720);
 		context.waitTicks(3);
 		setRecipeBookOpen(context, false);
 		int wide = guiWidth(context);
-		// anchorLeft = (W - 147)/2 - 86 - 30 and the body needs 54 + 8 beside it,
-		// so both fit from (W - 147)/2 >= 178, i.e. W >= 503.
-		if (wide < 503) {
-			throw new AssertionError("meant to test a window with room for both, got W = " + wide);
-		}
-		int[] shut = context.computeOnClient(client -> BodyInspector.panelBounds());
-		if (shut == null) {
-			throw new AssertionError("the panel drew nothing with the recipe book shut at W = " + wide);
-		}
+		int[] shut = assertInsideTheWindow(context, "book shut, W = " + wide);
 
 		setRecipeBookOpen(context, true);
-		int[] open = context.computeOnClient(client -> BodyInspector.panelBounds());
-		if (open == null) {
-			throw new AssertionError("the panel vanished at W = " + wide + ", which has room for it");
-		}
-		if (open[0] == shut[0]) {
-			throw new AssertionError("the panel did not move when the recipe book opened: still at "
-					+ open[0]);
-		}
-		// Vanilla's own arithmetic, spelled out here rather than asked of
-		// BodyInspector: RecipeBookComponent.getXOrigin is (width - IMAGE_WIDTH)
-		// / 2 - xOffset, and updateTabs hangs the category column 30 further
-		// left. If the panel and this ever disagree it is because Mojang moved
-		// one of them, which is exactly the day this test is for.
-		int tabLeft = context.computeOnClient(client ->
-				(client.getWindow().getGuiScaledWidth() - 147) / 2 - 86 - 30);
-		if (open[2] > tabLeft) {
-			throw new AssertionError("the panel reaches " + open[2]
-					+ ", over the recipe book tabs that start at " + tabLeft);
-		}
-		for (BodyPart part : BodyPart.values()) {
-			hover(context, part);
-			if (context.computeOnClient(client -> BodyInspector.hoveredPart()) != part) {
-				throw new AssertionError("the recipe book layout broke the hover on " + part);
-			}
+		int[] open = assertInsideTheWindow(context, "book open, W = " + wide);
+		// Vanilla slides the window 77 right for the book, and the box is part
+		// of the window.
+		if (open[0] - shut[0] != 77) {
+			throw new AssertionError("the body moved " + (open[0] - shut[0])
+					+ " when the recipe book opened; the window moves 77");
 		}
 		context.takeScreenshot("rd_20_recipe_book_open");
 
-		// Squeezed, with the book still open, there is no strip wide enough for
-		// the body: 24px left of the tabs and 49px right of the window, against a
-		// 54px diagram, and the right strip already belongs to the status
-		// effects. Standing aside beats painting over the recipes.
+		// The default window, book still open: the case the old panel gave up on.
 		context.getInput().resizeWindow(854, 480);
 		context.waitTicks(3);
 		int narrow = guiWidth(context);
-		if (narrow < 379 || narrow >= 503) {
-			throw new AssertionError("meant to test the band where the book shifts but nothing fits, got W = "
-					+ narrow);
-		}
-		if (context.computeOnClient(client -> BodyInspector.panelBounds()) != null
-				|| context.computeOnClient(client -> BodyInspector.regionCenter(BodyPart.HEAD)) != null) {
-			throw new AssertionError("the panel drew at W = " + narrow
-					+ " with no room beside the open recipe book");
-		}
+		assertInsideTheWindow(context, "book open, W = " + narrow);
 		context.takeScreenshot("rd_21_recipe_book_cramped");
 
-		// And it comes straight back — suppression is a response to the book, not
-		// a state the panel gets stuck in.
 		setRecipeBookOpen(context, false);
-		int[] backAgain = context.computeOnClient(client -> BodyInspector.panelBounds());
-		if (backAgain == null) {
-			throw new AssertionError("the panel never returned once the recipe book was shut");
-		}
-		// The other half of "follows the window": same book state, different
-		// window, different place. This is what the old code could not do.
+		int[] backAgain = assertInsideTheWindow(context, "book shut, W = " + narrow);
 		if (backAgain[0] == shut[0]) {
-			throw new AssertionError("the panel sat at " + shut[0] + " at both W = " + wide
-					+ " and W = " + narrow);
+			throw new AssertionError("the body sat at " + shut[0] + " at both W = " + wide + " and W = " + narrow);
 		}
 
-		// Back to whatever the harness had, so the blocks after this one see the
-		// window they were written against.
 		setGuiScale(context, restoreScale);
 		context.getInput().resizeWindow(854, 480);
 		context.waitTicks(3);
+	}
+
+	/** The body is drawn, lies wholly inside the inventory window, and every region answers its own hover. */
+	private int[] assertInsideTheWindow(ClientGameTestContext context, String when) {
+		int[] box = context.computeOnClient(client -> BodyInspector.panelBounds());
+		if (box == null) {
+			throw new AssertionError("the body was not drawn (" + when + ")");
+		}
+		int left = context.computeOnClient(client ->
+				((dev.captience.realisticdamage.client.mixin.ContainerLayoutAccessor) client.gui.screen())
+						.realisticdamage$leftPos());
+		if (box[0] < left || box[2] > left + 176) {
+			throw new AssertionError("the body is at " + box[0] + ".." + box[2] + ", outside the window at "
+					+ left + ".." + (left + 176) + " (" + when + ")");
+		}
+		for (BodyPart part : BodyPart.values()) {
+			int[] centre = context.computeOnClient(client -> BodyInspector.regionCenter(part));
+			if (centre == null || centre[0] < box[0] || centre[0] >= box[2] || centre[1] < box[1] || centre[1] >= box[3]) {
+				throw new AssertionError(part + " is not inside the box (" + when + ")");
+			}
+			hover(context, part);
+			if (context.computeOnClient(client -> BodyInspector.hoveredPart()) != part) {
+				throw new AssertionError("hovering " + part + " did not find it (" + when + ")");
+			}
+		}
+		return box;
 	}
 
 	/** 0 is vanilla's "auto". resizeGui is what actually applies the new scale. */
@@ -754,7 +773,12 @@ public class BodyHudClientGameTest implements FabricClientGameTest {
 	private void hover(ClientGameTestContext context, BodyPart part) {
 		int[] centre = context.computeOnClient(client -> BodyInspector.regionCenter(part));
 		if (centre == null) {
-			throw new AssertionError("the inspector never drew " + part);
+			String why = context.computeOnClient(client -> "view drawn " + BodyInspector.viewDrawn()
+					+ ", chosen " + ClientEffectsConfig.get().inventoryBodyView
+					+ ", display on " + ClientEffectsConfig.get().showBodyHud
+					+ ", taking part " + dev.captience.realisticdamage.client.ClientState.active()
+					+ ", screen " + (client.gui.screen() == null ? null : client.gui.screen().getClass().getSimpleName()));
+			throw new AssertionError("the inspector never drew " + part + " (" + why + ")");
 		}
 		setCursor(context, centre[0], centre[1]);
 		context.waitTicks(2);

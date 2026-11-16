@@ -71,7 +71,7 @@ Names: `fracture`, `destruction` (limb lost), `collapse`, `neck_crack`,
    ```
    /rdmg break @s left_leg
    /rdmg destroy @s left_arm
-   /rdmg setconsciousness @s 0
+   /rdmg set @s consciousness 0
    /rdmg behead @e[type=zombie,limit=1,sort=nearest]
    ```
    A real break still screams on top, if Pain Screams is on.

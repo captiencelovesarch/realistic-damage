@@ -79,10 +79,24 @@ public final class BloodEmitter {
 		private final double[] contactCarry = new double[BodyPart.values().length];
 		private long emitted;
 		private long transferred;
+		/** Last tick's hurt timer, to see the tick a new blow lands. */
+		private int hurtTime;
+	}
+
+	/** Drops thrown by blows landing on bodies that were already bleeding; read by the client gametest. */
+	private static long struckDrops;
+
+	public static long struckDrops() {
+		return struckDrops;
 	}
 
 	static void bindSprites(SpriteSet spriteSet) {
 		sprites = spriteSet;
+	}
+
+	/** The drop sprites, for the other things that shed blood (a wet weapon); null before resources load. */
+	static @Nullable SpriteSet sprites() {
+		return sprites;
 	}
 
 	public static void tick() {
@@ -165,6 +179,18 @@ public final class BloodEmitter {
 		Cardio heart = local ? ClientState.heart() : advanceRemoteHeart(player, snapshot, bleeder);
 		boolean beat = heart.beatJustFired();
 
+		// A blow landing on a body that is already bleeding (2.0). The server
+		// throws its spray once, when a wound opens; after that a second and a
+		// third cut into the same wound threw nothing, and a fight with a
+		// bleeding zombie was drier than the first hit of it. Every client sees
+		// the body flinch, so every client can throw this, and nothing crosses
+		// the wire. Not for yourself: your own blows are ImpactEffect's.
+		int hurtTime = player.hurtTime;
+		if (!local && hurtTime > bleeder.hurtTime && hurtTime >= player.hurtDuration - 1) {
+			struck(player, snapshot, bleeder);
+		}
+		bleeder.hurtTime = hurtTime;
+
 		double lensWeighted = 0.0;
 		for (BodyPart part : BodyPart.values()) {
 			WoundSeverity wound = snapshot.wound(part);
@@ -218,6 +244,83 @@ public final class BloodEmitter {
 			BloodLens.feed(lensWeighted);
 		}
 	}
+
+	/**
+	 * The splash a blow knocks out of an open wound: a few drops from the
+	 * worst wound on the body, more for a worse one, thrown back toward
+	 * whoever is standing within reach in front of it (the one who most likely
+	 * struck it; blood leaves along the blow, as the server's own spray does)
+	 * or straight up and outward when nobody is. They are ordinary drops:
+	 * they arc, land, mark the floor, and mark whoever they hit, which is how
+	 * a close fight ends up on your arms and, if you are close enough, on
+	 * your face.
+	 */
+	private static void struck(LivingEntity body, BodySnapshot snapshot, Bleeder bleeder) {
+		Minecraft client = Minecraft.getInstance();
+		ClientLevel level = client.level;
+		if (level == null || sprites == null || !body.isAlive() || snapshot.underPressure()) {
+			return;
+		}
+		BodyPart worstPart = null;
+		WoundSeverity worst = null;
+		for (BodyPart part : BodyPart.values()) {
+			WoundSeverity wound = snapshot.wound(part);
+			if (wound != null && (worst == null || wound.ordinal() > worst.ordinal())) {
+				worst = wound;
+				worstPart = part;
+			}
+		}
+		if (worst == null) {
+			return;
+		}
+		Vec3 from = BodyHitResolver.regionCenter(body, worstPart);
+		// Toward the nearest other body within reach, at the height of its chest.
+		Vec3 toward = null;
+		double nearest = STRUCK_REACH * STRUCK_REACH;
+		for (LivingEntity other : level.getEntitiesOfClass(LivingEntity.class,
+				body.getBoundingBox().inflate(STRUCK_REACH))) {
+			if (other == body || !other.isAlive() || other.isSpectator()) {
+				continue;
+			}
+			double distance = other.distanceToSqr(body);
+			if (distance < nearest) {
+				nearest = distance;
+				toward = other.position().add(0.0, other.getBbHeight() * 0.75, 0.0).subtract(from);
+			}
+		}
+		int drops = 2 + worst.ordinal() * 2;
+		for (int i = 0; i < drops; i++) {
+			long index = bleeder.emitted++;
+			Vec3 direction;
+			if (toward != null && toward.lengthSqr() > 1.0e-6) {
+				// A loose cone around the line to them, lifted so it arcs there
+				// rather than falling short.
+				Vec3 aim = toward.normalize().add(0.0, 0.28, 0.0);
+				direction = aim.add(BloodFlow.jitterSigned(index, 31) * 0.30,
+						BloodFlow.jitterSigned(index, 32) * 0.30,
+						BloodFlow.jitterSigned(index, 33) * 0.30).normalize();
+			} else {
+				double angle = BloodFlow.jitter(index, 31) * Math.PI * 2.0;
+				direction = new Vec3(Math.cos(angle) * 0.7, 0.7, Math.sin(angle) * 0.7).normalize();
+			}
+			double speed = (STRUCK_SPEED + BloodFlow.jitter(index, 34) * 0.10) * (0.8 + 0.1 * worst.ordinal());
+			BloodDrop drop = new BloodDrop(level,
+					from.x + BloodFlow.jitterSigned(index, 35) * 0.1,
+					from.y + BloodFlow.jitterSigned(index, 36) * 0.1,
+					from.z + BloodFlow.jitterSigned(index, 37) * 0.1,
+					direction.x * speed, direction.y * speed, direction.z * speed,
+					body.getId(),
+					sprites.get((int) (BloodFlow.jitter(index, 38) * DROP_SPRITE_COUNT), SPRITE_COUNT - 1),
+					BloodTint.of(body));
+			client.particleEngine.add(drop);
+			struckDrops++;
+		}
+	}
+
+	/** How far away somebody can stand and still be the one the splash flies at. */
+	private static final double STRUCK_REACH = 4.5;
+	/** Blocks a tick: about what the server's spray is thrown at. */
+	private static final double STRUCK_SPEED = 0.30;
 
 	/**
 	 * Someone else's heart, so their arterial wounds spurt in their own rhythm

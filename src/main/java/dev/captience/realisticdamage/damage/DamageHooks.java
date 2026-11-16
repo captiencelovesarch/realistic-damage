@@ -40,7 +40,10 @@ public final class DamageHooks {
 			if (applied < 0) {
 				applied = damageTaken; // no capture (shouldn't happen) — degrade to the pre-armor amount
 			}
+			int[] woundsBefore = BloodiedItem.woundsNow(data);
+			int destroyedBefore = BloodiedItem.destroyedNow(data);
 			var trauma = TraumaPipeline.handle(entity, data, source, baseDamageTaken, damageTaken, applied, blocked);
+			BloodiedItem.afterBlow(entity, data, source, trauma, woundsBefore, destroyedBefore);
 			Knockdowns.afterHit(entity, data, source, baseDamageTaken);
 			Flinches.afterHit(entity, source, trauma, damageTaken);
 			RDAttachments.pushSnapshot(entity);
@@ -78,6 +81,7 @@ public final class DamageHooks {
 		// can never colour a later, calmer death.
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
 			Corpses.died(entity, source);
+			BloodiedItem.afterKill(entity, source);
 			if (!(entity instanceof ServerPlayer player)) {
 				return;
 			}

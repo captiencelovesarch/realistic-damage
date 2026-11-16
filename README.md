@@ -188,7 +188,11 @@ Injuries show on a small body diagram that fades in when something's wrong. Stat
 injuries are shown by shape and color; exact numbers stay hidden. Action-bar messages call
 out the moments that matter ("Your left leg breaks!", "You're bleeding heavily!").
 
-Open your inventory for a larger panel you can hover for detail on any region. Turn on
+Open your inventory and the box that normally holds your turning model shows your body
+instead: a paper doll of your own skin with what is wrong drawn on it (blood, a grey cast
+and a crack on a broken limb, a stump where one is gone, a frame round each region in the
+colour of its state). Hover a region for the detail. The small button in the corner of the
+box switches to an x-ray on Minecraft's own skeleton, or back to the ordinary model. Turn on
 **Exact Numbers** and it will also show condition figures there — but only there, and
 Blood and Consciousness are still only ever named ("heavy loss", "fading"), never
 numbered. Being surprised by your own blood level is the point of hiding it.
@@ -279,6 +283,7 @@ side. It follows the **Death Camera** toggle.
 | `unconsciousAggro` | `NEARBY` | Who notices a body on the floor. `ATTACKERS` keeps whatever was already fighting you, `NEARBY` adds anything within 6 blocks that can see you, `ALL` pulls in every hostile with line of sight, `NONE` takes you off the menu entirely |
 | `preyOnWounded` | `VISIBLE` | Which visible injuries hostiles prefer: `OFF`, `DOWNED`, `LIMPING`, or `VISIBLE` (limping and bleeding) |
 | `enableBleeding` / `enableBrokenLimbs` / `enableConsciousness` / `enableBurns` / `enableHitLocation` | true | Turn whole systems off |
+| `enableBloodiedItems` | true | A held weapon or tool that opens a wound, lands in one or kills keeps the blood on it: it dries from red to brown over half a minute and stays until rain or standing water rinses it off. Only things that don't stack |
 | `enableWeapons` | false | The field kit's Weapons half: poisons, trick arrows, traps and the gear that answers them. Off, none of it can be made or found and any already held does nothing |
 | `enableMedicine` | false | The field kit's Medicine half: bandages, splints, tourniquets and other treatment. Off, food and time are the only cure |
 
@@ -291,23 +296,29 @@ hunting magic numbers.
 `realisticdamage:command/debug` node:
 
 ```
-/rdmg info <player>                       show all hidden values
-/rdmg heal <player>                       full reset
-/rdmg setpart <player> <part> <value>     set body condition
-/rdmg damagepart <player> <part> <amount> apply test trauma
-/rdmg setblood <player> <0-100>
-/rdmg setconsciousness <player> <0-100>
-/rdmg break <player> <part>
-/rdmg bleed <player> <part> <severity>
-/rdmg concussion <player> [mild|moderate|severe|none]
-/rdmg burn <player>
-/rdmg destroy <player> <part>             destroy a limb outright
-/rdmg blast <player> <part> [radius]      test a localized explosion beside a limb
-/rdmg ceiling <player> <part|all> <band>  set max/hurt/injured/critical recovery
-/rdmg scar <player> <part> <level>        set none/broken/destroyed history
-/rdmg config <setting> [value]            inspect or change any server setting
-/rdmg preset <arcade|grounded>            switch the server-side preset
+/rdmg info [target]                        show all hidden values
+/rdmg heal [targets]                       full reset
+/rdmg set <targets> <part> <value>         set a part's condition
+/rdmg set <targets> blood <0-100>
+/rdmg set <targets> consciousness <0-100>
+/rdmg damage <targets> <part> <amount>     apply test trauma
+/rdmg break <targets> <part>               fracture an arm or leg; head = break the neck
+/rdmg destroy <targets> <part>             destroy a part outright
+/rdmg behead [targets]                     take the head off
+/rdmg bleed <targets> <part> <severity>
+/rdmg whiplash [targets] [0-1]
+/rdmg concussion <targets> [mild|moderate|severe|none]
+/rdmg burn <targets>
+/rdmg blast <targets> <limb> [radius]      test a localized explosion beside a limb
+/rdmg ceiling <players> <part|all> <band>  set max/hurt/injured/critical recovery
+/rdmg scar <players> <part> <level>        set none/broken/destroyed history
+/rdmg config <setting> [value]             inspect or change any server setting
+/rdmg preset <arcade|grounded>             switch the server-side preset
 ```
+
+Every verb reads the same way: the verb, then who, then which part, then how much
+(`/rdmg break Steve head`, `/rdmg set @s blood 40`). "Who" is any selector: players
+always, and any mob with anatomy (`@e[type=zombie,limit=1,sort=nearest]`).
 
 ## For mod authors
 

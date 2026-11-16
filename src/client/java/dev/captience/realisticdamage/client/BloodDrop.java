@@ -268,6 +268,13 @@ public class BloodDrop extends SingleQuadParticle {
 			}
 			if (player.getBoundingBox().intersects(box)) {
 				BloodBody.splash(player, y, scale);
+				// On you, and you are the one looking (2.0): if it landed high
+				// enough it is on the lens too, in its own colour.
+				if (player == net.minecraft.client.Minecraft.getInstance().player) {
+					AABB body = player.getBoundingBox();
+					double height = body.getYsize() <= 1.0e-6 ? 0.5 : (y - body.minY) / body.getYsize();
+					BloodLens.splashFromAnother(tint, height, scale);
+				}
 				remove();
 				return true;
 			}

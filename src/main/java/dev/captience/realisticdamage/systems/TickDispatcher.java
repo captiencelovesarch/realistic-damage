@@ -19,6 +19,8 @@ public final class TickDispatcher {
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 				tickPlayer(player);
+				// Rain rinses a creative player's sword too; the rest of it gates itself.
+				dev.captience.realisticdamage.damage.BloodiedItem.tickHolder(player);
 			}
 			// Mobs with bodies (1.7): only the injured set, nothing else is touched.
 			MobAnatomy.tick();

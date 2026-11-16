@@ -202,7 +202,7 @@ The jar is `realistic-damage-2.0.0-items.3.jar`, in "Realistic Damage items"
   seconds your eyelids get heavy and blink slowly, you slow down, then the lids
   droop and you nod off (microsleeps), then you're out. You wake up groggy about
   25 seconds later, and the chat says "You slept it off." Hurt yourself first
-  (`/rdmg damagepart`) and check you woke up healed like after a bed.
+  (`/rdmg damage @s left_arm 3`) and check you woke up healed like after a bed.
 - [ ] **3. One arrow, one zombie.** Shoot a zombie with an Arrow of Sedation. It
   slows, stumbles, then drops into a ragdoll after about 8 seconds, and gets
   back up a while later. A ravager needs five arrows.

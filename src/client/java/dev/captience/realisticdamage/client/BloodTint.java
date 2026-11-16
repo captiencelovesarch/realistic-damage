@@ -52,6 +52,26 @@ public record BloodTint(float[] fresh, float[] freshVisceral, float[] dried) {
 	public static final BloodTint BILE = new BloodTint(
 			new float[] {0.50F, 0.46F, 0.16F}, new float[] {0.58F, 0.54F, 0.18F}, new float[] {0.36F, 0.32F, 0.14F});
 
+	/**
+	 * The tint the server names on a bloodied item (2.0; see
+	 * {@code BloodiedItem.tintOf}); red for a name this version does not know.
+	 */
+	public static BloodTint byName(String name) {
+		return switch (name) {
+			case "dark" -> DARK;
+			case "purple" -> PURPLE;
+			case "green" -> GREEN;
+			case "magma" -> MAGMA;
+			case "blue" -> BLUE;
+			case "glow" -> GLOW;
+			case "insect" -> INSECT;
+			case "sculk" -> SCULK;
+			case "sulfur" -> SULFUR;
+			case "bile" -> BILE;
+			default -> RED;
+		};
+	}
+
 	/** The tint for whatever this blood came out of; red when unknown. */
 	public static BloodTint of(@Nullable Entity entity) {
 		if (entity == null || entity instanceof Player) {
