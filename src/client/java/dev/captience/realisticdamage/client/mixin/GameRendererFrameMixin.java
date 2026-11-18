@@ -64,6 +64,7 @@ public abstract class GameRendererFrameMixin {
 			// The spring is stepped here, after this frame's bobHurt has read it, so
 			// the picture lags the impulse by one frame and never by a partial one.
 			CameraMotion.frame(deltaTracker.getGameTimeDeltaTicks());
+			dev.captience.realisticdamage.client.FirstPersonLimp.frame(deltaTracker.getGameTimeDeltaTicks());
 			DeathCamera.frame(deltaTracker.getGameTimeDeltaTicks());
 			if (!DeathCamera.active()) {
 				// Knocked down (phase 4): the same ragdoll view, without the death.
@@ -83,6 +84,8 @@ public abstract class GameRendererFrameMixin {
 			return;
 		}
 		CameraMotion.apply(poseStack);
+		// A broken leg (2.0): the dip and lean of each step taken on it.
+		dev.captience.realisticdamage.client.FirstPersonLimp.apply(poseStack);
 		// The collapse on top (1.7): a dead body's view rolls over and sags.
 		DeathCamera.apply(poseStack);
 		if (!DeathCamera.active() && dev.captience.realisticdamage.client.RagdollView.active()) {
@@ -95,6 +98,7 @@ public abstract class GameRendererFrameMixin {
 	@Inject(method = "renderItemInHand", at = @At("HEAD"), cancellable = true)
 	private void realisticdamage$deadHand(CameraRenderState cameraState, float deltaPartialTick,
 			org.joml.Matrix4fc modelViewMatrix, CallbackInfo ci) {
+		dev.captience.realisticdamage.client.FirstPersonLimp.handPass();
 		if (DeathCamera.hideHand() || dev.captience.realisticdamage.client.RagdollView.active()) {
 			ci.cancel();
 		}

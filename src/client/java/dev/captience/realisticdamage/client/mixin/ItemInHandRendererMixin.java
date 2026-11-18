@@ -3,7 +3,9 @@ package dev.captience.realisticdamage.client.mixin;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.captience.realisticdamage.RDAttachments;
 import dev.captience.realisticdamage.body.BodyPart;
+import dev.captience.realisticdamage.client.FirstPersonBrokenArm;
 import dev.captience.realisticdamage.client.compat.Vr;
+import dev.captience.realisticdamage.systems.BrokenArmHold;
 import dev.captience.realisticdamage.net.BodySnapshot;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
@@ -64,8 +66,20 @@ public abstract class ItemInHandRendererMixin {
 		}
 		BodyPart part = arm == HumanoidArm.RIGHT ? BodyPart.RIGHT_ARM : BodyPart.LEFT_ARM;
 		if (snapshot == null || !snapshot.destroyed(part)) {
-			original.call(player, frameInterp, xRot, hand, attack, itemStack, inverseArmHeight, poseStack,
+			// A broken arm (2.0): the hold sags and shakes, and the swing it is
+			// drawn with is a weak one. Pushed here, around the whole vanilla
+			// method, so the pop runs even when another mod cancels the draw.
+			BrokenArmHold.Pose hold = FirstPersonBrokenArm.pose(player, arm, itemStack, attack, frameInterp);
+			if (hold == null) {
+				original.call(player, frameInterp, xRot, hand, attack, itemStack, inverseArmHeight, poseStack,
+						submitNodeCollector, lightCoords);
+				return;
+			}
+			poseStack.pushPose();
+			FirstPersonBrokenArm.apply(poseStack, hold, arm);
+			original.call(player, frameInterp, xRot, hand, hold.swing(), itemStack, inverseArmHeight, poseStack,
 					submitNodeCollector, lightCoords);
+			poseStack.popPose();
 			return;
 		}
 		if (vr) {

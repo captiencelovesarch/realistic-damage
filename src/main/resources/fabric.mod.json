@@ -45,6 +45,7 @@
 			"dev.captience.realisticdamage.client.gametest.DeathKindsClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.ScarClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.InjuryPoseClientGameTest",
+			"dev.captience.realisticdamage.client.gametest.FirstPersonInjuryClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.MobAnatomyClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.MobBodiesClientGameTest",
 			"dev.captience.realisticdamage.client.gametest.AfflictionsClientGameTest",

@@ -202,6 +202,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			Afterimage.reset();
 			VrLens.reset();
 			CameraMotion.reset();
+			FirstPersonLimp.reset();
 			DeathCamera.reset();
 			BlastShock.reset();
 			ConcussionEffects.reset();

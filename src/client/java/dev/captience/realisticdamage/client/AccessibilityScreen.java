@@ -93,7 +93,14 @@ public class AccessibilityScreen extends OptionsSubScreen {
 						.create(0, 0, 150, 20,
 								Component.translatable("realisticdamage.config.injury_pose"),
 								(button, value) -> config.showInjuryPose = value),
-				null);
+				// Its first-person half (2.0): the hold of a broken arm and the
+				// limp of a broken leg, as you see them yourself.
+				CycleButton.onOffBuilder(config.firstPersonInjury)
+						.withTooltip(value -> net.minecraft.client.gui.components.Tooltip.create(
+								Component.translatable("realisticdamage.config.first_person_injury.tooltip")))
+						.create(0, 0, 150, 20,
+								Component.translatable("realisticdamage.config.first_person_injury"),
+								(button, value) -> config.firstPersonInjury = value));
 
 		this.list.addHeader(Component.translatable("realisticdamage.config.section.vision"));
 		this.list.addSmall(

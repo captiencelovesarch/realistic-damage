@@ -1,5 +1,42 @@
 # Realistic Damage 2.0: what to test
 
+## A broken arm and a broken leg in first person (Nov 18 2026)
+
+The jar is `realistic-damage-2.0.0-alpha.4.fixes.1.firstperson.1.jar`, in
+"Realistic Damage (dev)" (the fixes.1 jar is parked in `mods/replaced-jars/`).
+It is fixes.1 plus the two things below. Pictures:
+`previews/first_person_broken_arm_sheet.png` (sword, axe, shield, bread and an
+empty hand, sound and broken, at rest and through a swing).
+
+Looks only: damage, attack speed and aim are untouched. Off in VR. One switch,
+Accessibility > Display > "First-Person Injuries" (the panic button turns it
+off too).
+
+- [ ] **1. The hold.** `/rdmg break @s right_arm`, then hold a sword, an axe, a
+  shield, food, nothing. Each sits lower, turned in toward the middle and
+  tipped forward; the axe and shield most, food least. Is any of it too much
+  or too little? Is anything pushed too far off the screen?
+- [ ] **2. The shake.** Standing still it trembles a little; sprinting more;
+  during a swing most. Too jittery, or not noticeable?
+- [ ] **3. The swing.** Attack with it: the arm manages a short lift, then the
+  hand drops and comes back up instead of following through. Heavier things
+  lift less and drop further. The hit itself lands as normal.
+- [ ] **4. Each hand on its own arm.** Break only the left arm with a shield in
+  the off hand: the shield sags, the sword in the right hand does not.
+- [ ] **5. The limp.** `/rdmg break @s left_leg` and walk: the view dips and
+  leans left on every second step. Break the right leg instead: it leans
+  right. Both: a dip on every step. It should never make aiming harder (the
+  crosshair itself does not move).
+- [ ] **6. The switch.** Turn "First-Person Injuries" off: all of the above
+  stops at once.
+
+If a number wants changing, they are all at the top of two files:
+`systems/BrokenArmHold.java` (`SAG_DROP`, `SAG_ROLL`, `SAG_TIP`,
+`TREMOR_OFFSET`, `TREMOR_TWIST`, `TREMOR_SPRINT`, `TREMOR_SWING`,
+`SWING_REACH`, `SWING_LIFT_TIME`, `SWING_DROP`, `SWING_DROP_TIP`; the four
+numbers in each row are empty hand, light, medium, heavy) and
+`systems/BrokenLegLimp.java` (`DIP`, `ROLL`, `SHARPNESS`).
+
 ## Bloodied weapons, blood on your screen, tidier commands (Nov 16 2026)
 
 The jar is `realistic-damage-2.0.0-alpha.4.fixes.1.jar`, in "Realistic Damage

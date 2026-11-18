@@ -81,6 +81,20 @@ public final class ClientEffectsConfig {
 	 */
 	public boolean showInjuryPose = true;
 	/**
+	 * The first-person half of the posture above (2.0): a broken arm holds what
+	 * it carries low, shaking, and swings it weakly; a broken leg dips and
+	 * leans the view on each step taken with it. Drawing only.
+	 *
+	 * <p>Its own switch because it moves the player's own view, which the
+	 * posture on the model does not. For the same reason the panic button,
+	 * {@link #disableAllEffects()}, does turn this one off: a camera that dips
+	 * on every step is something happening to your senses.
+	 *
+	 * <p>A plain boolean: absent from an older config file Gson leaves the
+	 * initialiser standing, which is the right answer.
+	 */
+	public boolean firstPersonInjury = true;
+	/**
 	 * The white line at the bottom of the screen — "Your right leg breaks!"
 	 * (1.6). Every other visible layer of this mod already had a control and
 	 * this one did not, which made the output that uses <em>words</em> the only
@@ -479,6 +493,7 @@ public final class ClientEffectsConfig {
 		fullBlackUnconscious = false;
 		cameraDriftIntensity = 0.35;
 		cameraSwayIntensityValue = 0.55;
+		firstPersonInjury = true;
 		cameraLagIntensityValue = 0.5;
 		desaturationIntensity = 0.7;
 		distortionIntensity = 0.5;
@@ -513,6 +528,7 @@ public final class ClientEffectsConfig {
 		fullBlackUnconscious = true;
 		cameraDriftIntensity = 1.0;
 		cameraSwayIntensityValue = 1.0;
+		firstPersonInjury = true;
 		cameraLagIntensityValue = 1.0;
 		desaturationIntensity = 1.0;
 		distortionIntensity = 1.0;
@@ -563,6 +579,7 @@ public final class ClientEffectsConfig {
 		breathingVolumeValue = 0.0;
 		vrHapticsValue = 0.0;
 		sedationEffectsValue = 0.0;
+		firstPersonInjury = false;
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
