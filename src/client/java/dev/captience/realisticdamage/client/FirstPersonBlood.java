@@ -105,7 +105,8 @@ public final class FirstPersonBlood {
 		// alone filling the corner of the screen.
 		poseStack.translate(0.0F, (12.0F - LimbMeshes.STUMP_LENGTH - 3.0F) / 16.0F, 0.0F);
 		BloodBodyLayer.submitStump(collector, poseStack, skin, stumps[part.ordinal()], caps[part.ordinal()],
-				shells[part.ordinal()], level, strength, lightCoords, OverlayTexture.NO_OVERLAY, BloodTint.RED);
+				shells[part.ordinal()], level, strength, lightCoords, OverlayTexture.NO_OVERLAY,
+				BloodBody.tint(player.getId(), part, BloodTint.RED));
 		poseStack.popPose();
 		stumpSubmits++;
 	}
@@ -148,7 +149,8 @@ public final class FirstPersonBlood {
 		poseStack.pushPose();
 		arm.translateAndRotate(poseStack);
 		BloodBodyLayer.paint(collector, poseStack, scars[part.ordinal()], blood[part.ordinal()],
-				scar, level, strength, lightCoords, OverlayTexture.NO_OVERLAY, BloodTint.RED);
+				scar, level, strength, lightCoords, OverlayTexture.NO_OVERLAY,
+				BloodBody.tint(player.getId(), part, BloodTint.RED));
 		poseStack.popPose();
 		if (level >= BloodBodyLayer.VISIBLE) {
 			bloodSubmits++;

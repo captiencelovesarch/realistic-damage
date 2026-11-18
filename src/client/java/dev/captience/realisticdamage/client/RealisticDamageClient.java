@@ -131,6 +131,9 @@ public class RealisticDamageClient implements ClientModInitializer {
 				dev.captience.realisticdamage.net.FlinchPayload.TYPE,
 				(payload, context) -> Flinches.hit(payload));
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+				dev.captience.realisticdamage.net.SprayOwnerPayload.TYPE,
+				(payload, context) -> SprayOwners.announce(payload));
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
 				dev.captience.realisticdamage.net.StandTestPayload.TYPE,
 				(payload, context) -> RagdollCorpse.standTest(payload));
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
@@ -179,6 +182,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			BloodEmitter.tick();
 			BloodiedDrips.tick();
 			BloodBody.tick();
+			SprayOwners.tick();
 			BloodStains.tick();
 			BloodLens.tick();
 			while (openSettings.consumeClick()) {
@@ -197,6 +201,7 @@ public class RealisticDamageClient implements ClientModInitializer {
 			BloodEmitter.reset();
 			BloodiedDrips.reset();
 			BloodBody.reset();
+			SprayOwners.reset();
 			BloodStains.reset();
 			BloodLens.reset();
 			Afterimage.reset();

@@ -267,7 +267,7 @@ public class BloodDrop extends SingleQuadParticle {
 				continue;
 			}
 			if (player.getBoundingBox().intersects(box)) {
-				BloodBody.splash(player, y, scale);
+				BloodBody.splash(player, y, scale, tint);
 				// On you, and you are the one looking (2.0): if it landed high
 				// enough it is on the lens too, in its own colour.
 				if (player == net.minecraft.client.Minecraft.getInstance().player) {
@@ -313,7 +313,12 @@ public class BloodDrop extends SingleQuadParticle {
 			if (ClientEffectsConfig.get().bloodIntensity() <= 0.0) {
 				return null;
 			}
-			int occupant = occupantAt(level, x, y, z);
+			// Told outright when the server announced this spray; guessed from
+			// the place it started only when it did not (an older server).
+			int occupant = SprayOwners.ownerAt(x, y, z);
+			if (occupant < 0) {
+				occupant = occupantAt(level, x, y, z);
+			}
 			BloodTint tint = BloodTint.of(occupant < 0 ? null : level.getEntity(occupant));
 			lastTint = tint;
 			thrown++;

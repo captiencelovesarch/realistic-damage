@@ -62,6 +62,8 @@ public abstract class LivingRenderStateMixin implements LimbStateHolder, BloodSt
 	@Unique
 	private float[] realisticdamage$bloodStains;
 	@Unique
+	private dev.captience.realisticdamage.client.BloodTint[] realisticdamage$bloodTints;
+	@Unique
 	private int realisticdamage$scarMask;
 
 	@Override
@@ -92,6 +94,16 @@ public abstract class LivingRenderStateMixin implements LimbStateHolder, BloodSt
 	@Override
 	public void realisticdamage$setLimbRungs(int rungs) {
 		this.realisticdamage$limbRungs = rungs;
+	}
+
+	@Override
+	public dev.captience.realisticdamage.client.BloodTint[] realisticdamage$bloodTints() {
+		return this.realisticdamage$bloodTints;
+	}
+
+	@Override
+	public void realisticdamage$setBloodTints(dev.captience.realisticdamage.client.BloodTint[] tints) {
+		this.realisticdamage$bloodTints = tints;
 	}
 
 	@Override

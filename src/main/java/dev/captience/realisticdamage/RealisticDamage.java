@@ -40,6 +40,9 @@ public class RealisticDamage implements ModInitializer {
 				.register(dev.captience.realisticdamage.net.FlinchPayload.TYPE,
 						dev.captience.realisticdamage.net.FlinchPayload.CODEC);
 		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()
+				.register(dev.captience.realisticdamage.net.SprayOwnerPayload.TYPE,
+						dev.captience.realisticdamage.net.SprayOwnerPayload.CODEC);
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()
 				.register(dev.captience.realisticdamage.net.StandTestPayload.TYPE,
 						dev.captience.realisticdamage.net.StandTestPayload.CODEC);
 		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay()

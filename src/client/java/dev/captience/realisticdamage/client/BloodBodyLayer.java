@@ -129,6 +129,46 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 	 */
 	static final float SCAR_OFFSET = SKIN_OFFSET / 2.0F;
 
+	/**
+	 * Blood on armour (2.0). Worn armour is the body's own cubes grown outward -
+	 * a full pixel for a helmet, a chestplate and boots, half of one for
+	 * leggings - and it hid every stain, because the stain sat on the skin
+	 * underneath. A second shell just outside the armour carries the same stain
+	 * where a piece covers the region, so a blow that bloodies a chest bloodies
+	 * the breastplate over it.
+	 */
+	static final float ARMOR_OUTER_OFFSET = 1.0F + 0.06F;
+	static final float ARMOR_INNER_OFFSET = 0.5F + 0.06F;
+	private static long armorSubmitCount;
+
+	/** Stains drawn on armour so far; read by the client gametests. */
+	public static long armorSubmits() {
+		return armorSubmitCount;
+	}
+
+	/** Whether this is a piece of armour drawn on the body, and so something a stain can be hidden under. */
+	static boolean covers(net.minecraft.world.item.ItemStack stack) {
+		if (stack == null || stack.isEmpty() || stack.has(net.minecraft.core.component.DataComponents.GLIDER)) {
+			return false;
+		}
+		var equippable = stack.get(net.minecraft.core.component.DataComponents.EQUIPPABLE);
+		return equippable != null && equippable.assetId().isPresent();
+	}
+
+	/** How far out the armour over this region sits, in model units, or 0 where the skin shows. */
+	static float armorOffset(BodyPart part, boolean helmet, boolean chestplate, boolean leggings, boolean boots) {
+		return switch (part) {
+			case HEAD -> helmet ? ARMOR_OUTER_OFFSET : 0.0F;
+			case TORSO -> chestplate ? ARMOR_OUTER_OFFSET : 0.0F;
+			// A chestplate's sleeves are pauldrons and boots stop at the shin: a
+			// shell the length of the limb would hang in the air past them, so an
+			// arm's blood stays on the arm and shows below the plate, and a leg's
+			// goes on the leggings, which do run its whole length.
+			case LEFT_ARM, RIGHT_ARM -> 0.0F;
+			case LEFT_LEG, RIGHT_LEG -> leggings ? ARMOR_INNER_OFFSET : 0.0F;
+		};
+	}
+
 	/** Translucent buckets, drawn in ascending order. See the class javadoc. */
 	private static final int ORDER_SCARS = 1;
 	static final int ORDER_BLOOD = 2;
@@ -150,6 +190,9 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 	private final ModelPart[][] fullByKind = new ModelPart[LimbMeshes.Kind.values().length][];
 	/** The same six regions again, worn closer to the skin, for the scar pass. */
 	private final ModelPart[][] scarByKind = new ModelPart[LimbMeshes.Kind.values().length][];
+	/** The shells that sit on armour. Armour is cut for the wide build whatever is inside it. */
+	private ModelPart[] armorOuter;
+	private ModelPart[] armorInner;
 	/**
 	 * The stump (1.6.2): what is left of a destroyed limb. Vanilla's part is
 	 * hidden by {@code PlayerModelMixin}, so until now a lost arm was simply an
@@ -296,9 +339,17 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 		ModelPart[] scarParts = meshes(scarByKind, kind, k -> LimbMeshes.full(k, SCAR_OFFSET));
 		int overlay = LivingEntityRenderer.getOverlayCoords(state, 0.0F);
 		Identifier skin = skinOf(state);
-		BloodTint tint = mob ? BloodTint.ofType(state.entityType) : BloodTint.RED;
+		BloodTint own = mob ? BloodTint.ofType(state.entityType) : BloodTint.RED;
+		BloodTint[] foreign = holder.realisticdamage$bloodTints();
+		boolean armored = kind == LimbMeshes.Kind.WIDE || kind == LimbMeshes.Kind.SLIM || kind == LimbMeshes.Kind.THIN;
+		boolean helmet = armored && covers(state.headEquipment);
+		boolean chestplate = armored && covers(state.chestEquipment);
+		boolean leggings = armored && covers(state.legsEquipment);
+		boolean boots = armored && covers(state.feetEquipment);
 
 		for (BodyPart part : BodyPart.values()) {
+			// Somebody else's blood where most of the stain is theirs (see BodyStainMix).
+			BloodTint tint = foreign != null && foreign[part.ordinal()] != null ? foreign[part.ordinal()] : own;
 			ScarLevel scar = ScarMask.level(scars, part);
 			if (isSet(broken, part)) {
 				// Not yet history. A break raises its mark inside the setter, so
@@ -335,6 +386,20 @@ public class BloodBodyLayer<S extends HumanoidRenderState, M extends HumanoidMod
 			source.translateAndRotate(poseStack);
 			paint(collector, poseStack, scarParts[part.ordinal()], bloodParts[part.ordinal()],
 					scar, level, strength, lightCoords, overlay, tint);
+			float over = level < VISIBLE ? 0.0F : armorOffset(part, helmet, chestplate, leggings, boots);
+			if (over > 0.0F) {
+				ModelPart[] shells;
+				if (over == ARMOR_OUTER_OFFSET) {
+					shells = armorOuter == null
+							? armorOuter = LimbMeshes.full(LimbMeshes.Kind.WIDE, ARMOR_OUTER_OFFSET) : armorOuter;
+				} else {
+					shells = armorInner == null
+							? armorInner = LimbMeshes.full(LimbMeshes.Kind.WIDE, ARMOR_INNER_OFFSET) : armorInner;
+				}
+				paint(collector, poseStack, shells[part.ordinal()], shells[part.ordinal()],
+						ScarLevel.NONE, level, strength, lightCoords, overlay, tint);
+				armorSubmitCount++;
+			}
 			poseStack.popPose();
 			if (mob) {
 				mobSubmitCount++;

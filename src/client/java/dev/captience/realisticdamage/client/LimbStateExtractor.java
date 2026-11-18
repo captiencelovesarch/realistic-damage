@@ -43,6 +43,7 @@ public final class LimbStateExtractor {
 				: (snapshot.unconscious() ? DOWN_UNCONSCIOUS : 0) | (snapshot.knockedDown() ? DOWN_KNOCKED : 0));
 		BloodStainHolder stains = (BloodStainHolder) state;
 		stains.realisticdamage$setBloodStains(BloodBody.stains(entity.getId()));
+		stains.realisticdamage$setBloodTints(BloodBody.tints(entity.getId()));
 		stains.realisticdamage$setScarMask(snapshot == null ? 0 : snapshot.scarMask());
 	}
 

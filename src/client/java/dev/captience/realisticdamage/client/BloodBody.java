@@ -8,6 +8,7 @@ import dev.captience.realisticdamage.body.BodyPart;
 import dev.captience.realisticdamage.body.WoundSeverity;
 import dev.captience.realisticdamage.config.Balance;
 import dev.captience.realisticdamage.net.BodySnapshot;
+import dev.captience.realisticdamage.systems.BodyStainMix;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -34,6 +35,43 @@ public final class BloodBody {
 
 	/** Per player, one accumulated stain level per region. */
 	private static final Map<Integer, double[]> stains = new HashMap<>();
+
+	/**
+	 * Per player, how much of each region's stain is somebody else's blood, and
+	 * whose (2.0). Only bodies that have been splashed have an entry. See
+	 * {@link BodyStainMix} for how the two are told apart when drawn.
+	 */
+	private static final Map<Integer, double[]> foreign = new HashMap<>();
+	private static final Map<Integer, BloodTint[]> foreignTint = new HashMap<>();
+
+	/**
+	 * The colour each region's stain is drawn in where it is not the body's own,
+	 * or null when all of it is: a null entry means "this body's own blood".
+	 */
+	public static BloodTint @org.jspecify.annotations.Nullable [] tints(int entityId) {
+		double[] share = foreign.get(entityId);
+		double[] levels = stains.get(entityId);
+		if (share == null || levels == null) {
+			return null;
+		}
+		BloodTint[] whose = foreignTint.get(entityId);
+		BloodTint[] out = null;
+		for (int i = 0; i < share.length; i++) {
+			if (whose[i] != null && BodyStainMix.foreignShows(levels[i], share[i])) {
+				if (out == null) {
+					out = new BloodTint[share.length];
+				}
+				out[i] = whose[i];
+			}
+		}
+		return out;
+	}
+
+	/** The colour one region's stain is drawn in: somebody else's when most of it is theirs, else {@code own}. */
+	public static BloodTint tint(int entityId, BodyPart part, BloodTint own) {
+		BloodTint[] tints = tints(entityId);
+		return tints == null || tints[part.ordinal()] == null ? own : tints[part.ordinal()];
+	}
 
 	/** How bloody a region looks, 0 to 1. */
 	public static double stain(int entityId, BodyPart part) {
@@ -68,10 +106,21 @@ public final class BloodBody {
 	 * height it struck, so blood thrown at someone's legs lands on their legs.
 	 */
 	public static void splash(Player player, double atY, double dropScale) {
+		splash(player, atY, dropScale, BloodTint.RED);
+	}
+
+	/** As above, keeping whose blood it was: a drop always comes from somebody else (see {@code BloodDrop}). */
+	public static void splash(Player player, double atY, double dropScale, BloodTint tint) {
 		double[] levels = stains.computeIfAbsent(player.getId(), id -> new double[BodyPart.values().length]);
-		BodyPart part = regionAtHeight(player, atY);
-		levels[part.ordinal()] = Math.min(Balance.BODY_STAIN_MAX,
-				levels[part.ordinal()] + Balance.BODY_STAIN_PER_DROP * (0.4 + 0.6 * dropScale));
+		int part = regionAtHeight(player, atY).ordinal();
+		double before = levels[part];
+		levels[part] = Math.min(Balance.BODY_STAIN_MAX,
+				before + Balance.BODY_STAIN_PER_DROP * (0.4 + 0.6 * dropScale));
+		double[] share = foreign.computeIfAbsent(player.getId(), id -> new double[BodyPart.values().length]);
+		BloodTint[] whose = foreignTint.computeIfAbsent(player.getId(), id -> new BloodTint[BodyPart.values().length]);
+		share[part] = Math.min(levels[part], share[part] + (levels[part] - before));
+		// The newest blood names the colour: two creatures' worth on one arm is the later one's.
+		whose[part] = tint;
 	}
 
 	/**
@@ -103,12 +152,12 @@ public final class BloodBody {
 		Minecraft client = Minecraft.getInstance();
 		ClientLevel level = client.level;
 		if (level == null) {
-			stains.clear();
+			reset();
 			return;
 		}
 		if (ClientEffectsConfig.get().bloodIntensity() <= 0.0) {
 			if (!stains.isEmpty()) {
-				stains.clear();
+				reset();
 			}
 			return;
 		}
@@ -140,6 +189,10 @@ public final class BloodBody {
 								id -> new double[BodyPart.values().length]);
 					}
 					levels[part.ordinal()] = next;
+					double[] share = foreign.get(player.getId());
+					if (share != null) {
+						share[part.ordinal()] = BodyStainMix.foreignAfter(share[part.ordinal()], current, next);
+					}
 				}
 			}
 		}
@@ -155,9 +208,13 @@ public final class BloodBody {
 			}
 			return true;
 		});
+		foreign.keySet().retainAll(stains.keySet());
+		foreignTint.keySet().retainAll(stains.keySet());
 	}
 
 	public static void reset() {
 		stains.clear();
+		foreign.clear();
+		foreignTint.clear();
 	}
 }

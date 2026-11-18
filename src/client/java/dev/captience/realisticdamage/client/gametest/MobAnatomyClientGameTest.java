@@ -239,6 +239,7 @@ public class MobAnatomyClientGameTest implements FabricClientGameTest {
 		});
 		context.waitTicks(20);
 		long before = context.computeOnClient(client -> dev.captience.realisticdamage.client.BloodDrop.Provider.thrown());
+		long namedBefore = context.computeOnClient(client -> dev.captience.realisticdamage.client.SprayOwners.matched());
 		singleplayer.getServer().runOnServer(server -> {
 			for (ServerPlayer player : server.getPlayerList().getPlayers()) {
 				var level = player.level();
@@ -257,6 +258,12 @@ public class MobAnatomyClientGameTest implements FabricClientGameTest {
 		if (tint != dev.captience.realisticdamage.client.BloodTint.GREEN) {
 			throw new AssertionError("a creeper's first wound sprayed " + (tint == dev.captience.realisticdamage.client.BloodTint.RED
 					? "red" : "the wrong colour") + "; creepers bleed green");
+		}
+		long named = context.computeOnClient(client -> dev.captience.realisticdamage.client.SprayOwners.matched())
+				- namedBefore;
+		if (named <= 0) {
+			throw new AssertionError("the spray's drops were not matched to the body the server named; "
+					+ "their colour was guessed from where they started");
 		}
 		context.takeScreenshot("rd_mob_first_wound_green");
 	}
