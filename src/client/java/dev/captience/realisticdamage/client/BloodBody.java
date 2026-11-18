@@ -11,6 +11,7 @@ import dev.captience.realisticdamage.net.BodySnapshot;
 import dev.captience.realisticdamage.systems.BodyStainMix;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
@@ -22,8 +23,9 @@ import net.minecraft.world.phys.Vec3;
  * <p>The layer that answers "look down and see it", and the only one that is
  * legible without watching for a drop at the right moment: a cut left arm
  * becomes a bloody left arm, on your own model and on everyone else's, and it
- * stays bloody after the wound closes because blood dries on rather than
- * rinsing off.
+ * stays bloody after the wound closes because blood dries on - until water
+ * takes it off: wading rinses the legs, swimming all of it, rain all of it
+ * slowly (see {@link BodyStainMix#washPerSecond}).
  *
  * <p>Purely client-side and derived from the synced snapshot, so it costs
  * nothing on the wire. It is deliberately <em>not</em> in the snapshot itself:
@@ -171,21 +173,30 @@ public final class BloodBody {
 		for (LivingEntity player : level.getEntitiesOfClass(LivingEntity.class,
 				new AABB(here, here).inflate(64.0))) {
 			BodySnapshot snapshot = player.getAttached(RDAttachments.SNAPSHOT);
-			if (snapshot == null) {
+			double[] levels = stains.get(player.getId());
+			// A body with no snapshot has no wounds to bleed from, but may still be
+			// carrying somebody else's blood: that dries and washes like any other.
+			if (snapshot == null && levels == null) {
 				continue;
 			}
-			double[] levels = stains.get(player.getId());
+			// How far up the body the water comes, and whether rain is on it.
+			double height = player.getBbHeight();
+			double waterLine = player.isUnderWater() ? 1.0
+					: height <= 1.0e-6 ? 0.0 : Math.clamp(player.getFluidHeight(FluidTags.WATER) / height, 0.0, 1.0);
+			boolean rain = !player.isInWater() && player.isInWaterOrRain();
 			for (BodyPart part : BodyPart.values()) {
-				WoundSeverity wound = snapshot.wound(part);
+				WoundSeverity wound = snapshot == null ? null : snapshot.wound(part);
 				double current = levels == null ? 0.0 : levels[part.ordinal()];
 				double next;
 				// A corpse's snapshot freezes with its wounds still in it; without
 				// the isAlive gate the dead would quietly go on soaking.
 				if (wound != null && !snapshot.underPressure() && player.isAlive()) {
+					// An open wound keeps the region red however wet it is.
 					next = Math.min(Balance.BODY_STAIN_MAX,
 							current + wound.bloodPerSecond() * Balance.BODY_STAIN_GAIN / 20.0);
 				} else {
-					next = Math.max(0.0, current - Balance.BODY_STAIN_DECAY / 20.0);
+					next = Math.max(0.0, current - (Balance.BODY_STAIN_DECAY
+							+ BodyStainMix.washPerSecond(part, waterLine, rain)) / 20.0);
 				}
 				if (next != current) {
 					if (levels == null) {

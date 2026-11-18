@@ -506,6 +506,14 @@ public final class Balance {
 	public static final double BODY_STAIN_GAIN = 0.035;
 	/** ...and loses per second once the wound is closed. Slower: blood dries on, it does not rinse. */
 	public static final double BODY_STAIN_DECAY = 0.02;
+	/**
+	 * ...until water does it (2.0). What a second under water takes off a region
+	 * that is not still bleeding: a soaked limb is clean in about four seconds,
+	 * the same few seconds a weapon takes to rinse.
+	 */
+	public static final double BODY_STAIN_WASH_WATER = 0.25;
+	/** The same for a second out in the rain, which gets there in the end: about twelve seconds. */
+	public static final double BODY_STAIN_WASH_RAIN = 0.08;
 	public static final double BODY_STAIN_MAX = 1.0;
 	/** A drop landing on someone stains them by this much. */
 	public static final double BODY_STAIN_PER_DROP = 0.16;
