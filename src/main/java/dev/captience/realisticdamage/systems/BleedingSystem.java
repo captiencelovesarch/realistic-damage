@@ -125,6 +125,15 @@ public final class BleedingSystem {
 			away = direction.normalize().scale(-1.0);
 		}
 		int count = BloodFlow.burstDrops(severity.ordinal(), severance);
+		// Whose blood this is, ahead of the drops themselves: see SprayOwnerPayload.
+		var owner = new dev.captience.realisticdamage.net.SprayOwnerPayload(player.getId(), at.x, at.y, at.z);
+		for (net.minecraft.server.level.ServerPlayer watcher
+				: net.fabricmc.fabric.api.networking.v1.PlayerLookup.around(level, at, 48.0)) {
+			if (net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(watcher,
+					dev.captience.realisticdamage.net.SprayOwnerPayload.TYPE)) {
+				net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(watcher, owner);
+			}
+		}
 		double spread = severance ? Balance.SEVERANCE_SPRAY_SPREAD : Balance.SPRAY_SPREAD;
 		double speed = Balance.SPRAY_SPEED / 20.0;
 		for (int i = 0; i < count; i++) {

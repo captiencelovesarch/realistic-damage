@@ -2,9 +2,9 @@
 
 ## A broken arm and a broken leg in first person (Nov 18 2026)
 
-The jar is `realistic-damage-2.0.0-alpha.4.fixes.1.firstperson.1.jar`, in
-"Realistic Damage (dev)" (the fixes.1 jar is parked in `mods/replaced-jars/`).
-It is fixes.1 plus the two things below. Pictures:
+The jar is `realistic-damage-2.0.0-alpha.4.fixes.2.firstperson.1.jar`, in
+"Realistic Damage (dev)" (the fixes.2 jar is parked in `mods/replaced-jars/`).
+It is fixes.2 (the blood colour fixes) plus the two things below. Pictures:
 `previews/first_person_broken_arm_sheet.png` (sword, axe, shield, bread and an
 empty hand, sound and broken, at rest and through a swing).
 

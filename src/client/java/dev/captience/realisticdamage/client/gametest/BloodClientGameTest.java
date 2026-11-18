@@ -24,6 +24,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
+import dev.captience.realisticdamage.client.BloodTint;
+import dev.captience.realisticdamage.client.BloodBodyLayer;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -583,6 +585,65 @@ public class BloodClientGameTest implements FabricClientGameTest {
 			// exactly how the death test shipped its first screenshots of a
 			// completely vanilla death screen.
 			context.runOnClient(client -> ClientEffectsConfig.load());
+
+			// Blood on armour, and somebody else's blood in its own colour (2.0).
+			// A bleeding chest under a breastplate used to show nothing at all,
+			// and a splash from any creature landed red.
+			mutate(singleplayer, data -> {
+				data.reset();
+				data.clearWounds();
+				data.addWound(BodyPart.TORSO, WoundSeverity.CRITICAL);
+			});
+			singleplayer.getServer().runOnServer(server -> {
+				for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+					player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST,
+							new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_CHESTPLATE));
+					player.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD,
+							new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_HELMET));
+					// The water test before this one left the player standing in it.
+					var level = player.level();
+					var feet = player.blockPosition();
+					for (var pos : net.minecraft.core.BlockPos.betweenClosed(feet.offset(-4, 0, -4), feet.offset(4, 4, 4))) {
+						if (!level.getFluidState(pos).isEmpty()) {
+							level.setBlockAndUpdate(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+						}
+					}
+					player.setXRot(0.0F);
+					player.connection.teleport(player.getX(), player.getY(), player.getZ(), player.getYRot(), 0.0F);
+				}
+			});
+			context.runOnClient(client -> client.options.setCameraType(CameraType.THIRD_PERSON_FRONT));
+			context.runOnClient(client -> BloodBody.reset());
+			long armourBefore = context.computeOnClient(client -> BloodBodyLayer.armorSubmits());
+			context.waitTicks(120);
+			long armourAfter = context.computeOnClient(client -> BloodBodyLayer.armorSubmits());
+			if (armourAfter <= armourBefore) {
+				throw new AssertionError("a bleeding chest under a breastplate drew no blood on the armour");
+			}
+			context.takeScreenshot("rd_blood_17_on_armour");
+
+			// A slime's blood across the face: green on the helmet, not red.
+			BloodTint onHead = context.computeOnClient(client -> {
+				Minecraft mc = Minecraft.getInstance();
+				for (int i = 0; i < 8; i++) {
+					BloodBody.splash(mc.player, mc.player.getBoundingBox().maxY - 0.05, 1.0, BloodTint.GREEN);
+				}
+				return BloodBody.tint(mc.player.getId(), BodyPart.HEAD, BloodTint.RED);
+			});
+			if (onHead != BloodTint.GREEN) {
+				throw new AssertionError("green blood splashed on a clean head was not drawn green");
+			}
+			BloodTint onTorso = context.computeOnClient(client -> {
+				Minecraft mc = Minecraft.getInstance();
+				BloodBody.splash(mc.player, mc.player.getBoundingBox().minY + 1.1, 0.2, BloodTint.GREEN);
+				return BloodBody.tint(mc.player.getId(), BodyPart.TORSO, BloodTint.RED);
+			});
+			if (onTorso != BloodTint.RED) {
+				throw new AssertionError("one drop of green on a chest soaked in its own blood turned it green");
+			}
+			context.waitTicks(5);
+			context.takeScreenshot("rd_blood_18_green_on_helmet");
+			context.runOnClient(client -> client.options.setCameraType(CameraType.FIRST_PERSON));
 		}
 	}
 

@@ -17,6 +17,11 @@ public interface BloodStainHolder {
 
 	void realisticdamage$setBloodStains(float[] stains);
 
+	/** Per region, whose blood the stain is where it is not the body's own; null, or a null entry, for its own. */
+	BloodTint[] realisticdamage$bloodTints();
+
+	void realisticdamage$setBloodTints(BloodTint[] tints);
+
 	/**
 	 * The synced scar mask (1.6), two bits per part holding a
 	 * {@code ScarLevel} ordinal; 0 means unmarked everywhere.
