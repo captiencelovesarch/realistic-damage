@@ -111,8 +111,13 @@ public final class BloodBody {
 
 	/** As above, keeping whose blood it was: a drop always comes from somebody else (see {@code BloodDrop}). */
 	public static void splash(Player player, double atY, double dropScale, BloodTint tint) {
+		splash(player, player.getX(), atY, player.getZ(), dropScale, tint);
+	}
+
+	/** As above, from where the drop actually struck, so its side of the body is known too. */
+	public static void splash(Player player, double atX, double atY, double atZ, double dropScale, BloodTint tint) {
 		double[] levels = stains.computeIfAbsent(player.getId(), id -> new double[BodyPart.values().length]);
-		int part = regionAtHeight(player, atY).ordinal();
+		int part = regionAt(player, atX, atY, atZ).ordinal();
 		double before = levels[part];
 		levels[part] = Math.min(Balance.BODY_STAIN_MAX,
 				before + Balance.BODY_STAIN_PER_DROP * (0.4 + 0.6 * dropScale));
@@ -128,20 +133,19 @@ public final class BloodBody {
 	 * bounding box rather than fixed offsets so it stays right while crawling or
 	 * swimming, when the whole body is barely half a block tall.
 	 */
-	private static BodyPart regionAtHeight(Player player, double atY) {
+	private static BodyPart regionAt(Player player, double atX, double atY, double atZ) {
 		var box = player.getBoundingBox();
 		double height = box.getYsize();
 		if (height <= 1.0e-6) {
 			return BodyPart.TORSO;
 		}
 		double fraction = Math.clamp((atY - box.minY) / height, 0.0, 1.0);
-		if (fraction > 0.82) {
-			return BodyPart.HEAD;
-		}
-		if (fraction > 0.44) {
-			return BodyPart.TORSO;
-		}
-		return BodyPart.LEFT_LEG;
+		// The body's own right, from the way its chest faces: facing south
+		// (yaw 0, +z) the right hand is to the west (-x).
+		double yaw = Math.toRadians(player.yBodyRot);
+		double toRight = -(atX - player.getX()) * Math.cos(yaw) - (atZ - player.getZ()) * Math.sin(yaw);
+		double halfWidth = Math.max(1.0e-6, box.getXsize() / 2.0);
+		return BodyStainMix.splashRegion(fraction, Math.clamp(toRight / halfWidth, -1.0, 1.0));
 	}
 
 	/**

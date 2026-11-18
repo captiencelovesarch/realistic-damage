@@ -19,6 +19,24 @@ class BodyStainMixTest {
 	}
 
 	@Test
+	void aDropAtChestHeightOffToOneSideIsOnThatArm() {
+		assertEquals(dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM, BodyStainMix.splashRegion(0.6, 0.8));
+		assertEquals(dev.captience.realisticdamage.body.BodyPart.LEFT_ARM, BodyStainMix.splashRegion(0.6, -0.8));
+		assertEquals(dev.captience.realisticdamage.body.BodyPart.TORSO, BodyStainMix.splashRegion(0.6, 0.1));
+	}
+
+	@Test
+	void aDropAtLegHeightIsOnTheLegOfItsOwnSide() {
+		assertEquals(dev.captience.realisticdamage.body.BodyPart.RIGHT_LEG, BodyStainMix.splashRegion(0.2, 0.3));
+		assertEquals(dev.captience.realisticdamage.body.BodyPart.LEFT_LEG, BodyStainMix.splashRegion(0.2, -0.3));
+	}
+
+	@Test
+	void theHeadIsTheHeadWhicheverSide() {
+		assertEquals(dev.captience.realisticdamage.body.BodyPart.HEAD, BodyStainMix.splashRegion(0.9, 0.9));
+	}
+
+	@Test
 	void noForeignBloodNeverShows() {
 		assertFalse(BodyStainMix.foreignShows(0.5, 0.0));
 		assertFalse(BodyStainMix.foreignShows(0.0, 0.0));
