@@ -52,4 +52,34 @@ class BodyStainMixTest {
 	void ownBleedingOnTopDoesNotAddToTheForeignShare() {
 		assertEquals(0.3, BodyStainMix.foreignAfter(0.3, 0.4, 0.9), 1.0e-9);
 	}
+
+	@org.junit.jupiter.api.Test
+	void waterRinsesOnlyWhatItReaches() {
+		var legs = dev.captience.realisticdamage.body.BodyPart.LEFT_LEG;
+		var chest = dev.captience.realisticdamage.body.BodyPart.TORSO;
+		var arm = dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM;
+		var head = dev.captience.realisticdamage.body.BodyPart.HEAD;
+		double water = dev.captience.realisticdamage.config.Balance.BODY_STAIN_WASH_WATER;
+		// Dry and under a roof: nothing but the slow drying.
+		org.junit.jupiter.api.Assertions.assertEquals(0.0, BodyStainMix.washPerSecond(chest, 0.0, false));
+		// Wading to the waist: the legs rinse, the chest and head do not.
+		org.junit.jupiter.api.Assertions.assertEquals(water, BodyStainMix.washPerSecond(legs, 0.45, false));
+		org.junit.jupiter.api.Assertions.assertEquals(0.0, BodyStainMix.washPerSecond(chest, 0.45, false));
+		org.junit.jupiter.api.Assertions.assertEquals(0.0, BodyStainMix.washPerSecond(head, 0.45, false));
+		// Up to the neck: everything but the head.
+		org.junit.jupiter.api.Assertions.assertEquals(water, BodyStainMix.washPerSecond(arm, 0.8, false));
+		org.junit.jupiter.api.Assertions.assertEquals(0.0, BodyStainMix.washPerSecond(head, 0.8, false));
+		// Under: all of it.
+		org.junit.jupiter.api.Assertions.assertEquals(water, BodyStainMix.washPerSecond(head, 1.0, false));
+	}
+
+	@org.junit.jupiter.api.Test
+	void rainReachesEverythingButSlowly() {
+		double rain = dev.captience.realisticdamage.config.Balance.BODY_STAIN_WASH_RAIN;
+		for (var part : dev.captience.realisticdamage.body.BodyPart.values()) {
+			org.junit.jupiter.api.Assertions.assertEquals(rain, BodyStainMix.washPerSecond(part, 0.0, true));
+		}
+		org.junit.jupiter.api.Assertions.assertTrue(
+				rain < dev.captience.realisticdamage.config.Balance.BODY_STAIN_WASH_WATER);
+	}
 }

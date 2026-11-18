@@ -48,6 +48,32 @@ public final class BodyStainMix {
 	/** Past this share of the half-width a chest-high drop is on an arm: the chest is the middle half of the body. */
 	static final double ARM_FROM = 0.5;
 
+	/**
+	 * What water takes off a region's stain each second (2.0), on top of its
+	 * slow drying. Water only rinses what it reaches: wading cleans the legs
+	 * and leaves a bloody chest, swimming cleans everything, and rain falls on
+	 * all of it but slowly.
+	 *
+	 * @param waterLine how far up the body the water comes: 0 dry, 1 over the head
+	 * @param rain      whether rain is falling on the body
+	 */
+	public static double washPerSecond(dev.captience.realisticdamage.body.BodyPart part, double waterLine,
+			boolean rain) {
+		if (waterLine > middle(part)) {
+			return dev.captience.realisticdamage.config.Balance.BODY_STAIN_WASH_WATER;
+		}
+		return rain ? dev.captience.realisticdamage.config.Balance.BODY_STAIN_WASH_RAIN : 0.0;
+	}
+
+	/** Where the middle of a region sits, 0 at the feet to 1 at the crown: the bands {@link #splashRegion} uses. */
+	static double middle(dev.captience.realisticdamage.body.BodyPart part) {
+		return switch (part) {
+			case HEAD -> 0.91;
+			case LEFT_LEG, RIGHT_LEG -> 0.22;
+			default -> 0.63;
+		};
+	}
+
 	/** True when the stain on a region reads as somebody else's blood. */
 	public static boolean foreignShows(double level, double foreign) {
 		return foreign > 0.0 && foreign > level * 0.5;
