@@ -1,257 +1,205 @@
+<div align="center">
+
+<img src="docs/images/icon.png" width="96" alt="Realistic Damage icon: a cracked heart and a drop of blood">
+
 # Realistic Damage
 
 **Minecraft, but damage is cooler.**
 
-Vanilla damage is binary: a number goes down, you eat, the number goes back up. Realistic
-Damage adds a physical layer underneath — where you got hit, how badly that part of you
-works now, whether you're bleeding, and whether you can stay conscious — while leaving the
-vanilla heart bar completely in charge of life and death.
+![Fabric](https://img.shields.io/badge/loader-Fabric-dbd0b4)
+![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-3c8527)
+![Java 25](https://img.shields.io/badge/Java-25-e76f00)
+![Status: alpha](https://img.shields.io/badge/status-2.0%20alpha-b3261e)
+![License: CC0-1.0](https://img.shields.io/badge/license-CC0--1.0-lightgrey)
 
-Fabric · Minecraft 26.2 · Java 25
+</div>
+
+![A wounded player on a beach, leaving a trail of blood behind them](docs/images/hero.jpg)
+
+Vanilla damage is a number going down. Realistic Damage adds a body underneath it: where
+you got hit, how badly that part of you works now, whether you're bleeding, and whether
+you can stay conscious. The vanilla heart bar stays completely in charge of life and death.
 
 > "I survived the fall, but both legs are wrecked."
+>
 > "I still had seven hearts, but those arrows made me black out."
+>
 > "The creeper didn't kill me, but I was concussed and could barely fight."
 
-## What it adds
+**Contents:** [What it looks like](#what-it-looks-like) ·
+[What it does](#what-it-does) ·
+[Status](#status) ·
+[Code tour](#code-tour) ·
+[Building and testing](#building-and-testing) ·
+[Server settings](#server-settings) ·
+[Commands](#admin--debug-commands) ·
+[Docs map](#docs-map)
 
-**Six body regions** — head, torso, both arms, both legs — each with hidden condition that
-degrades through `Healthy → Hurt → Injured → Critical → Disabled`. A hurt arm mines and
-fights slower; hurt legs slow you down and eventually cost you your sprint. Nothing soaks
-damage that would otherwise hit your hearts.
+## What it looks like
 
-**Real hit location.** Arrows use their actual impact point; melee reconstructs the
-attacker's swing ray. What you hit is what you damage — including left versus right.
-Headshots deal no bonus heart damage; their advantage is that heads run consciousness.
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/bleeding.jpg" alt="A player standing in a pool of their own blood"><br>
+      <b>Blood you can see.</b> Drops fall, land and mark what they hit.
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/fading.jpg" alt="The screen washed out and tinted as the player loses blood"><br>
+      <b>Going under is a slide.</b> Colour drains, the view warps, sound dulls.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/body-readout.jpg" alt="The inventory's player box showing a broken, bleeding left arm"><br>
+      <b>The body readout</b> lives in the inventory's own player box.
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/mobs.jpg" alt="An iron golem, cow, spider, slime, enderman and chicken, each bleeding its own colour"><br>
+      <b>Mobs have bodies too,</b> and bleed in their own colour.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/ragdoll.jpg" alt="A dead player lying sprawled as a ragdoll"><br>
+      <b>Deaths that look like deaths.</b> Bodies stumble, fall and stay.
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/bloodied.jpg" alt="A player holding a bloodied sword among fallen zombies"><br>
+      <b>A fight leaves marks:</b> on the ground, on you, on the blade.
+    </td>
+  </tr>
+</table>
 
-**Deterministic injuries.** No fracture rolls, ever. A mace or an iron golem breaks a
-healthy limb outright; swords and arrows only break one that's already critical. Cuts and
-punctures bleed, blunt trauma doesn't. Identical hits always produce identical outcomes.
+## What it does
 
-**Blood and Consciousness** — two hidden meters. Bleeding drains blood; low blood starts
-costing hearts and pulls you toward blacking out. Head trauma can knock you unconscious
-with most of your hearts intact. You wake up when you stabilize.
+- **Six body regions.** Head, torso, both arms and both legs each wear down from Healthy
+  to Disabled. A hurt arm mines and fights slower; hurt legs cost you your sprint.
+- **Real hit location.** Arrows use their actual impact point and melee traces the
+  attacker's swing, left versus right included.
+- **Deterministic injuries.** No fracture rolls, ever. Identical hits produce identical
+  outcomes.
+- **Blood and Consciousness.** Two hidden meters, only ever named by band ("heavy loss",
+  "fading"), never shown as numbers.
+- **Limbs can be lost,** heads included. Stumps show on the model and in first person,
+  and the limb lands in the world.
+- **Falls land like falls.** Severity comes from the drop, not from what your armour let
+  through. Necks can break; whiplash lingers.
+- **Afflictions.** Graded concussions, hypoxia, blast deafness, lost grip, adrenaline and
+  its crash.
+- **Every mob has a body.** All vanilla mobs take regional trauma through one of fourteen
+  body plans, picked by data tag. Blood colour is a tag too.
+- **Active ragdolls.** A small physics simulation in plain Java drives the vanilla model:
+  bodies stagger a few steps and go over instead of tipping like a plank.
+- **Rescue.** Drag a downed player, press a wound shut, feed someone who can't use their
+  hands.
+- **Food is the cure** in the core mod. The optional **field kit** (about forty items in
+  two switchable halves, Weapons and Medicine, both off by default) is the only place
+  bandages and splints exist.
+- **Everything sensory has a slider,** and one button turns it all off.
 
-**Going under is a slide, not a switch.** Near the bottom your hands stop obeying: swinging
-and mining fall off a cliff and eventually refuse outright, your feet start wandering off
-the direction you pointed them, and you black out in brief episodes that come more often
-and last longer the further down you are. Eating still always works — food is the cure —
-but at the bottom a loaf takes eight seconds you may not have. A concussion brings all of
-it forward.
+The long version, written for players, is in [docs/PLAYER_GUIDE.md](docs/PLAYER_GUIDE.md).
 
-**Falls land like falls.** Severity comes from how far you dropped, not from what your
-armour let through, so a long drop in good gear still shatters the leg you landed on and
-still rattles your skull. Hard landings put you on the ground for a moment. The leading
-foot takes the worse of it. Hay, leaves and snow genuinely cushion; stone and iron don't.
-And the lethal tail is compressed — you survive drops that used to kill you, concussed and
-limping, which is usually worse.
+## Status
 
-**Limb destruction** (Arcade preset, on by default). Keep hitting a limb that is already
-Disabled and it is gone for good — and an extreme TNT or creeper blast can take the nearest
-limb outright, after the same localized armour check as every other injury. A destroyed arm
-cannot use that hand and works one-handed at a heavy penalty, destroyed legs are a permanent
-limp, losing both means you crawl, and a destroyed head or torso kills. Destroyed limbs
-vanish from your body in first and third person; the stump keeps bleeding, and the loss
-leaves a larger mark on the world than an ordinary wound. Turn it off with
-`/rdmg preset grounded`.
+This is an **alpha**. It gets played and tested constantly, and things still change under it.
 
-**A body keeps the receipt.** Once a limb has broken or a region has been destroyed, its
-scar stays in the body panel and on the player model, through healing and even through
-death. Scars are presentation only: mobs, healing and impairment never read them, and the
-accessibility screen can hide them.
+| | Where it stands |
+|---|---|
+| This branch | 2.0 alpha, **Minecraft 26.2**, Fabric Loader 0.19.3, Fabric API 0.158.0+26.2, Java 25 |
+| Last tagged release | `v1.6.2` (Minecraft 26.2) |
+| Runs on | Client and server. A Fabric server needs it, and so does everyone joining it |
+| VR | Built for Vivecraft: effects are drawn per eye, lost arms show as stumps, controllers get haptics |
+| Minecraft 26.3 | Ported on a separate line, not merged here yet |
 
-**Long-term injuries** are an optional hardcore rule, off by default. A break, a region
-driven to zero or a limb lost lowers that region's best possible recovery by one familiar
-state band. Food and time still do all the healing, but they stop at that ceiling; sleep and
-totems cannot erase it, and while the mode remains enabled it follows the character through
-death. The panel shows the ceiling as a band, never a hidden number.
+## Code tour
 
-**Predators pick off the wounded.** Hostiles prefer a player whose injury is actually
-visible: down first, then a missing or broken leg, then a visible limp, then running blood.
-They do not roll for it, do not smell cosmetic scars or hidden meters, and keep a grudge
-long enough that a scratch cannot peel them off the player who just hit them. The same limb
-rungs drive both the mob's choice and the pose you see on the player model.
+About 42,000 lines of server and shared code, 32,000 of client code and 11,000 of tests.
+If you are here to read it, this is the short way in.
 
-**Rescue.** Sneak-use a downed player to drag them out of the fire — half speed, both
-hands full. Hold use with empty hands to press a wound shut and slow the bleeding, on a
-teammate or on yourself (pressing your own pins you in place: stop the bleeding or keep
-fighting, not both). Feed food to someone who can't use their own hands. No bandages
-involved in any of it — pressure only buys time, food is still what fixes you.
+### The idea in one paragraph
 
-**Food is the cure.** No bandages, no splints, no medical crafting. Eating, natural
-regeneration, sleeping, golden apples and healing potions repair everything — the danger
-is whether you have enough food and enough time before things spiral.
+The server owns everything. Each living thing with a body carries a mutable, persistent
+`RealisticDamageData` attachment that is **never** sent to clients. A second, immutable
+and quantized `BodySnapshot` attachment is derived from it, deduplicated by equality and
+synced to every client tracking that entity. One-shot moments (an impact, a landing, a
+sound, a death, a corpse) travel as small custom payloads. The client only presents:
+blood, poses, camera, sound and HUD are all computed locally from the snapshot.
 
-## The field kit (2.0, optional)
+### The damage pipeline
 
-2.0 adds about forty survival items in two halves, each behind its own server switch.
-**Both start off**, and with both off everything above holds exactly: food and time are
-the only cure.
+```
+vanilla damage happens (armour, enchantments, resistance, absorption: all vanilla)
+  └─ AFTER_DAMAGE: post-mitigation amount, source, blocked flag
+       ├─ classify → DamageCategory + DamageProfile       damage/DamageClassifier
+       ├─ locate   → projectile point / melee ray / env   damage/BodyHitResolver
+       ├─ trauma   → condition loss, break check,         damage/TraumaPipeline
+       │             localized armour, limb shock
+       ├─ wounds   → deterministic, by threshold          systems/BleedingSystem
+       └─ mind     → head trauma, blunt, blast, falls     systems/ConsciousnessSystem
+```
 
-- **Weapons:** anything that hurts someone, or protects you from being hurt. Brewed
-  poisons (Haemorrhage, Sedation, Adrenaline), trick arrows, blowgun darts, bolas, nets,
-  caltrops, the bear trap, the blackjack, flash bangs, blood bait, and the gas mask and
-  padding that answer them. They hit players exactly as hard as mobs, so they change PvP.
-- **Medicine:** anything that treats, supports or reads an injury that already happened.
-  Bandages, tourniquets, cauterizing, needle and thread, blood bags, splints, slings,
-  smelling salts, the stethoscope, Numbing, coffee, spirits, crutches and prosthetics.
+Body parts never soak vanilla damage. `AFTER_DAMAGE` does not fire for a killing blow, so
+anything that reacts to the lethal hit hangs off `ALLOW_DEATH` and is confirmed in
+`AFTER_DEATH`.
 
-The first time the game starts with 2.0 it asks about both. After that they live on the
-**World rules** page (the mod's settings, from Mod Menu or **K**), which shows every
-server setting: in singleplayer you change them there directly; on a server an
-operator's changes go through `/rdmg config`, and everyone else sees them read-only.
+### Where things live
 
-Off means off, without a restart: a switched-off half can't be crafted or brewed, isn't
-in loot, trades or the creative tab, anything already in a chest does nothing and says
-why, and its effects wear off at once. Flip it back and it all returns. The items arrive
-over the 2.0 alphas; the **Field kit** creative tab shows whatever exists so far.
+Everything is under `dev.captience.realisticdamage`. The common source set is `src/main`,
+the client is `src/client`, unit tests are `src/test`.
 
-**The brews** (phase 3): start from an awkward potion. Redstone makes them last longer,
-glowstone makes them stronger where there's a level to raise, and gunpowder and dragon's
-breath make splash and lingering potions as usual. Eight arrows round one drinkable potion
-make eight tipped arrows, no dragon's breath needed. Milk clears them, but what they already
-did stays done.
+| Package | What is in it |
+|---|---|
+| `body/` | The data model: `BodyPart`, `BodyState`, `RealisticDamageData`, `BleedWound`, `BodyPlan` (the fourteen mob layouts), `Vitals` (band wording shared by server and client) |
+| `damage/` | The pipeline above, plus the special cases: falls, breaks, destruction, decapitation, broken necks, lethal blasts, corpses, knockdowns |
+| `systems/` | What ticks: bleeding, consciousness, concussion, healing, impairment, adrenaline, rescue, mob anatomy. Also the pure maths (`*Math`, `Cardio`, `BloodFlow`), kept free of Minecraft types so it unit-tests without a game |
+| `net/` | `BodySnapshot` (the versioned wire record) and the one-shot payloads |
+| `ragdoll/` | The ragdoll simulation: an XPBD solver in `physics/`, the six-body humanoid rig, muscles, the stepping and stumbling controllers |
+| `fieldkit/` | The optional items, behind their two switches: `brew/`, `medicine/`, the gating (`Gate`, `Half`, `SwitchedRecipe`) |
+| `config/` | `ServerConfig` (the settings table below) and `Balance` (every tuning constant, in one file) |
+| `command/` | `/rdmg`. Its `config` subcommand is generated by reflection from `ServerConfig`, so a new setting shows up without wiring |
+| `api/` | The small integration API ([API.md](API.md)) |
+| `mixin/` | Server-side mixins. Client ones are in `client/mixin/`, Vivecraft-only ones load through their own config |
+| `gametest/` | Server game tests (in `src/main`, registered in `fabric.mod.json`) |
+| `client/` | Presentation only: blood (`Blood*`), the HUD and inventory readout (`BodyHud`, `BodyInspector`), consciousness and concussion effects, camera (`CameraMotion`, `DeathCamera`), ragdoll drawing (`RemoteCorpses`, `RagdollCorpse`), audio (`audio/SoundDirector`), settings (`ClientEffectsConfig`) |
 
-- **Haemorrhage** (Weapons; sweet berries): the blood stops clotting. A lighter hit opens a
-  bleed, wounds open a step worse, they bleed past the usual cap, and a hand pressed on them
-  holds back half as much. An arrow of it opens a bleed where it lands, on anything that
-  bleeds.
-- **Sedation** (Weapons; poppy): every dose builds. Your eyelids get heavy and you slow down,
-  then you stumble and nod off, then you're out, and enough of it stops your breathing. One
-  arrow drops a zombie or a player; a ravager takes five. It wears off with time. Drunk, it's
-  the **Sleeping Draught**: you sleep where you stand and wake healed like a night in a bed,
-  lying on the floor where everything hunts first. Sneak-use an unconscious mob with an
-  empty hand to drag it. Bosses and golems shrug it off.
-- **Adrenaline** (Weapons; glow berries): the last-two-hearts surge, now, for as long as it
-  lasts, then the usual crash. It heals nothing, your racing heart makes open wounds bleed
-  harder, and a second dose is refused until your heart has recovered from the last surge.
-- **Numbing** (Medicine; packed ice): for a minute you feel nothing. No limp, no flinch, no
-  pain blur, and your body diagram goes pale because you can't feel what's wrong. Every
-  injury is still there: sprinting on a broken leg wears it down, and so does swinging a
-  broken arm.
+Good places to start: `RealisticDamage.java` (what gets registered),
+`damage/DamageHooks.java` and `damage/TraumaPipeline.java` (a hit, end to end),
+`systems/TickDispatcher.java` (what runs every tick), `net/BodySnapshot.java` (exactly
+what a client is told), `config/Balance.java` (the numbers).
 
-**The bleeding kit** (Medicine, phase 4). Hold use to treat yourself, or right-click
-someone with it and hold to treat them; each lands on the worst wound it can help.
+### Rules the code holds itself to
 
-- **Bandage** (2 paper + string makes 3; about 3 s): slows a minor or moderate wound. A
-  moderate one soaks it through in under a minute and it needs changing; a spurting
-  (arterial) wound it can't hold at all.
-- **Tourniquet** (leather + stick + string; 2 s): stops a limb's bleed dead, but the limb
-  is Disabled while it's on, and after five minutes it dies. Sneak and use with an empty
-  hand to take it off (in the air for your own, on someone for theirs).
-- **Cauterizing:** sneak and use flint and steel or a fire charge in the air (or on
-  someone). The worst bleed stops at once, the pain can knock you out, and it leaves a
-  burn.
-- **Needle and Thread** (iron nugget + string; 10 s, four wounds): closes the worst wound
-  for good. Getting hurt, either of you, spoils the stitching.
-- **Blood Bag:** sneak and use a glass bottle in the air to bank your own blood, or on a
-  mob or someone who's out cold; use the bag (5 s) to give the blood back. It keeps three
-  days.
+- **No randomness in outcomes.** Where variety is wanted (which way a body falls), it is
+  seeded from stable facts like an entity id.
+- **Blood and Consciousness are never shown as figures,** anywhere, including with
+  "Exact Numbers" on.
+- **Data over code.** Which mobs have bodies, their body plan, their blood colour and how
+  a damage type is classified are all tags (`data/realisticdamage/tags/`), so a datapack
+  can change them.
+- **Nothing that deletes itself.** Blood on an item is stored in vanilla `custom_data`,
+  not a mod component, so removing the mod never deletes the item.
+- **Injury sounds ship as recipes or synthesis,** never as samples. The Arcade set layers
+  and re-pitches vanilla sounds at run time; the Grounded set is synthesised by
+  `tools/audio/`.
 
-**Bones, head and senses** (Medicine, phase 4). The same hold-to-use.
+## Building and testing
 
-- **Splint** (2 sticks + string; 4 s): goes on the worst broken arm or leg and halves what
-  the break costs you (the limp, the slow swing, the stalled bow). It stays on until the
-  bone has knit. With long-term injuries on, a limb that knits in a splint keeps its full
-  strength.
-- **Sling** (any wool + string; 3 s): holds a broken arm still. Its hand can't use
-  anything, and if it's your main arm you can't swing or dig either. In exchange it heals
-  twice as fast. It comes back to you when the arm has knit; sneak and use with an empty
-  hand to take it out sooner.
-- **Smelling Salts** (glass bottle + bone meal; 1 s): bring round someone who was knocked
-  out or fainted. Not someone out from blood loss, from lack of air, or from Sedation.
-- **Stethoscope** (copper ingot + string): hold use on someone, or in the air for
-  yourself, and hear their heart: fast, weak or skipping. Only you hear it, and it's only
-  sound.
-- **Tinted Goggles** (2 tinted glass + leather): worn on the head instead of a helmet
-  (they're no protection). Bright light stops making a concussion worse, and the world
-  looks darker through them.
+Needs **Java 25**.
 
-**Food and drink** (Medicine, phase 4).
+```sh
+./gradlew build              # the jar, in build/libs
+./gradlew test               # unit tests (pure maths and codecs)
+./gradlew runGametest        # server game tests, headless
+./gradlew runClient          # a dev client
+./gradlew runClientGametest  # client game tests: boots worlds and takes screenshots
+```
 
-- **Coffee** (cocoa beans + water bottle + sugar; drunk, the bottle comes back):
-  Caffeinated for 3 minutes. Sedation takes you a stage less far (one dart leaves you
-  stumbling, not out), and you don't nod off in microsleeps. Your heart runs faster, so
-  open wounds bleed more.
-- **Spirits** (brew a potato into a water bottle): Tipsy for 2 minutes. A limp and a sore
-  arm slow you half as much, the world doubles as it moves, and wounds bleed a little more.
-- **Blood Sausage** (raw porkchop + blood bag makes a raw one, and the bag's bottle comes
-  back; cook it like pork): a cooked porkchop's worth of food, and 20 more Blood than any
-  other food that size. A bag that has gone off makes nothing.
-- **Iron Tonic** (brew an iron nugget into an awkward potion; redstone makes it last 8
-  minutes): Blood comes back twice as fast for 3 minutes. Like all Blood coming back, it
-  waits until you've stopped bleeding.
+`runClientGametest` opens a real game window. Run it under `xvfb-run` if you don't want
+it on your screen.
 
-## Playing with it
-
-Injuries show on a small body diagram that fades in when something's wrong. States and
-injuries are shown by shape and color; exact numbers stay hidden. Action-bar messages call
-out the moments that matter ("Your left leg breaks!", "You're bleeding heavily!").
-
-Open your inventory and the box that normally holds your turning model shows your body
-instead: a paper doll of your own skin with what is wrong drawn on it (blood, a grey cast
-and a crack on a broken limb, a stump where one is gone, a frame round each region in the
-colour of its state). Hover a region for the detail. The small button in the corner of the
-box switches to an x-ray on Minecraft's own skeleton, or back to the ordinary model. Turn on
-**Exact Numbers** and it will also show condition figures there — but only there, and
-Blood and Consciousness are still only ever named ("heavy loss", "fading"), never
-numbered. Being surprised by your own blood level is the point of hiding it.
-
-As consciousness fails the world genuinely changes rather than being overlaid: colour
-drains out of it, the view warps, doubles and blurs — the frames you just saw trail behind
-the one you're seeing — your aim goes slippery and slow, the horizon starts to tilt and
-your head nods, and the world's audio is low-passed into a dull murmur behind a ringing
-tone and a heartbeat. Being hit moves the picture as well as the crosshair: a blow rolls
-and shoves the view and it springs back, a landing drops it, a blast shakes it. What the screen does tells you *which* thing is wrong — the colour drains for
-blood loss and the world warps for head trauma — and how a blow looked tells you what
-landed: a cut throws blood across the camera, a puncture pinches the view shut, a club
-leaves it ringing and doubled, a blast whites everything out and takes your hearing with
-it for several seconds.
-
-Your heart is not a metronome. It races when you're bleeding and slows to something heavy
-and enormous when your head is going, and once you're in real trouble it starts to skip —
-an early weak beat, a pause too long, then a thump that lands harder than any of them.
-
-Bleeding is something you can see. Drops fall, land, and mark whatever they hit, so you
-leave a trail behind you and a pool under you when you stop; a bad wound spurts in time
-with your pulse; blood soaks into the limb it came out of and dries there; and it gets on
-the camera, which is the part you can't miss. Every layer of it has its own slider, and
-none of it is on the HUD.
-
-Losing a limb leaves a stump — on your model, and raised into view in first person — and
-the limb itself, thrown along the blow, lying where it lands and bleeding out for most of a
-minute before it's gone. You can walk through it, mobs ignore it, and fire burns it away.
-
-Mobs have bodies too. Zombies, skeletons, piglins and the rest of the humanoid families take
-the same regional trauma you do: they bleed and bleed out, limp on a broken leg, lose limbs
-to a blow or a blast, stop swinging with no arms and stop shooting without a drawing arm,
-lose the thread when concussed, and go down at zero consciousness. They mend on time alone.
-Skeletons break and lose limbs but never bleed, the undead bleed dark, and a concussed
-skeleton shoots wide. Which mobs, and what colour they bleed, are data tags, so a pack can
-add its own.
-
-Breaking, losing a limb and going down each have their own synthesised audio, in a muted
-set that sits inside Minecraft's palette and a visceral set that doesn't. Your own
-injuries are close and loud; a teammate's carry from where they're standing, quieter —
-useful for knowing someone across the cave is in trouble.
-
-Press **K** (rebindable) or use Mod Menu for accessibility settings. Every one of those
-effects has its own slider and can be turned off individually without disabling
-unconsciousness itself, and there's a one-click "turn off all sensory effects" button.
-Slow aim and sloppy aim are separate sliders (**Look Slowdown** and **Look Drift**), so
-you can have one without the other, and the camera effects that never touch your aim
-(**Head Sway**, **Impact Shock**) are separate from the ones that do (**Camera Drift**).
-Two presets: **Arcade** (limb destruction, readable effects) and **Grounded** (no
-destruction, full blackout, camera drift, everything at full strength).
-
-**Something to hit:** vanilla's mannequin (`/summon minecraft:mannequin`) has a full
-body: it bleeds, breaks and loses limbs like a player. (It replaced the mod's own
-practice dummy in 1.7.)
-
-**Deaths, as everyone else sees them:** a blast that kills you takes limbs with it, the
-nearest first and all four point-blank, and other players see the body thrown, tumbling
-and landing flat with a thud, limbs flailing, instead of vanilla's stiff tip onto its
-side. It follows the **Death Camera** toggle.
+A clean checkout has no pain screams. They are imported locally from an owned copy of
+Team Fortress 2 (`tools/import_tf2_screams.py`) and are never committed; the mod builds
+and runs without them.
 
 ## Server settings
 
@@ -322,38 +270,30 @@ always, and any mob with anatomy (`@e[type=zombie,limit=1,sort=nearest]`).
 
 ## For mod authors
 
-`API.md` covers integration. The short version: add your damage type to a
-`realisticdamage:ballistic` (or `slash`, `blunt`, ...) tag in a datapack and it's
-classified, with no dependency in either direction. There's a small API for the cases a
-tag can't answer — runtime-varying categories, and supplying an exact hit point for
+[API.md](API.md) covers integration. The short version: add your damage type to a
+`realisticdamage:ballistic` (or `slash`, `blunt`, ...) tag in a datapack and it is
+classified, with no dependency in either direction. There is a small API for the cases a
+tag can't answer: categories that vary at run time, and supplying an exact hit point for
 hitscan weapons that have no projectile to reconstruct from.
 
-## Notes
+## Docs map
 
-State persists across logout, dimension changes and restarts — logging out is not a cure.
-Death resets active injury; scars remain, and long-term ceilings remain while that server
-rule is enabled. Creative and Spectator are ignored entirely.
+| File | What it is |
+|---|---|
+| [docs/PLAYER_GUIDE.md](docs/PLAYER_GUIDE.md) | Every feature, in full, written for players |
+| [DESIGN.md](DESIGN.md) | Architecture and the balance tables |
+| [API.md](API.md) | Integration for other mods and datapacks |
+| [ROADMAP.md](ROADMAP.md) | Release by release: what shipped and what is next |
+| [2.0_PLAN.md](2.0_PLAN.md) | The 2.0 plan: heads and necks, the field kit |
+| [RAGDOLL_PLAN.md](RAGDOLL_PLAN.md), [IK_PLAN.md](IK_PLAN.md) | The ragdoll and stumbling-death designs, with what each phase taught |
+| [AUDIO_PLAN.md](AUDIO_PLAN.md) | The two sound sets and the sound director |
+| `TESTING_*.md`, `RAGDOLL_TESTING.md`, `AUDIO_TESTING.md` | Playtest checklists, newest on top. Working notes, not documentation |
+| `tools/` | The generators for textures, the icon and the synthesised sounds |
+| `publish/` | The store listing's text and gallery |
 
-## Building
+## License and credits
 
-```sh
-./gradlew build          # jar in build/libs
-./gradlew test           # pure-math unit tests
-./gradlew runGametest    # in-server behavior tests
-./gradlew runClient          # dev client
-./gradlew runClientGametest  # boots a world and screenshots the UI
-```
+[CC0 1.0](LICENSE): public domain. Take what is useful.
 
-## What's next
-
-`ROADMAP.md` covers what comes after Consequence: anatomy for mobs. `2.0_PLAN.md` covers
-2.0: heads and necks, and the switchable field kit. Medicine in the core mod is still
-explicitly not planned; it lives behind the Medicine switch.
-
-## Design
-
-`DESIGN.md` holds the full architecture and the balance tables. Limb destruction was pulled
-forward into 1.0 during playtesting; medical items stay out of the core mod and live behind
-the field kit's Medicine switch.
-Damage classification is tag- and component-driven so a future compatibility layer (e.g.
-firearms mods with exact impact coordinates) can feed the same pipeline.
+Designed, directed and playtested by captience. The code, generated art and text were
+written with [Claude Code](https://claude.com/claude-code).

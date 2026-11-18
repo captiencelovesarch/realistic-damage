@@ -47,3 +47,6 @@ replay_*.log
 # TF2 pain lines, imported locally from an owned TF2 install (tools/import_tf2_screams.py).
 # Valve audio never enters version control; a clean checkout builds without screams.
 src/main/resources/assets/realisticdamage/sounds/scream/
+
+# loom caches
+.fabric/
