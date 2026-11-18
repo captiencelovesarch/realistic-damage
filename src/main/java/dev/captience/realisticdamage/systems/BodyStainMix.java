@@ -15,6 +15,39 @@ package dev.captience.realisticdamage.systems;
 public final class BodyStainMix {
 	private BodyStainMix() {}
 
+	/**
+	 * Which region a drop landing on a body stains.
+	 *
+	 * <p>By height alone there are only three answers - head, chest, legs - and
+	 * for a long time that was the whole rule, with "legs" meaning the left one:
+	 * a body drenched in somebody else's blood had clean arms and one clean leg.
+	 * The side the drop struck on settles the rest. A body's arms hang outside
+	 * its chest, so a drop at chest height that lands off to one side is on that
+	 * arm; a drop at leg height is on the leg of the side it landed on.
+	 *
+	 * @param height  0 at the feet, 1 at the top of the head
+	 * @param toRight how far to the body's own right the drop landed, as a share
+	 *                of half its width: -1 the left edge, 0 dead centre, 1 the right edge
+	 */
+	public static dev.captience.realisticdamage.body.BodyPart splashRegion(double height, double toRight) {
+		if (height > 0.82) {
+			return dev.captience.realisticdamage.body.BodyPart.HEAD;
+		}
+		boolean right = toRight > 0.0;
+		if (height > 0.44) {
+			if (Math.abs(toRight) > ARM_FROM) {
+				return right ? dev.captience.realisticdamage.body.BodyPart.RIGHT_ARM
+						: dev.captience.realisticdamage.body.BodyPart.LEFT_ARM;
+			}
+			return dev.captience.realisticdamage.body.BodyPart.TORSO;
+		}
+		return right ? dev.captience.realisticdamage.body.BodyPart.RIGHT_LEG
+				: dev.captience.realisticdamage.body.BodyPart.LEFT_LEG;
+	}
+
+	/** Past this share of the half-width a chest-high drop is on an arm: the chest is the middle half of the body. */
+	static final double ARM_FROM = 0.5;
+
 	/** True when the stain on a region reads as somebody else's blood. */
 	public static boolean foreignShows(double level, double foreign) {
 		return foreign > 0.0 && foreign > level * 0.5;

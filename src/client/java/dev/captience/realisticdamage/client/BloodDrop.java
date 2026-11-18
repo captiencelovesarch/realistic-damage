@@ -267,7 +267,7 @@ public class BloodDrop extends SingleQuadParticle {
 				continue;
 			}
 			if (player.getBoundingBox().intersects(box)) {
-				BloodBody.splash(player, y, scale, tint);
+				BloodBody.splash(player, x, y, z, scale, tint);
 				// On you, and you are the one looking (2.0): if it landed high
 				// enough it is on the lens too, in its own colour.
 				if (player == net.minecraft.client.Minecraft.getInstance().player) {
